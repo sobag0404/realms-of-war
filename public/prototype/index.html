@@ -1,0 +1,2923 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Realms of War — Изометрический прототип</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#eee;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;display:flex;height:100vh}
+#game-area{flex:1;position:relative}
+canvas{display:block}
+#sidebar{width:280px;background:#0d1b2a;border-left:2px solid #1b2838;display:flex;flex-direction:column;overflow-y:auto}
+#sidebar h2{text-align:center;padding:10px;background:#1b2838;font-size:15px;letter-spacing:2px;color:#e0c97f}
+.section{padding:10px 14px;border-bottom:1px solid #1b2838}
+.section h3{color:#e94560;font-size:12px;margin-bottom:5px;text-transform:uppercase;letter-spacing:1px}
+.section p{font-size:11px;line-height:1.5;color:#8a9bb5}
+.section .val{color:#53d8fb;font-weight:bold}
+#minimap-container{padding:8px;text-align:center;border-bottom:1px solid #1b2838}
+#minimap{border:2px solid #1b2838;border-radius:3px;cursor:pointer}
+#unit-info .stats{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px}
+#unit-info .stat-label{color:#667;font-size:10px}
+#unit-info .stat-val{color:#53d8fb;font-size:11px;font-weight:bold}
+#actions{padding:10px 14px;display:flex;flex-direction:column;gap:5px}
+#actions button{padding:7px;border:none;border-radius:3px;cursor:pointer;font-size:12px;font-weight:bold;transition:all .2s}
+#btn-end-turn{background:#e94560;color:#fff}
+#btn-end-turn:hover{background:#ff6b81}
+#btn-attack{background:#f39c12;color:#fff}
+#btn-attack:hover{background:#f1c40f;color:#333}
+#btn-attack:disabled{background:#333;color:#666;cursor:not-allowed}
+#btn-build{background:#2ecc71;color:#fff}
+#btn-build:hover{background:#27ae60}
+#btn-build:disabled{background:#333;color:#666;cursor:not-allowed}
+#log{padding:8px 12px;flex:1;overflow-y:auto}
+#log h3{color:#e94560;font-size:12px;margin-bottom:4px}
+#log .entry{font-size:10px;padding:2px 0;border-bottom:1px solid #0d1b2a;color:#667}
+#log .entry.player{color:#53d8fb}
+#log .entry.enemy{color:#e94560}
+#log .entry.system{color:#f39c12}
+#topbar{position:absolute;top:0;left:0;right:280px;background:rgba(13,27,42,.95);padding:5px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1b2838;z-index:10;gap:10px;flex-wrap:wrap}
+#topbar .info{font-size:12px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+#topbar .info span{margin-right:4px;white-space:nowrap}
+.epoch{color:#e0c97f;font-weight:bold}.turn{color:#53d8fb;font-weight:bold}.gold{color:#ffd700}.food{color:#2ecc71}.wood{color:#8B6914}.stone{color:#9a9a9a}.pp-color{color:#f1c40f}.science-color{color:#00e5ff}
+.res-income{font-size:9px;color:#5a7;font-weight:normal;margin-left:1px}
+#research-display{color:#00e5ff;font-size:11px;font-style:italic}
+#phase-indicator{position:absolute;top:40px;left:50%;transform:translateX(-50%);z-index:11;font-size:13px;font-weight:bold;padding:4px 16px;border-radius:4px;pointer-events:none;display:none}
+#phase-indicator.enemy-turn{display:block;background:rgba(233,69,96,0.85);color:#fff;animation:phaseFlash 1s infinite}
+#phase-indicator.recruiting-phase{display:block;background:rgba(46,204,113,0.85);color:#fff}
+@keyframes phaseFlash{0%,100%{opacity:1}50%{opacity:0.6}}
+#gameover-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:100;align-items:center;justify-content:center;flex-direction:column}
+#gameover-overlay.visible{display:flex}
+#gameover-title{font-size:36px;letter-spacing:4px;margin-bottom:16px}
+#gameover-subtitle{font-size:16px;color:#8a9bb5;margin-bottom:24px}
+#gameover-stats{font-size:12px;color:#667;line-height:2}
+#btn-restart{margin-top:24px;background:#e0c97f;color:#0a0a1a;border:none;border-radius:4px;padding:10px 24px;cursor:pointer;font-size:14px;font-weight:bold;transition:all .2s}
+#btn-restart:hover{background:#f0d990;transform:scale(1.05)}
+#turn-toast{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:12;background:rgba(13,27,42,0.95);color:#e0c97f;font-size:13px;font-weight:bold;padding:8px 20px;border-radius:6px;border:1px solid #e0c97f;pointer-events:none;opacity:0;transition:opacity 0.5s}
+#turn-toast.show{opacity:1}
+#canvas-dim{position:absolute;inset:0;background:rgba(0,0,0,0.25);z-index:5;pointer-events:none;display:none}
+@media(max-width:1100px){#topbar .info span{font-size:10px;margin-right:2px}#topbar{padding:4px 8px}}
+#tooltip{position:absolute;background:rgba(13,27,42,.95);color:#c0c8d8;padding:6px 10px;border-radius:3px;font-size:10px;pointer-events:none;display:none;z-index:20;border:1px solid #e0c97f;max-width:220px;line-height:1.4}
+#loading{position:fixed;inset:0;background:#0a0a1a;display:flex;align-items:center;justify-content:center;z-index:100;flex-direction:column;gap:16px}
+#loading h1{color:#e0c97f;font-size:24px;letter-spacing:3px}
+#loading p{color:#8a9bb5;font-size:14px}
+#loading .bar{width:200px;height:4px;background:#1b2838;border-radius:2px;overflow:hidden}
+#loading .bar-fill{height:100%;background:#e0c97f;width:0%;transition:width .3s}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <h1>REALMS OF WAR</h1>
+  <p>Загрузка спрайтов...</p>
+  <div class="bar"><div class="bar-fill" id="load-bar"></div></div>
+</div>
+
+<div id="game-area">
+  <canvas id="canvas"></canvas>
+  <div id="topbar">
+    <div class="info" id="topbar-left">
+      <span class="epoch" id="epoch-display">◆ Эпоха I: Примитивы</span>
+      <span class="turn" id="turn-display">⚔ Ход: 1</span>
+    </div>
+    <div class="info" id="topbar-center">
+      <span id="research-display">🔬 Свободно — выберите технологию (T)</span>
+    </div>
+    <div class="info" id="topbar-right">
+      <span class="gold">💰<span id="gold-display">50</span><span class="res-income" id="gold-income"></span></span>
+      <span class="food">🌾<span id="food-display">30</span><span class="res-income" id="food-income"></span></span>
+      <span class="wood">🪵<span id="wood-display">20</span><span class="res-income" id="wood-income"></span></span>
+      <span class="stone">🪨<span id="stone-display">10</span><span class="res-income" id="stone-income"></span></span>
+      <span class="pp-color">⚡<span id="pp-display">0</span><span class="res-income" id="pp-income"></span></span>
+      <span class="science-color">🔬<span id="science-display">0</span>/ход</span>
+    </div>
+  </div>
+  <div id="phase-indicator"></div>
+  <div id="turn-toast"></div>
+  <div id="canvas-dim"></div>
+  <div id="tooltip"></div>
+</div>
+
+<div id="gameover-overlay">
+  <h1 id="gameover-title"></h1>
+  <p id="gameover-subtitle"></p>
+  <div id="gameover-stats"></div>
+  <button id="btn-restart">Начать заново</button>
+</div>
+
+<div id="tech-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:50">
+  <canvas id="tech-canvas"></canvas>
+  <div style="position:absolute;top:10px;right:20px;color:#8a9bb5;font-size:12px;cursor:pointer" id="tech-close">Закрыть (T / Esc)</div>
+</div>
+
+<div id="sidebar">
+  <h2>REALMS OF WAR</h2>
+  <div id="minimap-container"><canvas id="minimap" width="240" height="200"></canvas></div>
+  <div class="section" id="cell-info"><h3>Клетка</h3><p>Нажмите на клетку</p></div>
+  <div class="section" id="unit-info"><h3>Юнит</h3><p>Выберите юнит</p></div>
+  <div id="actions">
+    <button id="btn-attack" disabled>Атаковать</button>
+    <button id="btn-build" disabled>Строить</button>
+    <button id="btn-end-turn">Завершить ход</button>
+  </div>
+  <div id="log"><h3>Журнал</h3></div>
+</div>
+
+<script>
+// ============================================================
+// КОНФИГУРАЦИЯ ГЕКСАГОНАЛЬНОЙ СЕТКИ
+// ============================================================
+const HEX_SIZE = 30;
+const HEX_W = Math.sqrt(3) * HEX_SIZE;
+const HEX_H = 2 * HEX_SIZE;
+
+const COLS = 20, ROWS = 15;
+
+const TERRAIN_HEIGHT = { 0:8, 1:14, 2:40, 3:3, 4:5, 5:7, 6:20, 7:16 };
+const TERRAIN = { PLAINS:0, FOREST:1, MOUNTAIN:2, WATER:3, DESERT:4, SWAMP:5, HILLS:6, RUINS:7 };
+const T_NAMES = { 0:'Равнина',1:'Лес',2:'Гора',3:'Вода',4:'Пустыня',5:'Болото',6:'Холмы',7:'Руины' };
+const T_MOVE  = { 0:1,1:2,2:99,3:99,4:1,5:2,6:1,7:1 };
+const T_DEF   = { 0:0,1:3,2:99,3:0,4:-1,5:-2,6:2,7:1 };
+
+const T_COLORS = {
+  0: { top:'#6aad55', left:'#3d7a30', right:'#4e9040' },
+  1: { top:'#1a7520', left:'#0e4a0a', right:'#145c10' },
+  2: { top:'#8a8a9a', left:'#505060', right:'#686878' },
+  3: { top:'#1868c8', left:'#0a3a78', right:'#104a98' },
+  4: { top:'#d8b840', left:'#a88020', right:'#c09830' },
+  5: { top:'#4a6838', left:'#283820', right:'#384a2a' },
+  6: { top:'#a89060', left:'#706040', right:'#887048' },
+  7: { top:'#b050c0', left:'#682888', right:'#8838a0' },
+};
+
+// Декорации — рисуем на гексах
+const T_DECOR = {
+  0: [], // равнина — чистая
+  1: [{type:'tree',ox:-8,oy:-4,s:1.0},{type:'tree',ox:6,oy:-2,s:0.8},{type:'tree',ox:0,oy:2,s:0.7}],
+  2: [{type:'rock',ox:-4,oy:-6,s:1.2},{type:'rock',ox:5,oy:2,s:0.9}],
+  3: [{type:'wave',ox:0,oy:0}],
+  4: [{type:'cactus',ox:-3,oy:0},{type:'cactus',ox:6,oy:-2}],
+  5: [{type:'mushroom',ox:-5,oy:1},{type:'mushroom',ox:4,oy:-3}],
+  6: [{type:'hill',ox:0,oy:0}],
+  7: [{type:'ruin',ox:0,oy:0}],
+};
+
+// ============================================================
+// ЗАГРУЗКА СПРАЙТОВ
+// ============================================================
+const SPRITE_FILES = {
+  hero: 'sprites/hero.png',
+  spearman: 'sprites/spearman.png',
+  scout: 'sprites/scout.png',
+  archer_p: 'sprites/archer_p.png',
+  knight: 'sprites/knight.png',
+  mage: 'sprites/mage.png',
+  goblin: 'sprites/goblin.png',
+  archer: 'sprites/archer.png',
+  wolf: 'sprites/wolf.png',
+  castle: 'sprites/castle.png',
+  barracks: 'sprites/barracks.png',
+  library: 'sprites/library.png',
+};
+
+const sprites = {};
+let spritesLoaded = 0;
+const totalSprites = Object.keys(SPRITE_FILES).length;
+
+function loadSprites(callback) {
+  const bar = document.getElementById('load-bar');
+  Object.entries(SPRITE_FILES).forEach(([key, src]) => {
+    const img = new Image();
+    img.onload = () => {
+      sprites[key] = img;
+      spritesLoaded++;
+      bar.style.width = (spritesLoaded / totalSprites * 100) + '%';
+      if (spritesLoaded === totalSprites) {
+        document.getElementById('loading').style.display = 'none';
+        callback();
+      }
+    };
+    img.onerror = () => {
+      sprites[key] = null;
+      spritesLoaded++;
+      bar.style.width = (spritesLoaded / totalSprites * 100) + '%';
+      if (spritesLoaded === totalSprites) {
+        document.getElementById('loading').style.display = 'none';
+        callback();
+      }
+    };
+    img.src = src;
+  });
+}
+
+// ============================================================
+// АКСИАЛЬНЫЕ КООРДИНАТЫ
+// ============================================================
+function hexToPixel(q, r) {
+  return {
+    x: HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r),
+    y: HEX_SIZE * (3/2 * r)
+  };
+}
+function pixelToHex(px, py) {
+  const q = (Math.sqrt(3)/3 * px - 1/3 * py) / HEX_SIZE;
+  const r = (2/3 * py) / HEX_SIZE;
+  return hexRound(q, r);
+}
+function hexRound(q, r) {
+  let s = -q-r;
+  let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+  const dq = Math.abs(rq-q), dr = Math.abs(rr-r), ds = Math.abs(rs-s);
+  if (dq > dr && dq > ds) rq = -rr-rs;
+  else if (dr > ds) rr = -rq-rs;
+  return {q:rq, r:rr};
+}
+function hexDist(q1,r1,q2,r2) {
+  return (Math.abs(q1-q2)+Math.abs(q1+r1-q2-r2)+Math.abs(r1-r2))/2;
+}
+const HEX_DIRS = [{q:1,r:0},{q:1,r:-1},{q:0,r:-1},{q:-1,r:0},{q:-1,r:1},{q:0,r:1}];
+function hexNeighbors(q,r) { return HEX_DIRS.map(d=>({q:q+d.q,r:r+d.r})); }
+function hexKey(q,r) { return `${q},${r}`; }
+
+// ============================================================
+// СОСТОЯНИЕ
+// ============================================================
+// [PATCH 1] Таймер хода противника — единая точка отмены
+let _enemyTurnTimer = null;
+
+const S = {
+  map:{}, units:[], buildings:[], selectedUnit:null,
+  moveHighlights:new Set(), attackHighlights:new Set(),
+  // [TASK 2+3] Unified highlight system
+  hoverHex:null, threatHighlights:new Set(), pathHighlights:new Set(), recruitHighlights:new Set(),
+  // [PATCH 5] turn=0, startPlayerTurn инкрементит до 1
+  turn:0, phase:'player',
+  cam:{x:0,y:0}, dragging:false, dragStart:{x:0,y:0}, camStart:{x:0,y:0},
+  res:{gold:50,food:30,wood:20,stone:10}, epoch:0, pp:0,
+  // [PATCH 4] Карта стоимостей путей для частичного хода
+  lastCostMap:{},
+  // [TASK 6] Path preview cost map and max-reach boundary set
+  pathCostMap:{}, maxReachHighlights:new Set(),
+  // [EFFECTS] Visual effects array for spawn/move/hit feedback
+  effects:[],
+  // [TECH TREE] Research state
+  researched: new Set(),
+  currentResearch: null,
+  researchProgress: 0,
+  unlockedUnits: new Set(['hero','spearman']),
+  // [TASK 9] Game stats for game-over screen
+  stats:{unitsKilled:0}
+};
+
+// [PATCH 1+2] Централизованный guard: блокировка ввода вне фазы player
+function isInputAllowed(){
+  return S.phase === 'player';
+}
+
+// ============================================================
+// [EFFECTS] ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (спавн/движение/удар)
+// ============================================================
+function addEffect(effect) {
+  S.effects.push(effect);
+}
+
+function updateEffects() {
+  S.effects = S.effects.filter(e => {
+    e.t++;
+    return e.t < e.maxT;
+  });
+}
+
+function renderEffects() {
+  S.effects.forEach(e => {
+    const pos = hexToPixel(e.q, e.r);
+    const sx = pos.x - S.cam.x;
+    const sy = pos.y - S.cam.y;
+    const progress = e.t / e.maxT;
+
+    if (e.type === 'spawn') {
+      // Expanding ring in team color
+      const radius = 10 + progress * 30;
+      const alpha = 1 - progress;
+      ctx.beginPath();
+      ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+      const teamColor = e.team === 'player' ? `rgba(83,216,251,${alpha})` : `rgba(233,69,96,${alpha})`;
+      ctx.strokeStyle = teamColor;
+      ctx.lineWidth = 3 * (1 - progress);
+      ctx.stroke();
+      // Bright flash
+      if (progress < 0.25) {
+        const flashAlpha = 0.5 * (1 - progress / 0.25);
+        ctx.beginPath();
+        ctx.arc(sx, sy, 15, 0, Math.PI * 2);
+        ctx.fillStyle = e.team === 'player' ? `rgba(83,216,251,${flashAlpha})` : `rgba(233,69,96,${flashAlpha})`;
+        ctx.fill();
+      }
+    } else if (e.type === 'hit') {
+      // Floating damage number
+      const dy = -progress * 40;
+      const alpha = 1 - progress;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = `rgba(233,69,96,${alpha})`;
+      ctx.fillText(`-${e.damage}`, sx, sy - 20 + dy);
+      // Flash circle
+      if (progress < 0.3) {
+        ctx.beginPath();
+        ctx.arc(sx, sy - 10, 15, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,100,100,${0.3 * (1 - progress / 0.3)})`;
+        ctx.fill();
+      }
+    } else if (e.type === 'death') {
+      // Expanding particles
+      const alpha = 1 - progress;
+      const rgb = hexToRgb(e.color);
+      for (let i = 0; i < 8; i++) {
+        const angle = (Math.PI * 2 / 8) * i + progress * 2;
+        const dist = progress * 25;
+        const px = sx + Math.cos(angle) * dist;
+        const py = sy - 10 + Math.sin(angle) * dist;
+        ctx.beginPath();
+        ctx.arc(px, py, 3 * (1 - progress), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+        ctx.fill();
+      }
+    } else if (e.type === 'trail') {
+      // Fading trail line
+      const fromPos = hexToPixel(e.fromQ, e.fromR);
+      const toPos = hexToPixel(e.toQ, e.toR);
+      const alpha = 1 - progress;
+      ctx.beginPath();
+      ctx.moveTo(fromPos.x - S.cam.x, fromPos.y - S.cam.y);
+      ctx.lineTo(toPos.x - S.cam.x, toPos.y - S.cam.y);
+      ctx.strokeStyle = `rgba(83,216,251,${alpha * 0.5})`;
+      ctx.lineWidth = 2 * (1 - progress);
+      ctx.stroke();
+      // Arrival puff at destination
+      if (progress < 0.4) {
+        const puffAlpha = 0.3 * (1 - progress / 0.4);
+        ctx.beginPath();
+        ctx.arc(toPos.x - S.cam.x, toPos.y - S.cam.y, 8 + progress * 10, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(83,216,251,${puffAlpha})`;
+        ctx.fill();
+      }
+    }
+  });
+}
+
+// ============================================================
+// ТИПЫ ЮНИТОВ И ЗДАНИЙ
+// ============================================================
+const UT = {
+  hero:     {name:'Герой',hp:100,atk:15,def:8,move:3,range:1,team:'player',color:'#f1c40f',sprite:'hero',size:22,cost:null,minEpoch:0},
+  spearman: {name:'Копейщик',hp:40,atk:8,def:4,move:3,range:1,team:'player',color:'#53d8fb',sprite:'spearman',size:18,cost:{gold:20,food:5},minEpoch:0},
+  scout:    {name:'Разведчик',hp:25,atk:5,def:2,move:4,range:1,team:'player',color:'#2ecc71',sprite:'scout',size:16,cost:{gold:15,food:3},minEpoch:0},
+  archer_p: {name:'Лучник',hp:28,atk:10,def:2,move:2,range:2,team:'player',color:'#3498db',sprite:'archer_p',size:16,cost:{gold:25,food:5,wood:5},minEpoch:1},
+  knight:   {name:'Рыцарь',hp:60,atk:12,def:7,move:2,range:1,team:'player',color:'#9b59b6',sprite:'knight',size:20,cost:{gold:40,food:10,wood:10},minEpoch:2},
+  mage:     {name:'Маг',hp:20,atk:14,def:1,move:2,range:3,team:'player',color:'#e74c3c',sprite:'mage',size:16,cost:{gold:50,food:5,wood:15},minEpoch:2},
+  goblin:   {name:'Гоблин',hp:30,atk:7,def:3,move:3,range:1,team:'enemy',color:'#e94560',sprite:'goblin',size:18},
+  archer:   {name:'Лучник гоб.',hp:22,atk:9,def:1,move:2,range:2,team:'enemy',color:'#c0392b',sprite:'archer',size:16},
+  wolf:     {name:'Волк',hp:20,atk:10,def:1,move:5,range:1,team:'enemy',color:'#8e44ad',sprite:'wolf',size:18},
+};
+
+const BT = {
+  castle:   {name:'Замок',sprite:'castle',size:40,opp:2,cost:{gold:0,wood:0},desc:'+2 ОП/ход, центр',canRecruit:true,recruits:['spearman','scout']},
+  barracks: {name:'Казармы',sprite:'barracks',size:28,opp:0,cost:{gold:20,wood:10},desc:'Наём юнитов',canRecruit:true,recruits:['spearman','archer_p','knight']},
+  library:  {name:'Библиотека',sprite:'library',size:26,opp:3,cost:{gold:25,wood:15},desc:'+3 ОП/ход, наём мага',canRecruit:true,recruits:['mage']},
+};
+
+// ============================================================
+// ДЕРЕВО ТЕХНОЛОГИЙ
+// ============================================================
+const TECHS = {
+  gathering:     {id:'gathering',    name:'Собирательство',  epoch:0, cost:0,  requires:[],                  effect:'+1 еда/ход с равнин'},
+  hunting:       {id:'hunting',      name:'Охота',           epoch:0, cost:5,  requires:['gathering'],       effect:'Разблокирует Разведчика'},
+  agriculture:   {id:'agriculture',  name:'Земледелие',      epoch:0, cost:8,  requires:['gathering'],       effect:'+2 еда/ход'},
+  campfires:     {id:'campfires',    name:'Костры',          epoch:0, cost:3,  requires:[],                  effect:'+1 ОП/ход'},
+  shamanism:     {id:'shamanism',    name:'Шаманизм',        epoch:0, cost:6,  requires:['campfires'],       effect:'Открывает путь к Магу'},
+
+  writing:       {id:'writing',      name:'Письменность',    epoch:1, cost:12, requires:['agriculture'],     effect:'+1 ОП/ход'},
+  tactics:       {id:'tactics',      name:'Тактика',          epoch:1, cost:10, requires:['hunting'],         effect:'Разблокирует Лучника'},
+  stonework:     {id:'stonework',    name:'Каменная кладка', epoch:1, cost:10, requires:['campfires'],       effect:'+2 защита зданий'},
+  religion:      {id:'religion',     name:'Религия',         epoch:1, cost:15, requires:['shamanism'],       effect:'+2 ОП/ход'},
+
+  education:     {id:'education',    name:'Образование',     epoch:2, cost:20, requires:['writing'],         effect:'+2 ОП/ход'},
+  fortification: {id:'fortification',name:'Фортификация',    epoch:2, cost:18, requires:['stonework'],       effect:'Стены вокруг замка'},
+  chivalry:      {id:'chivalry',     name:'Рыцарство',       epoch:2, cost:22, requires:['tactics','writing'],effect:'Разблокирует Рыцаря'},
+  paladinhood:   {id:'paladinhood',  name:'Паладинство',     epoch:2, cost:25, requires:['religion','tactics'],effect:'Герой: Исцеление'},
+
+  alchemy:       {id:'alchemy',      name:'Алхимия',         epoch:3, cost:35, requires:['education'],       effect:'+3 ОП/ход'},
+  gunpowder:     {id:'gunpowder',    name:'Порох',           epoch:3, cost:40, requires:['alchemy','fortification'], effect:'Разблокирует Пушки'},
+  diplomacy:     {id:'diplomacy',    name:'Дипломатия',       epoch:3, cost:30, requires:['education','paladinhood'], effect:'Торговые посты +2 ОП'},
+
+  empire:        {id:'empire',       name:'Империя',         epoch:4, cost:60, requires:['gunpowder','diplomacy'], effect:'Все юниты +2 ATK'},
+};
+
+const EPOCH_NAMES = ['Примитивы','Ранняя цивилизация','Средние века','Возрождение','Раскол'];
+
+function makeUnit(type,q,r) {
+  const t=UT[type];
+  return{type,q,r,name:t.name,hp:t.hp,maxHp:t.hp,atk:t.atk,def:t.def,
+    move:t.move,maxMove:t.move,range:t.range,team:t.team,
+    color:t.color,sprite:t.sprite,size:t.size,
+    moved:false,attacked:false,level:1,xp:0};
+}
+
+function makeBuilding(type,q,r) {
+  const t=BT[type];
+  return{type,q,r,name:t.name,sprite:t.sprite,size:t.size,opp:t.opp};
+}
+
+// ============================================================
+// ТЕХНОЛОГИИ: УТИЛИТЫ
+// ============================================================
+function unlockUnit(type){S.unlockedUnits.add(type);}
+function isTechResearched(id){return S.researched.has(id);}
+
+function canResearch(id){
+  const tech=TECHS[id];
+  if(!tech)return false;
+  if(tech.epoch>S.epoch)return false;
+  if(S.researched.has(id))return false;
+  for(const req of tech.requires){
+    if(!S.researched.has(req))return false;
+  }
+  return true;
+}
+
+function getTechStatus(id){
+  const tech=TECHS[id];
+  if(!tech)return {status:'unknown',reason:''};
+  if(S.researched.has(id))return {status:'researched',reason:'Изучено'};
+  if(S.currentResearch===id)return {status:'researching',reason:`Изучается (${S.researchProgress}/${tech.cost} ОП)`};
+  if(tech.epoch>S.epoch)return {status:'epoch-locked',reason:`Нужна Эпоха ${tech.epoch} (сейчас ${S.epoch})`};
+  for(const req of tech.requires){
+    if(!S.researched.has(req))return {status:'locked',reason:`Требуется: ${TECHS[req]?.name||req}`};
+  }
+  if(tech.cost>S.pp)return {status:'expensive',reason:`Мало ОП: нужно ${tech.cost}, есть ${S.pp}`};
+  return {status:'available',reason:'Доступно для изучения'};
+}
+
+function startResearch(id){
+  if(!canResearch(id))return false;
+  S.currentResearch=id;
+  S.researchProgress=0;
+  addLog(`Исследование: ${TECHS[id].name}`,'system');
+  updateUI();
+  return true;
+}
+
+function completeResearch(){
+  if(!S.currentResearch)return;
+  const tech=TECHS[S.currentResearch];
+  if(!tech){S.currentResearch=null;return;}
+  S.researched.add(tech.id);
+  applyTechEffect(tech.id);
+  addLog(`Изучено: ${tech.name} — ${tech.effect}`,'system');
+  S.currentResearch=null;
+  S.researchProgress=0;
+  checkEpochTransition();
+}
+
+function applyTechEffect(id){
+  switch(id){
+    case 'hunting': unlockUnit('scout'); break;
+    case 'tactics': unlockUnit('archer_p'); break;
+    case 'chivalry': unlockUnit('knight'); break;
+    case 'shamanism': /* opens path to mage via later techs */ break;
+    // Other effects are passive bonuses checked at income time
+  }
+}
+
+function getSciencePerTurn(){
+  let sci=0;
+  S.buildings.forEach(b=>{
+    if(b.type==='library')sci+=3;
+  });
+  if(S.researched.has('writing'))sci+=1;
+  if(S.researched.has('religion'))sci+=2;
+  if(S.researched.has('education'))sci+=2;
+  if(S.researched.has('alchemy'))sci+=3;
+  return sci;
+}
+
+function countTerrain(t){
+  let c=0;
+  S.units.filter(u=>u.team==='player').forEach(u=>{
+    const terrain=S.map[hexKey(u.q,u.r)]?.terrain;
+    if(terrain===t)c++;
+  });
+  return c;
+}
+
+function checkEpochTransition(){
+  if(S.epoch>=4)return;
+  const thresholds=[15,50,120,250];
+  const requiredPP=thresholds[S.epoch];
+  if(S.pp<requiredPP)return;
+  const hasTech=Object.values(TECHS).some(t=>t.epoch===S.epoch&&S.researched.has(t.id));
+  if(!hasTech&&S.epoch>0)return;
+  S.epoch++;
+  addLog(`★ ЭПОХА ${S.epoch}: ${EPOCH_NAMES[S.epoch]}! ★`,'system');
+  updateUI();
+}
+
+// ============================================================
+// ГЕНЕРАЦИЯ КАРТЫ
+// ============================================================
+function genMap() {
+  S.map={};
+  for(let r=0;r<ROWS;r++) for(let q=0;q<COLS;q++){
+    const rnd=Math.random();
+    let terrain;
+    if(rnd<.42)terrain=0;else if(rnd<.56)terrain=1;else if(rnd<.65)terrain=6;
+    else if(rnd<.73)terrain=4;else if(rnd<.80)terrain=5;
+    else if(rnd<.87)terrain=2;else if(rnd<.93)terrain=3;else terrain=7;
+    S.map[hexKey(q,r)]={q,r,terrain};
+  }
+  const clear=(cq,cr)=>{const c=S.map[hexKey(cq,cr)];if(c)c.terrain=0;
+    hexNeighbors(cq,cr).forEach(n=>{const c2=S.map[hexKey(n.q,n.r)];if(c2)c2.terrain=0;})};
+  clear(2,2); clear(COLS-3,ROWS-3);
+  const setR=(q,r)=>{const c=S.map[hexKey(q,r)];if(c)c.terrain=7;};
+  setR(5,1);setR(COLS-6,ROWS-2);setR(Math.floor(COLS/2),Math.floor(ROWS/2));
+}
+
+function spawnUnits() {
+  S.units=[];
+  S.effects=[];
+  const _spawnUnit=(type,q,r)=>{
+    const u=makeUnit(type,q,r);
+    S.units.push(u);
+    addEffect({type:'spawn',q,r,t:0,maxT:30,team:u.team});
+  };
+  _spawnUnit('hero',2,2);
+  _spawnUnit('spearman',3,2);
+  _spawnUnit('spearman',2,3);
+  _spawnUnit('scout',1,3);
+
+  _spawnUnit('goblin',COLS-3,ROWS-3);
+  _spawnUnit('goblin',COLS-2,ROWS-3);
+  _spawnUnit('archer',COLS-4,ROWS-2);
+  _spawnUnit('wolf',COLS-5,ROWS-4);
+  _spawnUnit('goblin',Math.floor(COLS/2)+1,Math.floor(ROWS/2));
+  _spawnUnit('goblin',Math.floor(COLS/2),Math.floor(ROWS/2)+1);
+
+  // Стартовые здания
+  S.buildings=[];
+  S.buildings.push(makeBuilding('castle',2,2));
+}
+
+// ============================================================
+// РЕНДЕРИНГ
+// ============================================================
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const mmCanvas=document.getElementById('minimap');
+const mmCtx=mmCanvas.getContext('2d');
+
+function resizeCanvas(){
+  const area=document.getElementById('game-area');
+  canvas.width=area.clientWidth;canvas.height=area.clientHeight;
+}
+
+function hexVertices(cx,cy,size){
+  const v=[];
+  for(let i=0;i<6;i++){
+    const angle=Math.PI/180*(60*i-30);
+    v.push({x:cx+size*Math.cos(angle),y:cy+size*Math.sin(angle)});
+  }
+  return v;
+}
+
+// Рисование декораций на гексах (для тайлинга поверх террейна)
+function drawDecor(cx,cy,terrain){
+  ctx.save();
+  if(terrain===TERRAIN.FOREST){
+    // Маленькие деревья с тенями
+    const trees = [[-6,-4,5],[4,-3,4],[0,3,3],[-3,2,3],[6,1,4]];
+    trees.forEach(([ox,oy,s])=>{
+      // Тень дерева
+      ctx.beginPath();
+      ctx.ellipse(cx+ox+2,cy+oy+s*0.4+2,s*0.9,s*0.35,0,0,Math.PI*2);
+      ctx.fillStyle='rgba(0,0,0,0.18)';ctx.fill();
+      // Ствол
+      ctx.fillStyle='#3a2510';
+      ctx.fillRect(cx+ox-1,cy+oy+s-4,2,4);
+      // Крона — темно-зелёная
+      ctx.beginPath();
+      ctx.arc(cx+ox,cy+oy,s,0,Math.PI*2);
+      ctx.fillStyle='#0e5510';ctx.fill();
+      // Светлая подсветка сверху (light direction)
+      ctx.beginPath();
+      ctx.arc(cx+ox-1,cy+oy-1,s*0.65,0,Math.PI*2);
+      ctx.fillStyle='#28a828';ctx.fill();
+    });
+  } else if(terrain===TERRAIN.MOUNTAIN){
+    // Каменные выступы с текстурными линиями
+    ctx.fillStyle='#8a8a8a';
+    ctx.beginPath();ctx.moveTo(cx-8,cy+4);ctx.lineTo(cx-2,cy-10);ctx.lineTo(cx+4,cy+4);ctx.fill();
+    ctx.fillStyle='#9a9a9a';
+    ctx.beginPath();ctx.moveTo(cx-2,cy+6);ctx.lineTo(cx+6,cy-6);ctx.lineTo(cx+10,cy+6);ctx.fill();
+    // Rocky texture lines
+    ctx.strokeStyle='rgba(60,60,80,0.3)';ctx.lineWidth=0.6;
+    ctx.beginPath();ctx.moveTo(cx-6,cy+2);ctx.lineTo(cx-1,cy-6);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+1,cy+3);ctx.lineTo(cx+7,cy-3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-3,cy+0);ctx.lineTo(cx+2,cy+2);ctx.stroke();
+    // Снежная шапка с градиентом
+    const snowGrad=ctx.createLinearGradient(cx-2,cy-10,cx-2,cy-4);
+    snowGrad.addColorStop(0,'rgba(255,255,255,0.95)');
+    snowGrad.addColorStop(1,'rgba(220,230,240,0.5)');
+    ctx.fillStyle=snowGrad;
+    ctx.beginPath();ctx.moveTo(cx-5,cy-5);ctx.lineTo(cx-2,cy-10);ctx.lineTo(cx+1,cy-5);ctx.fill();
+    // Вторая шапка
+    const snowGrad2=ctx.createLinearGradient(cx+5,cy-6,cx+5,cy-1);
+    snowGrad2.addColorStop(0,'rgba(255,255,255,0.85)');
+    snowGrad2.addColorStop(1,'rgba(210,220,235,0.4)');
+    ctx.fillStyle=snowGrad2;
+    ctx.beginPath();ctx.moveTo(cx+3,cy-1);ctx.lineTo(cx+6,cy-6);ctx.lineTo(cx+8,cy-1);ctx.fill();
+  } else if(terrain===TERRAIN.WATER){
+    // Волны с анимированным мерцанием
+    const t=Date.now()*0.002;
+    const shimmer=Math.sin(t)*0.15+0.85;
+    for(let i=0;i<3;i++){
+      const wy=cy-4+i*5;
+      const phase=t+i*1.2;
+      // Bright highlight wave
+      ctx.strokeStyle=`rgba(${Math.round(80*shimmer)},${Math.round(190*shimmer)},${Math.round(250*shimmer)},0.6)`;
+      ctx.lineWidth=1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx-12,wy+Math.sin(phase)*1.5);
+      ctx.quadraticCurveTo(cx-5,wy-3+Math.sin(phase+1)*1.5,cx,wy+Math.sin(phase+2)*1.5);
+      ctx.quadraticCurveTo(cx+5,wy+3+Math.sin(phase+3)*1.5,cx+12,wy+Math.sin(phase+4)*1.5);
+      ctx.stroke();
+      // Secondary thinner wave
+      ctx.strokeStyle='rgba(40,140,220,0.3)';ctx.lineWidth=0.7;
+      ctx.beginPath();
+      ctx.moveTo(cx-10,wy+2);
+      ctx.quadraticCurveTo(cx-3,wy-1,cx+2,wy+2);
+      ctx.quadraticCurveTo(cx+7,wy+5,cx+10,wy+2);
+      ctx.stroke();
+    }
+    // Shimmer sparkles
+    for(let i=0;i<4;i++){
+      const sx=cx-8+i*5+Math.sin(t+i*2)*2;
+      const sy=cy-3+Math.cos(t*1.3+i)*3+i*4;
+      const sa=Math.max(0,Math.sin(t*2+i*1.5))*0.5;
+      if(sa>0.05){
+        ctx.beginPath();ctx.arc(sx,sy,1.2,0,Math.PI*2);
+        ctx.fillStyle=`rgba(180,230,255,${sa})`;ctx.fill();
+      }
+    }
+  } else if(terrain===TERRAIN.DESERT){
+    // Sand dots with subtle shadow
+    for(let i=0;i<5;i++){
+      const dx=cx-8+i*4,dy=cy-2+Math.sin(i)*4;
+      // Tiny shadow
+      ctx.beginPath();ctx.arc(dx+1,dy+1,2.2,0,Math.PI*2);
+      ctx.fillStyle='rgba(0,0,0,0.08)';ctx.fill();
+      // Dot
+      ctx.beginPath();ctx.arc(dx,dy,2,0,Math.PI*2);
+      ctx.fillStyle='#c8a838';ctx.fill();
+    }
+    // Subtle dune lines
+    ctx.strokeStyle='rgba(160,120,30,0.25)';ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(cx-10,cy+5);ctx.quadraticCurveTo(cx,cy+2,cx+10,cy+5);ctx.stroke();
+  } else if(terrain===TERRAIN.SWAMP){
+    // Murky swamp with bubbles
+    [[-5,0],[4,-2],[1,4]].forEach(([ox,oy])=>{
+      // Shadow
+      ctx.beginPath();ctx.arc(cx+ox+1,cy+oy+1,3.2,0,Math.PI*2);
+      ctx.fillStyle='rgba(0,0,0,0.1)';ctx.fill();
+      // Bush
+      ctx.beginPath();ctx.arc(cx+ox,cy+oy,3,0,Math.PI*2);
+      ctx.fillStyle='#4a6838';ctx.fill();
+      ctx.beginPath();ctx.arc(cx+ox,cy+oy-1,2,0,Math.PI*2);
+      ctx.fillStyle='#6a9058';ctx.fill();
+    });
+    // Murky bubble
+    const bt=Date.now()*0.003;
+    const bAlpha=Math.max(0,Math.sin(bt))*0.3;
+    if(bAlpha>0.05){
+      ctx.beginPath();ctx.arc(cx-2,cy+1+Math.sin(bt)*2,1.5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(100,160,80,${bAlpha})`;ctx.fill();
+    }
+  } else if(terrain===TERRAIN.HILLS){
+    // Hills with contour lines
+    ctx.fillStyle='#9a8a55';
+    ctx.beginPath();ctx.ellipse(cx-4,cy+2,8,5,0,Math.PI,0);ctx.fill();
+    ctx.fillStyle='#8a7a4a';
+    ctx.beginPath();ctx.ellipse(cx+5,cy+4,6,4,0,Math.PI,0);ctx.fill();
+    // Contour lines on hills
+    ctx.strokeStyle='rgba(90,70,30,0.3)';ctx.lineWidth=0.6;
+    ctx.beginPath();ctx.ellipse(cx-4,cy+1,6,3.5,0,Math.PI,0);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(cx-4,cy,4,2,0,Math.PI,0);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(cx+5,cy+3,4,2.5,0,Math.PI,0);ctx.stroke();
+    // Light highlight
+    ctx.strokeStyle='rgba(200,180,120,0.2)';ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.ellipse(cx-4,cy,6,3,0,Math.PI+0.3,Math.PI*1.7);ctx.stroke();
+  } else if(terrain===TERRAIN.RUINS){
+    // Ruins with mystical glow
+    // Glow under ruins
+    const glowGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,14);
+    glowGrad.addColorStop(0,'rgba(180,80,220,0.2)');
+    glowGrad.addColorStop(1,'rgba(180,80,220,0)');
+    ctx.fillStyle=glowGrad;
+    ctx.fillRect(cx-14,cy-14,28,28);
+    // Pillars
+    ctx.fillStyle='#7a5090';
+    ctx.fillRect(cx-6,cy-4,4,10);ctx.fillRect(cx+2,cy-2,4,8);
+    ctx.fillStyle='#604080';
+    ctx.fillRect(cx-3,cy+2,6,4);
+    // Glowing tips
+    ctx.fillStyle='#c080e0';
+    ctx.fillRect(cx-2,cy-6,2,4);ctx.fillRect(cx+1,cy-4,2,3);
+    // Subtle animated sparkle
+    const rt=Date.now()*0.003;
+    const rAlpha=Math.max(0,Math.sin(rt))*0.4;
+    if(rAlpha>0.05){
+      ctx.beginPath();ctx.arc(cx-1,cy-7,2,0,Math.PI*2);
+      ctx.fillStyle=`rgba(200,140,255,${rAlpha})`;ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// --- 3D Lighting helpers ---
+function hexToRgb(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+function rgbStr(r,g,b,a){
+  r=Math.max(0,Math.min(255,Math.round(r)));
+  g=Math.max(0,Math.min(255,Math.round(g)));
+  b=Math.max(0,Math.min(255,Math.round(b)));
+  return a!==undefined?`rgba(${r},${g},${b},${a})`:`rgb(${r},${g},${b})`;
+}
+function applyLight(rgb,intensity){
+  return {r:rgb.r*intensity,g:rgb.g*intensity,b:rgb.b*intensity};
+}
+// Light direction: from top-left (-1,-1,0.5), normalized
+const LIGHT_DIR={x:-0.66,y:-0.66,z:0.33};
+// Pre-compute wall normals and light dot products
+const LIGHT_LEFT_DOT  = Math.max(0, -(LIGHT_DIR.x*0.7+LIGHT_DIR.y*0.7));  // left wall faces roughly (0.7,0.7,0)
+const LIGHT_RIGHT_DOT = Math.max(0, -(LIGHT_DIR.x*-0.7+LIGHT_DIR.y*0.7)); // right wall faces roughly (-0.7,0.7,0)
+const LIGHT_BACK_DOT  = Math.max(0, -(LIGHT_DIR.x*-1+LIGHT_DIR.y*0));     // back-left wall faces (-1,0,0)
+const LIGHT_TOP_DOT   = Math.max(0, LIGHT_DIR.z);                          // top faces up (0,0,1)
+const AMBIENT = 0.55;
+
+function wallLitColor(baseHex,dot){
+  const base=hexToRgb(baseHex);
+  const intensity=AMBIENT+(1-AMBIENT)*dot;
+  const lit=applyLight(base,intensity);
+  return rgbStr(lit.r,lit.g,lit.b);
+}
+function wallGradientColors(baseHex,dot){
+  const base=hexToRgb(baseHex);
+  const topI=AMBIENT+(1-AMBIENT)*dot;
+  const botI=topI*0.45;
+  const topC=applyLight(base,topI);
+  const botC=applyLight(base,botI);
+  return {top:rgbStr(topC.r,topC.g,topC.b),bot:rgbStr(botC.r,botC.g,botC.b)};
+}
+
+function drawHex3D(cx,cy,terrain,highlight){
+  const h=TERRAIN_HEIGHT[terrain];
+  const colors=T_COLORS[terrain];
+  const verts=hexVertices(cx,cy,HEX_SIZE);
+
+  // ---- Drop shadow for tall hexes ----
+  if(h>14){
+    const shadowOff=Math.min(h*0.35,16);
+    ctx.save();
+    ctx.globalAlpha=0.18;
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const vx=verts[i].x+shadowOff,vy=verts[i].y+shadowOff;
+      if(i===0)ctx.moveTo(vx,vy);else ctx.lineTo(vx,vy);
+    }
+    ctx.closePath();
+    ctx.fillStyle='#000';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- Back-left wall (verts[2]->verts[3]) ----
+  if(h>6){
+    const grad=wallGradientColors(colors.left,LIGHT_BACK_DOT);
+    const wg=ctx.createLinearGradient(verts[2].x,verts[2].y,verts[3].x,verts[3].y);
+    wg.addColorStop(0,grad.top);wg.addColorStop(1,grad.bot);
+    ctx.beginPath();
+    ctx.moveTo(verts[2].x,verts[2].y);ctx.lineTo(verts[3].x,verts[3].y);
+    ctx.lineTo(verts[3].x,verts[3].y+h);ctx.lineTo(verts[2].x,verts[2].y+h);
+    ctx.closePath();ctx.fillStyle=wg;ctx.fill();
+    // Edge highlight (light-facing edge)
+    ctx.beginPath();ctx.moveTo(verts[2].x,verts[2].y);ctx.lineTo(verts[2].x,verts[2].y+h);
+    ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=1;ctx.stroke();
+    // Shadow edge
+    ctx.beginPath();ctx.moveTo(verts[3].x,verts[3].y);ctx.lineTo(verts[3].x,verts[3].y+h);
+    ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.lineWidth=1;ctx.stroke();
+  }
+
+  // ---- Left wall (verts[3]->verts[4]) with gradient ----
+  {
+    const grad=wallGradientColors(colors.left,LIGHT_LEFT_DOT);
+    const midY=(verts[3].y+verts[4].y)/2;
+    const wg=ctx.createLinearGradient((verts[3].x+verts[4].x)/2,midY,(verts[3].x+verts[4].x)/2,midY+h);
+    wg.addColorStop(0,grad.top);wg.addColorStop(1,grad.bot);
+    ctx.beginPath();
+    ctx.moveTo(verts[3].x,verts[3].y);ctx.lineTo(verts[4].x,verts[4].y);
+    ctx.lineTo(verts[4].x,verts[4].y+h);ctx.lineTo(verts[3].x,verts[3].y+h);
+    ctx.closePath();ctx.fillStyle=wg;ctx.fill();
+    // Light-facing edge highlight
+    ctx.beginPath();ctx.moveTo(verts[3].x,verts[3].y);ctx.lineTo(verts[3].x,verts[3].y+h);
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke();
+    // Shadow edge
+    ctx.beginPath();ctx.moveTo(verts[4].x,verts[4].y);ctx.lineTo(verts[4].x,verts[4].y+h);
+    ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;ctx.stroke();
+  }
+
+  // ---- Right wall (verts[4]->verts[5]) with gradient ----
+  {
+    const grad=wallGradientColors(colors.right,LIGHT_RIGHT_DOT);
+    const midY=(verts[4].y+verts[5].y)/2;
+    const wg=ctx.createLinearGradient((verts[4].x+verts[5].x)/2,midY,(verts[4].x+verts[5].x)/2,midY+h);
+    wg.addColorStop(0,grad.top);wg.addColorStop(1,grad.bot);
+    ctx.beginPath();
+    ctx.moveTo(verts[4].x,verts[4].y);ctx.lineTo(verts[5].x,verts[5].y);
+    ctx.lineTo(verts[5].x,verts[5].y+h);ctx.lineTo(verts[4].x,verts[4].y+h);
+    ctx.closePath();ctx.fillStyle=wg;ctx.fill();
+    // Edge highlights
+    ctx.beginPath();ctx.moveTo(verts[4].x,verts[4].y);ctx.lineTo(verts[4].x,verts[4].y+h);
+    ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=0.5;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(verts[5].x,verts[5].y);ctx.lineTo(verts[5].x,verts[5].y+h);
+    ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=1;ctx.stroke();
+  }
+
+  // ---- Bottom cap ----
+  if(h>10){
+    ctx.beginPath();
+    ctx.moveTo(verts[2].x,verts[2].y+h);ctx.lineTo(verts[3].x,verts[3].y+h);
+    ctx.lineTo(verts[4].x,verts[4].y+h);ctx.lineTo(verts[5].x,verts[5].y+h);
+    ctx.closePath();
+    const baseCol=hexToRgb(colors.left);
+    ctx.fillStyle=rgbStr(baseCol.r*0.2,baseCol.g*0.2,baseCol.b*0.2);
+    ctx.fill();
+  }
+
+  // ---- Top face with directional lighting ----
+  ctx.beginPath();
+  for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}
+  ctx.closePath();
+  const topLit=wallLitColor(colors.top,LIGHT_TOP_DOT);
+  ctx.fillStyle=topLit;ctx.fill();
+
+  // ---- Ambient occlusion: darken edges of top face ----
+  ctx.save();ctx.clip();
+  // Dark vignette at each vertex
+  for(let i=0;i<6;i++){
+    const v=verts[i];
+    const aGrad=ctx.createRadialGradient(v.x,v.y,0,v.x,v.y,HEX_SIZE*0.5);
+    aGrad.addColorStop(0,'rgba(0,0,0,0.15)');
+    aGrad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=aGrad;
+    ctx.fillRect(v.x-HEX_SIZE*0.5,v.y-HEX_SIZE*0.5,HEX_SIZE,HEX_SIZE);
+  }
+  ctx.restore();
+
+  // ---- Contour line around top face ----
+  ctx.beginPath();
+  for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}
+  ctx.closePath();
+  ctx.strokeStyle='rgba(0,0,0,0.28)';ctx.lineWidth=1.2;ctx.stroke();
+  // Light highlight on top edge facing light
+  ctx.beginPath();ctx.moveTo(verts[0].x,verts[0].y);ctx.lineTo(verts[1].x,verts[1].y);ctx.lineTo(verts[2].x,verts[2].y);
+  ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;ctx.stroke();
+
+  // ---- Height-based fog: low hexes get blue fog, tall hexes get bright vivid overlay ----
+  if(h<=5){
+    // Low areas: blue-ish fog at base
+    ctx.beginPath();
+    for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}
+    ctx.closePath();
+    ctx.fillStyle='rgba(40,60,120,0.15)';ctx.fill();
+  } else if(h>=30){
+    // High areas: slight brightness boost (atmospheric perspective)
+    ctx.beginPath();
+    for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}
+    ctx.closePath();
+    ctx.fillStyle='rgba(200,220,255,0.08)';ctx.fill();
+  }
+  // Subtle gradient fog: lower half of top face gets slight desaturation
+  {
+    ctx.save();
+    ctx.beginPath();
+    for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}
+    ctx.closePath();ctx.clip();
+    const fogGrad=ctx.createLinearGradient(cx,cy-HEX_SIZE,cx,cy+HEX_SIZE);
+    fogGrad.addColorStop(0,'rgba(0,0,0,0)');
+    fogGrad.addColorStop(1,'rgba(20,30,60,0.12)');
+    ctx.fillStyle=fogGrad;
+    ctx.fillRect(cx-HEX_SIZE,cy-HEX_SIZE,HEX_SIZE*2,HEX_SIZE*2);
+    ctx.restore();
+  }
+
+  // ---- Terrain border emphasis: darker outline for prominent terrain transitions ----
+  ctx.beginPath();
+  for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}
+  ctx.closePath();
+  if(terrain===TERRAIN.MOUNTAIN||terrain===TERRAIN.WATER){
+    ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=1.5;ctx.stroke();
+  } else if(terrain===TERRAIN.RUINS){
+    ctx.strokeStyle='rgba(180,80,220,0.35)';ctx.lineWidth=1.5;ctx.stroke();
+  }
+
+  // ---- Decorations on hex ----
+  drawDecor(cx,cy-2,terrain);
+
+  // ---- Unified Highlight System (hover/move/attack/selected/threat/recruit/path) ----
+  if(highlight&&highlight.size>0){
+    const drawHexPath=()=>{ctx.beginPath();for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}ctx.closePath();};
+
+    // hover: subtle white outline + slight brightness
+    if(highlight.has('hover')){
+      drawHexPath();ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1.5;ctx.stroke();
+    }
+    // recruit: green fill + dashed border
+    if(highlight.has('recruit')){
+      drawHexPath();ctx.fillStyle='rgba(46,204,113,0.2)';ctx.fill();
+      ctx.setLineDash([4,3]);ctx.strokeStyle='rgba(46,204,113,0.6)';ctx.lineWidth=2;ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // path: yellow fill + dots along edges + center dot
+    if(highlight.has('path')){
+      // Semi-transparent yellow fill for path cells
+      drawHexPath();ctx.fillStyle='rgba(255,220,50,0.12)';ctx.fill();
+      // Dots along edges
+      for(let i=0;i<6;i++){const v1=verts[i],v2=verts[(i+1)%6];
+        const mx=(v1.x+v2.x)/2,my=(v1.y+v2.y)/2;
+        ctx.beginPath();ctx.arc(mx,my,2.5,0,Math.PI*2);ctx.fillStyle='rgba(255,220,50,0.7)';ctx.fill();}
+      // Center dot
+      ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fillStyle='rgba(255,220,50,0.8)';ctx.fill();
+    }
+    // threat: orange pulsing border
+    if(highlight.has('threat')){
+      const pulse=0.5+0.3*Math.sin(Date.now()*0.004);
+      drawHexPath();ctx.strokeStyle=`rgba(230,126,34,${pulse})`;ctx.lineWidth=2.5;ctx.stroke();
+    }
+    // move: cyan fill + border (keep existing style)
+    if(highlight.has('move')){
+      drawHexPath();ctx.fillStyle='rgba(83,216,251,0.25)';ctx.fill();
+      ctx.strokeStyle='rgba(83,216,251,0.6)';ctx.lineWidth=2;ctx.stroke();
+    }
+    // [TASK 6] maxReach: cells at max movement range get a subtle marker
+    if(highlight.has('maxReach')){
+      drawHexPath();ctx.strokeStyle='rgba(83,216,251,0.35)';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+      // Small corner marker to indicate max reach
+      ctx.beginPath();ctx.arc(verts[0].x,verts[0].y,2.5,0,Math.PI*2);
+      ctx.fillStyle='rgba(83,216,251,0.6)';ctx.fill();
+    }
+    // attack: red fill + border (keep existing style)
+    if(highlight.has('attack')){
+      drawHexPath();ctx.fillStyle='rgba(233,69,96,0.3)';ctx.fill();
+      ctx.strokeStyle='rgba(233,69,96,0.7)';ctx.lineWidth=2;ctx.stroke();
+    }
+    // selected: gold thick border (always on top)
+    if(highlight.has('selected')){
+      drawHexPath();ctx.strokeStyle='#f1c40f';ctx.lineWidth=3;ctx.stroke();
+    }
+    // Stacking glow: if move/attack + hover, add subtle white outline
+    if((highlight.has('move')||highlight.has('attack'))&&highlight.has('hover')){
+      drawHexPath();ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke();
+    }
+  }
+}
+
+// ============================================================
+// PROCEDURAL UNIT ICON DRAWING (enhanced fallback prefabs)
+// ============================================================
+
+// Helper: darken a hex color by a factor
+function darkenColor(hex,factor){
+  const c=hexToRgb(hex);
+  return rgbStr(c.r*factor,c.g*factor,c.b*factor);
+}
+
+// drawUnitIcon: draws a distinctive procedural silhouette for a unit type
+// type: unit type string, cx/cy: center, size: radius, color: team color hex
+function drawUnitIcon(type,cx,cy,size,color){
+  const s=size; // shorthand
+  const dk=darkenColor(color,0.55); // darker outline color
+  ctx.save();
+  ctx.lineWidth=1.5;
+  ctx.strokeStyle=dk;
+  ctx.lineJoin='round';
+  ctx.lineCap='round';
+
+  if(type==='hero'){
+    // Crown on top (3 small triangles)
+    ctx.fillStyle='#f1c40f';
+    const crownY=cy-s*0.85;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.4,crownY+s*0.3);
+    ctx.lineTo(cx-s*0.3,crownY);
+    ctx.lineTo(cx-s*0.15,crownY+s*0.2);
+    ctx.lineTo(cx,crownY-s*0.1);
+    ctx.lineTo(cx+s*0.15,crownY+s*0.2);
+    ctx.lineTo(cx+s*0.3,crownY);
+    ctx.lineTo(cx+s*0.4,crownY+s*0.3);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Cape/shoulders (wider body)
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.55,cy-s*0.2);
+    ctx.quadraticCurveTo(cx-s*0.7,cy+s*0.3,cx-s*0.4,cy+s*0.6);
+    ctx.lineTo(cx+s*0.4,cy+s*0.6);
+    ctx.quadraticCurveTo(cx+s*0.7,cy+s*0.3,cx+s*0.55,cy-s*0.2);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Head
+    ctx.beginPath();ctx.arc(cx,cy-s*0.45,s*0.2,0,Math.PI*2);
+    ctx.fillStyle='#f0d0a0';ctx.fill();ctx.stroke();
+    // Gold accent on body
+    ctx.strokeStyle='#f1c40f';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx-s*0.35,cy+s*0.1);ctx.lineTo(cx+s*0.35,cy+s*0.1);ctx.stroke();
+  }else if(type==='spearman'){
+    // Shield shape (pointed bottom oval)
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy+s*0.7);
+    ctx.quadraticCurveTo(cx-s*0.55,cy+s*0.3,cx-s*0.45,cy-s*0.15);
+    ctx.quadraticCurveTo(cx-s*0.3,cy-s*0.5,cx,cy-s*0.55);
+    ctx.quadraticCurveTo(cx+s*0.3,cy-s*0.5,cx+s*0.45,cy-s*0.15);
+    ctx.quadraticCurveTo(cx+s*0.55,cy+s*0.3,cx,cy+s*0.7);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Spear/pole above
+    ctx.strokeStyle=dk;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(cx,cy-s*0.55);ctx.lineTo(cx,cy-s*1.1);ctx.stroke();
+    // Spear tip
+    ctx.fillStyle='#c0c0c0';
+    ctx.beginPath();ctx.moveTo(cx,cy-s*1.2);ctx.lineTo(cx-s*0.08,cy-s*1.0);ctx.lineTo(cx+s*0.08,cy-s*1.0);ctx.closePath();ctx.fill();
+    // Head dot
+    ctx.beginPath();ctx.arc(cx,cy-s*0.65,s*0.12,0,Math.PI*2);
+    ctx.fillStyle='#f0d0a0';ctx.fill();ctx.strokeStyle=dk;ctx.lineWidth=1;ctx.stroke();
+    // Shield cross detail
+    ctx.strokeStyle=dk;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,cy-s*0.3);ctx.lineTo(cx,cy+s*0.4);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-s*0.25,cy);ctx.lineTo(cx+s*0.25,cy);ctx.stroke();
+  }else if(type==='archer_p'){
+    // Player archer: slim figure with bow on right side
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.25,cy-s*0.3);
+    ctx.lineTo(cx-s*0.2,cy+s*0.5);
+    ctx.lineTo(cx+s*0.2,cy+s*0.5);
+    ctx.lineTo(cx+s*0.25,cy-s*0.3);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Head
+    ctx.beginPath();ctx.arc(cx,cy-s*0.5,s*0.15,0,Math.PI*2);
+    ctx.fillStyle='#f0d0a0';ctx.fill();ctx.stroke();
+    // Hood/hat
+    ctx.fillStyle=color;
+    ctx.beginPath();ctx.moveTo(cx-s*0.15,cy-s*0.55);ctx.lineTo(cx,cy-s*0.75);ctx.lineTo(cx+s*0.15,cy-s*0.55);ctx.closePath();ctx.fill();ctx.stroke();
+    // Curved bow on right side
+    ctx.strokeStyle='#8B4513';ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(cx+s*0.45,cy-s*0.05,s*0.4,Math.PI*0.4,Math.PI*1.6);
+    ctx.stroke();
+    // Bowstring
+    ctx.strokeStyle='#ddd';ctx.lineWidth=0.8;
+    const pBowCx=cx+s*0.45,pBowCy=cy-s*0.05,pBr=s*0.4;
+    const pBsX=pBowCx+pBr*Math.cos(Math.PI*0.4),pBsY=pBowCy+pBr*Math.sin(Math.PI*0.4);
+    const pBeX=pBowCx+pBr*Math.cos(Math.PI*1.6),pBeY=pBowCy+pBr*Math.sin(Math.PI*1.6);
+    ctx.beginPath();ctx.moveTo(pBsX,pBsY);ctx.lineTo(pBeX,pBeY);ctx.stroke();
+    // Arrow on left side
+    ctx.strokeStyle='#8B4513';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx-s*0.15,cy-s*0.6);ctx.lineTo(cx-s*0.15,cy+s*0.3);ctx.stroke();
+    // Arrow tip
+    ctx.fillStyle='#c0c0c0';
+    ctx.beginPath();ctx.moveTo(cx-s*0.15,cy-s*0.7);ctx.lineTo(cx-s*0.2,cy-s*0.55);ctx.lineTo(cx-s*0.1,cy-s*0.55);ctx.closePath();ctx.fill();
+    // Quiver on back
+    ctx.fillStyle='#6B3A10';
+    ctx.fillRect(cx+s*0.05,cy-s*0.45,s*0.08,s*0.5);
+  }else if(type==='archer'){
+    // Slimmer figure (goblin archer)
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.25,cy-s*0.3);
+    ctx.lineTo(cx-s*0.2,cy+s*0.5);
+    ctx.lineTo(cx+s*0.2,cy+s*0.5);
+    ctx.lineTo(cx+s*0.25,cy-s*0.3);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Head
+    ctx.beginPath();ctx.arc(cx,cy-s*0.5,s*0.15,0,Math.PI*2);
+    ctx.fillStyle='#f0d0a0';ctx.fill();ctx.stroke();
+    // Curved bow on left side
+    ctx.strokeStyle='#8B4513';ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.arc(cx-s*0.45,cy-s*0.05,s*0.4,-Math.PI*0.6,Math.PI*0.6);
+    ctx.stroke();
+    // Bowstring
+    ctx.strokeStyle='#ddd';ctx.lineWidth=0.8;
+    ctx.beginPath();
+    const bowCx=cx-s*0.45,bowCy=cy-s*0.05,br=s*0.4;
+    const bsX=bowCx+br*Math.cos(-Math.PI*0.6),bsY=bowCy+br*Math.sin(-Math.PI*0.6);
+    const beX=bowCx+br*Math.cos(Math.PI*0.6),beY=bowCy+br*Math.sin(Math.PI*0.6);
+    ctx.moveTo(bsX,bsY);ctx.lineTo(beX,beY);ctx.stroke();
+    // Arrow (vertical line on right side)
+    ctx.strokeStyle='#8B4513';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx+s*0.15,cy-s*0.6);ctx.lineTo(cx+s*0.15,cy+s*0.3);ctx.stroke();
+    // Arrow tip
+    ctx.fillStyle='#c0c0c0';
+    ctx.beginPath();ctx.moveTo(cx+s*0.15,cy-s*0.7);ctx.lineTo(cx+s*0.1,cy-s*0.55);ctx.lineTo(cx+s*0.2,cy-s*0.55);ctx.closePath();ctx.fill();
+  }else if(type==='mage'){
+    // Pointed hat (triangle) on top
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy-s*1.1);
+    ctx.lineTo(cx-s*0.35,cy-s*0.45);
+    ctx.lineTo(cx+s*0.35,cy-s*0.45);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Hat brim
+    ctx.fillStyle=darkenColor(color,0.7);
+    ctx.beginPath();ctx.ellipse(cx,cy-s*0.45,s*0.4,s*0.1,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Robe/body (trapezoid)
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.2,cy-s*0.4);
+    ctx.lineTo(cx-s*0.4,cy+s*0.55);
+    ctx.lineTo(cx+s*0.4,cy+s*0.55);
+    ctx.lineTo(cx+s*0.2,cy-s*0.4);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Head
+    ctx.beginPath();ctx.arc(cx,cy-s*0.55,s*0.13,0,Math.PI*2);
+    ctx.fillStyle='#f0d0a0';ctx.fill();ctx.stroke();
+    // Floating orb
+    const orbX=cx+s*0.5,orbY=cy-s*0.1;
+    ctx.beginPath();ctx.arc(orbX,orbY,s*0.12,0,Math.PI*2);
+    ctx.fillStyle='#a0f0ff';ctx.fill();ctx.stroke();
+    // Orb glow
+    const orbGlow=ctx.createRadialGradient(orbX,orbY,0,orbX,orbY,s*0.25);
+    orbGlow.addColorStop(0,'rgba(160,240,255,0.4)');
+    orbGlow.addColorStop(1,'rgba(160,240,255,0)');
+    ctx.fillStyle=orbGlow;
+    ctx.fillRect(orbX-s*0.25,orbY-s*0.25,s*0.5,s*0.5);
+  }else if(type==='knight'){
+    // Larger shield than swordsman
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy+s*0.65);
+    ctx.quadraticCurveTo(cx-s*0.6,cy+s*0.2,cx-s*0.5,cy-s*0.2);
+    ctx.quadraticCurveTo(cx-s*0.35,cy-s*0.55,cx,cy-s*0.6);
+    ctx.quadraticCurveTo(cx+s*0.35,cy-s*0.55,cx+s*0.5,cy-s*0.2);
+    ctx.quadraticCurveTo(cx+s*0.6,cy+s*0.2,cx,cy+s*0.65);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Diagonal sword
+    ctx.strokeStyle='#c0c0c0';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(cx-s*0.35,cy-s*0.55);ctx.lineTo(cx+s*0.35,cy+s*0.4);ctx.stroke();
+    // Sword crossguard
+    ctx.strokeStyle='#8B4513';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(cx-s*0.1,cy-s*0.2);ctx.lineTo(cx+s*0.1,cy+s*0.05);ctx.stroke();
+    // Head with helmet
+    ctx.fillStyle='#808890';
+    ctx.beginPath();ctx.arc(cx,cy-s*0.7,s*0.18,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Visor slit
+    ctx.strokeStyle='#333';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx-s*0.1,cy-s*0.7);ctx.lineTo(cx+s*0.1,cy-s*0.7);ctx.stroke();
+    // Shield emblem (small cross)
+    ctx.strokeStyle=darkenColor(color,0.4);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,cy-s*0.25);ctx.lineTo(cx,cy+s*0.3);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-s*0.2,cy);ctx.lineTo(cx+s*0.2,cy);ctx.stroke();
+  }else if(type==='scout'){
+    // Slim figure
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.2,cy-s*0.35);
+    ctx.lineTo(cx-s*0.15,cy+s*0.45);
+    ctx.lineTo(cx+s*0.15,cy+s*0.45);
+    ctx.lineTo(cx+s*0.2,cy-s*0.35);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Head
+    ctx.beginPath();ctx.arc(cx,cy-s*0.5,s*0.14,0,Math.PI*2);
+    ctx.fillStyle='#f0d0a0';ctx.fill();ctx.stroke();
+    // Binoculars (two small circles)
+    ctx.fillStyle='#555';ctx.strokeStyle='#333';ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(cx-s*0.1,cy-s*0.5,s*0.07,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.arc(cx+s*0.1,cy-s*0.5,s*0.07,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Binocular bridge
+    ctx.strokeStyle='#555';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(cx-s*0.03,cy-s*0.5);ctx.lineTo(cx+s*0.03,cy-s*0.5);ctx.stroke();
+  }else if(type==='goblin'){
+    // Small hunched figure with pointy ears
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(cx-s*0.3,cy-s*0.15);
+    ctx.quadraticCurveTo(cx-s*0.35,cy+s*0.4,cx-s*0.15,cy+s*0.55);
+    ctx.lineTo(cx+s*0.15,cy+s*0.55);
+    ctx.quadraticCurveTo(cx+s*0.35,cy+s*0.4,cx+s*0.3,cy-s*0.15);
+    ctx.closePath();ctx.fill();ctx.stroke();
+    // Head
+    ctx.beginPath();ctx.arc(cx,cy-s*0.3,s*0.18,0,Math.PI*2);
+    ctx.fillStyle='#7ab040';ctx.fill();ctx.stroke();
+    // Pointy ears
+    ctx.fillStyle='#7ab040';
+    ctx.beginPath();ctx.moveTo(cx-s*0.18,cy-s*0.35);ctx.lineTo(cx-s*0.4,cy-s*0.55);ctx.lineTo(cx-s*0.12,cy-s*0.3);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+s*0.18,cy-s*0.35);ctx.lineTo(cx+s*0.4,cy-s*0.55);ctx.lineTo(cx+s*0.12,cy-s*0.3);ctx.closePath();ctx.fill();ctx.stroke();
+    // Eyes
+    ctx.fillStyle='#ff0';
+    ctx.beginPath();ctx.arc(cx-s*0.07,cy-s*0.32,2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+s*0.07,cy-s*0.32,2,0,Math.PI*2);ctx.fill();
+  }else if(type==='wolf'){
+    // Four-legged silhouette
+    ctx.fillStyle=color;
+    // Body (horizontal ellipse)
+    ctx.beginPath();ctx.ellipse(cx,cy-s*0.05,s*0.5,s*0.2,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Head (forward)
+    ctx.beginPath();ctx.ellipse(cx+s*0.4,cy-s*0.2,s*0.2,s*0.15,-0.3,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Snout
+    ctx.fillStyle=darkenColor(color,0.7);
+    ctx.beginPath();ctx.ellipse(cx+s*0.55,cy-s*0.22,s*0.1,s*0.07,-0.3,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Ears
+    ctx.fillStyle=color;
+    ctx.beginPath();ctx.moveTo(cx+s*0.35,cy-s*0.32);ctx.lineTo(cx+s*0.3,cy-s*0.52);ctx.lineTo(cx+s*0.42,cy-s*0.35);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+s*0.45,cy-s*0.3);ctx.lineTo(cx+s*0.48,cy-s*0.5);ctx.lineTo(cx+s*0.52,cy-s*0.28);ctx.closePath();ctx.fill();ctx.stroke();
+    // Legs
+    ctx.strokeStyle=darkenColor(color,0.6);ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(cx-s*0.3,cy+s*0.15);ctx.lineTo(cx-s*0.35,cy+s*0.5);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-s*0.1,cy+s*0.15);ctx.lineTo(cx-s*0.12,cy+s*0.5);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+s*0.15,cy+s*0.15);ctx.lineTo(cx+s*0.12,cy+s*0.5);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+s*0.3,cy+s*0.15);ctx.lineTo(cx+s*0.35,cy+s*0.5);ctx.stroke();
+    // Tail
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(cx-s*0.5,cy-s*0.05);
+    ctx.quadraticCurveTo(cx-s*0.7,cy-s*0.3,cx-s*0.6,cy-s*0.45);ctx.stroke();
+    // Eye
+    ctx.fillStyle='#ff3';
+    ctx.beginPath();ctx.arc(cx+s*0.45,cy-s*0.23,1.5,0,Math.PI*2);ctx.fill();
+  }else{
+    // Generic fallback: circle with first letter
+    ctx.beginPath();ctx.arc(cx,cy,s,0,Math.PI*2);
+    ctx.fillStyle=color;ctx.fill();ctx.stroke();
+    ctx.font=`bold ${s}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#fff';ctx.fillText('?',cx,cy);
+  }
+  ctx.restore();
+}
+
+// drawUnitFallback: draws the enhanced fallback unit icon for when no sprite is available
+function drawUnitFallback(u,cx,cy){
+  const baseY=cy;
+  // Background disc (team-colored, semi-transparent)
+  ctx.save();
+  ctx.beginPath();ctx.arc(cx,baseY,u.size+2,0,Math.PI*2);
+  const teamBg=u.team==='player'?'rgba(83,216,251,0.18)':'rgba(233,69,96,0.18)';
+  ctx.fillStyle=teamBg;ctx.fill();
+  // Team base ring (thick)
+  ctx.strokeStyle=u.color;ctx.lineWidth=2.5;ctx.stroke();
+  ctx.restore();
+  // Draw the procedural icon
+  drawUnitIcon(u.type,cx,baseY,u.size,u.color);
+}
+
+// ============================================================
+// ENHANCED drawSpriteUnit
+// ============================================================
+function drawSpriteUnit(u,cx,cy){
+  const terrain=S.map[hexKey(u.q,u.r)]?.terrain||0;
+  const h=TERRAIN_HEIGHT[terrain];
+  const spriteImg=sprites[u.sprite];
+  const baseY=cy-h*0.3;
+  const isSelected=S.selectedUnit&&S.selectedUnit===u;
+
+  // --- Directional shadow (offset by scene light direction) ---
+  const shadowOffX=3; // light from top-left → shadow to bottom-right
+  const shadowOffY=4;
+  ctx.beginPath();
+  ctx.ellipse(cx+shadowOffX,cy+shadowOffY+2,u.size+1,u.size*0.35,0,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,0.32)';ctx.fill();
+
+  // --- Team-colored base ring (thick, visible on ground) ---
+  ctx.save();
+  ctx.beginPath();ctx.ellipse(cx,cy+3,u.size+4,u.size*0.5+2,0,0,Math.PI*2);
+  const teamRingColor=u.team==='player'?'rgba(83,216,251,0.45)':'rgba(233,69,96,0.45)';
+  ctx.strokeStyle=teamRingColor;ctx.lineWidth=3;ctx.stroke();
+  ctx.restore();
+
+  // --- Selection visuals ---
+  if(isSelected){
+    // Pulsing glow effect
+    const pulse=0.4+0.3*Math.sin(Date.now()*0.005);
+    const glowGrad=ctx.createRadialGradient(cx,baseY,u.size*0.5,cx,baseY,u.size+8);
+    glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.5})`);
+    glowGrad.addColorStop(1,'rgba(241,196,15,0)');
+    ctx.fillStyle=glowGrad;
+    ctx.beginPath();ctx.arc(cx,baseY,u.size+8,0,Math.PI*2);ctx.fill();
+
+    // Ground selection circle
+    ctx.save();
+    ctx.beginPath();ctx.ellipse(cx,cy+4,u.size+6,u.size*0.45+3,0,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(Date.now()*0.004)})`;
+    ctx.lineWidth=2.5;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // --- Draw unit body (sprite or fallback) ---
+  if(spriteImg){
+    ctx.save();
+    // Team marker disc behind sprite
+    ctx.beginPath();ctx.arc(cx,baseY,u.size+2,0,Math.PI*2);
+    ctx.fillStyle=u.team==='player'?'rgba(83,216,251,0.15)':'rgba(233,69,96,0.15)';ctx.fill();
+    ctx.strokeStyle=u.color;ctx.lineWidth=2;ctx.stroke();
+    // Clip and draw sprite
+    ctx.beginPath();ctx.arc(cx,baseY,u.size,0,Math.PI*2);ctx.clip();
+    ctx.drawImage(spriteImg,cx-u.size,baseY-u.size,u.size*2,u.size*2);
+    ctx.restore();
+  }else{
+    // Enhanced fallback
+    drawUnitFallback(u,cx,baseY);
+  }
+
+  // --- HP bar with border/outline ---
+  const bw=u.size*2.2,bh=4;
+  const bx=cx-bw/2,by=baseY-u.size-9;
+  const ratio=u.hp/u.maxHp;
+  // Border/outline
+  ctx.strokeStyle='#000';ctx.lineWidth=1;
+  ctx.strokeRect(bx-0.5,by-0.5,bw+1,bh+1);
+  // Background
+  ctx.fillStyle='#1a1a1a';ctx.fillRect(bx,by,bw,bh);
+  // HP fill
+  ctx.fillStyle=ratio>.5?'#2ecc71':ratio>.25?'#f39c12':'#e94560';
+  ctx.fillRect(bx,by,Math.max(0,bw*ratio),bh);
+  // HP text (if bar wide enough)
+  if(bw>28){
+    ctx.font='bold 6px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#fff';ctx.fillText(`${u.hp}/${u.maxHp}`,cx,by+bh/2);
+  }
+
+  // --- Level indicator (star icon for level 2+) ---
+  if(u.level>1){
+    const lx=cx+bw/2+8,ly=by+2;
+    // Gold star
+    ctx.fillStyle='#f1c40f';ctx.font='bold 9px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    // Draw small star shape
+    const starCx=lx,starCy=ly,starR=5,starIR=2.5;
+    ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const r=i%2===0?starR:starIR;
+      const angle=Math.PI/2*3+i*Math.PI/5;
+      const sx=starCx+Math.cos(angle)*r,sy=starCy+Math.sin(angle)*r;
+      if(i===0)ctx.moveTo(sx,sy);else ctx.lineTo(sx,sy);
+    }
+    ctx.closePath();ctx.fill();
+    // Level number
+    ctx.fillStyle='#fff';ctx.font='bold 6px sans-serif';
+    ctx.fillText(`${u.level}`,starCx,starCy+0.5);
+  }
+
+  // --- Status icons ---
+  const statusY=baseY+u.size+6;
+  // Attacked icon (grayed-out sword)
+  if(u.attacked){
+    const sx=cx-u.size-2,sy=statusY;
+    ctx.save();ctx.globalAlpha=0.6;
+    ctx.strokeStyle='#888';ctx.lineWidth=1.5;
+    // Small sword shape
+    ctx.beginPath();ctx.moveTo(sx,sy-5);ctx.lineTo(sx+4,sy-1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(sx-2,sy-1);ctx.lineTo(sx+2,sy-1);ctx.lineTo(sx+6,sy+3);ctx.stroke();
+    ctx.restore();
+  }
+  // Movement dots (remaining move points)
+  if(u.move>0&&!u.attacked){
+    const dots=Math.min(u.move,5);
+    for(let i=0;i<dots;i++){
+      const dx=cx-u.size+4+i*5,dy=statusY;
+      ctx.beginPath();ctx.arc(dx,dy,2,0,Math.PI*2);
+      ctx.fillStyle=u.team==='player'?'#53d8fb':'#e94560';ctx.fill();
+    }
+  }
+  // Defensive terrain icon (shield) — forest or hills
+  const defBonus=T_DEF[terrain]||0;
+  if(defBonus>0){
+    const sx=cx+u.size+4,sy=statusY-2;
+    ctx.save();ctx.globalAlpha=0.7;
+    ctx.strokeStyle='#4a90d9';ctx.lineWidth=1.2;
+    // Mini shield
+    ctx.beginPath();
+    ctx.moveTo(sx,sy-4);ctx.lineTo(sx-3,sy-2);ctx.lineTo(sx-3,sy+1);
+    ctx.quadraticCurveTo(sx,sy+4,sx+3,sy+1);ctx.lineTo(sx+3,sy-2);ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // --- Movement remaining dots below unit (when selected) ---
+  if(isSelected&&u.move>0){
+    const moveDots=Math.min(u.move,5);
+    const dotsStartX=cx-(moveDots-1)*3;
+    for(let i=0;i<moveDots;i++){
+      ctx.beginPath();ctx.arc(dotsStartX+i*6,cy+10,2.5,0,Math.PI*2);
+      ctx.fillStyle='rgba(241,196,15,0.8)';ctx.fill();
+      ctx.strokeStyle='rgba(241,196,15,0.4)';ctx.lineWidth=1;ctx.stroke();
+    }
+  }
+
+  // [PATCH 4] Затемнение: юнит полностью истощён (ход=0 и атаковал)
+  if(u.move<=0&&u.attacked&&u.team==='player'){
+    ctx.beginPath();ctx.arc(cx,baseY,u.size+2,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fill();
+  }
+}
+
+function drawSpriteBuilding(b,cx,cy){
+  const terrain=S.map[hexKey(b.q,b.r)]?.terrain||0;
+  const h=TERRAIN_HEIGHT[terrain];
+  const spriteImg=sprites[b.sprite];
+  const drawSize=b.size;
+
+  if(spriteImg){
+    // Здание рисуется чуть ниже верха гекса
+    ctx.save();
+    // Тень
+    ctx.beginPath();ctx.ellipse(cx,cy+6,drawSize*0.6,drawSize*0.3,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
+
+    // Спрайт здания
+    const bx=cx-drawSize,by=cy-h-drawSize*1.2;
+    ctx.drawImage(spriteImg,bx,by,drawSize*2,drawSize*2);
+
+    // Подпись
+    ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle='#e0c97f';
+    ctx.fillText(b.name,cx,cy-drawSize*0.6);
+    ctx.restore();
+  }
+}
+
+function render(){
+  updateEffects();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+  ctx.translate(-S.cam.x,-S.cam.y);
+
+  const cells=Object.values(S.map);
+  cells.sort((a,b)=>a.r-b.r||a.q-b.q);
+
+  // Собираем объекты для сортировки по Y (painter's algorithm)
+  const drawables=[];
+  cells.forEach(cell=>{
+    const pos=hexToPixel(cell.q,cell.r);
+    const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
+    if(sx>-150&&sx<canvas.width+150&&sy>-200&&sy<canvas.height+150){
+      const key=hexKey(cell.q,cell.r);
+      // [TASK 2+3] Unified highlight: compute full Set with all active types
+      const hl=new Set();
+      if(S.hoverHex&&S.hoverHex.q===cell.q&&S.hoverHex.r===cell.r)hl.add('hover');
+      if(S.recruitHighlights.has(key))hl.add('recruit');
+      if(S.pathHighlights.has(key))hl.add('path');
+      if(S.threatHighlights.has(key))hl.add('threat');
+      if(S.moveHighlights.has(key))hl.add('move');
+      if(S.maxReachHighlights.has(key))hl.add('maxReach');
+      if(S.attackHighlights.has(key))hl.add('attack');
+      if(S.selectedUnit&&S.selectedUnit.q===cell.q&&S.selectedUnit.r===cell.r)hl.add('selected');
+      drawables.push({type:'hex',pos,cell,hl:hl.size?hl:null,y:pos.y+TERRAIN_HEIGHT[cell.terrain]});
+    }
+  });
+
+  // Здания
+  S.buildings.forEach(b=>{
+    const pos=hexToPixel(b.q,b.r);
+    const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
+    if(sx>-150&&sx<canvas.width+150&&sy>-200&&sy<canvas.height+150){
+      const t=S.map[hexKey(b.q,b.r)]?.terrain||0;
+      drawables.push({type:'building',obj:b,pos,y:pos.y+TERRAIN_HEIGHT[t]-20});
+    }
+  });
+
+  // Юниты
+  S.units.forEach(u=>{
+    const pos=hexToPixel(u.q,u.r);
+    const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
+    if(sx>-150&&sx<canvas.width+150&&sy>-200&&sy<canvas.height+150){
+      const t=S.map[hexKey(u.q,u.r)]?.terrain||0;
+      drawables.push({type:'unit',obj:u,pos,y:pos.y+TERRAIN_HEIGHT[t]});
+    }
+  });
+
+  // Сортируем по Y для правильного порядка отрисовки
+  drawables.sort((a,b)=>a.y-b.y);
+
+  // Рисуем всё
+  drawables.forEach(d=>{
+    if(d.type==='hex'){
+      drawHex3D(d.pos.x,d.pos.y,d.cell.terrain,d.hl);
+      // [TASK 6] Draw path cost numbers on path-highlighted cells
+      if(d.hl&&d.hl.has('path')){
+        const key=hexKey(d.cell.q,d.cell.r);
+        const cost=S.pathCostMap[key];
+        if(cost!==undefined){
+          ctx.save();
+          const h=TERRAIN_HEIGHT[d.cell.terrain];
+          // Small cost badge: dark circle with number
+          const bx=d.pos.x+10,by=d.pos.y-h*0.1-10;
+          ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);
+          ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fill();
+          ctx.strokeStyle='rgba(255,220,50,0.8)';ctx.lineWidth=1;ctx.stroke();
+          ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillStyle='#ffdc32';ctx.fillText(String(cost),bx,by);
+          ctx.restore();
+        }
+      }
+    }
+    else if(d.type==='building') drawSpriteBuilding(d.obj,d.pos.x,d.pos.y);
+    else if(d.type==='unit') drawSpriteUnit(d.obj,d.pos.x,d.pos.y);
+  });
+
+  // [EFFECTS] Render visual effects on top of everything
+  renderEffects();
+
+  ctx.restore();
+  renderMinimap();
+}
+
+function renderMinimap(){
+  const mw=mmCanvas.width,mh=mmCanvas.height;
+  const legendH=18; // reserved for legend at bottom
+  const mapH=mh-legendH;
+  const sx=mw/(COLS*HEX_W),sy=mapH/(ROWS*HEX_H*0.75);
+  const sc=Math.min(sx,sy);
+  const offsetX=mw/2-COLS*HEX_W*sc/2;
+  const offsetY=8;
+
+  // Helper: world coords to minimap coords
+  function mmPos(q,r){
+    const pos=hexToPixel(q,r);
+    return {x:pos.x*sc+offsetX, y:pos.y*sc+offsetY};
+  }
+
+  mmCtx.clearRect(0,0,mw,mh);
+  mmCtx.fillStyle='#0a0a1a';mmCtx.fillRect(0,0,mw,mh);
+
+  // --- Enhanced terrain colors for minimap (more saturated) ---
+  const MM_TERRAIN_COLORS={
+    0:'#7cc462', // plains - brighter green
+    1:'#1fa828', // forest - vivid green
+    2:'#9a9ab0', // mountain - lighter grey
+    3:'#2888e8', // water - bright blue
+    4:'#e8c840', // desert - vivid yellow
+    5:'#5a8848', // swamp - olive green
+    6:'#c0a068', // hills - tan
+    7:'#c858d8', // ruins - vivid purple
+  };
+
+  // --- Draw terrain as small hexagons ---
+  const hexR=Math.max(2.5, sc*HEX_SIZE*0.48); // small hex radius on minimap
+  function drawMiniHex(cx,cy,r,fillColor,borderColor){
+    mmCtx.beginPath();
+    for(let i=0;i<6;i++){
+      const angle=Math.PI/180*(60*i-30);
+      const vx=cx+r*Math.cos(angle);
+      const vy=cy+r*Math.sin(angle);
+      if(i===0)mmCtx.moveTo(vx,vy);else mmCtx.lineTo(vx,vy);
+    }
+    mmCtx.closePath();
+    mmCtx.fillStyle=fillColor;mmCtx.fill();
+    if(borderColor){
+      mmCtx.strokeStyle=borderColor;mmCtx.lineWidth=0.5;mmCtx.stroke();
+    }
+  }
+
+  // Compute visibility: hexes near player units are visible
+  const playerUnits=S.units.filter(u=>u.team==='player');
+  const visCache={};
+  function isVisible(q,r){
+    const k=q+','+r;
+    if(k in visCache)return visCache[k];
+    let minD=999;
+    for(let i=0;i<playerUnits.length;i++){
+      const d=hexDist(q,r,playerUnits[i].q,playerUnits[i].r);
+      if(d<minD)minD=d;
+    }
+    visCache[k]=minD<=6;
+    return visCache[k];
+  }
+
+  // Draw terrain hexes
+  Object.values(S.map).forEach(cell=>{
+    const {x,y}=mmPos(cell.q,cell.r);
+    const col=MM_TERRAIN_COLORS[cell.terrain]||'#555';
+    drawMiniHex(x,y,hexR,col,'#0a0a1a');
+
+    // Fog of war overlay for unexplored areas
+    if(playerUnits.length>0 && !isVisible(cell.q,cell.r)){
+      mmCtx.beginPath();
+      for(let i=0;i<6;i++){
+        const angle=Math.PI/180*(60*i-30);
+        const vx=x+hexR*Math.cos(angle);
+        const vy=y+hexR*Math.sin(angle);
+        if(i===0)mmCtx.moveTo(vx,vy);else mmCtx.lineTo(vx,vy);
+      }
+      mmCtx.closePath();
+      mmCtx.fillStyle='rgba(10,10,26,0.55)';mmCtx.fill();
+    }
+  });
+
+  // --- Draw buildings ---
+  S.buildings.forEach(b=>{
+    const {x,y}=mmPos(b.q,b.r);
+    const isCastle=b.type==='castle';
+    const sz=isCastle?5:3.5;
+
+    if(isCastle){
+      // Castle: star shape
+      mmCtx.beginPath();
+      for(let i=0;i<5;i++){
+        const outerAngle=Math.PI/180*(72*i-90);
+        const innerAngle=Math.PI/180*(72*i+36-90);
+        mmCtx.lineTo(x+sz*Math.cos(outerAngle),y+sz*Math.sin(outerAngle));
+        mmCtx.lineTo(x+sz*0.45*Math.cos(innerAngle),y+sz*0.45*Math.sin(innerAngle));
+      }
+      mmCtx.closePath();
+      mmCtx.fillStyle='#ffd700';mmCtx.fill();
+      mmCtx.strokeStyle='#fff';mmCtx.lineWidth=0.8;mmCtx.stroke();
+    }else{
+      // Other buildings: diamond
+      mmCtx.beginPath();
+      mmCtx.moveTo(x,y-sz);mmCtx.lineTo(x+sz,y);
+      mmCtx.lineTo(x,y+sz);mmCtx.lineTo(x-sz,y);
+      mmCtx.closePath();
+      mmCtx.fillStyle='#e0c97f';mmCtx.fill();
+      mmCtx.strokeStyle='rgba(255,255,255,0.5)';mmCtx.lineWidth=0.6;mmCtx.stroke();
+    }
+  });
+
+  // --- Draw units ---
+  const now=performance.now();
+  S.units.forEach(u=>{
+    const {x,y}=mmPos(u.q,u.r);
+    const isPlayer=u.team==='player';
+    const isSelected=S.selectedUnit&&S.selectedUnit===u;
+    const dotR=isSelected?4.5:3;
+
+    // Pulse effect for selected unit
+    if(isSelected){
+      const pulse=0.6+0.4*Math.sin(now/200);
+      mmCtx.beginPath();
+      mmCtx.arc(x,y,dotR+3,0,Math.PI*2);
+      mmCtx.fillStyle=`rgba(255,255,255,${(pulse*0.35).toFixed(2)})`;
+      mmCtx.fill();
+    }
+
+    // Unit dot
+    mmCtx.beginPath();
+    mmCtx.arc(x,y,dotR,0,Math.PI*2);
+    mmCtx.fillStyle=u.color;mmCtx.fill();
+
+    // Outline: white for player, dark for enemy
+    mmCtx.strokeStyle=isPlayer?'rgba(255,255,255,0.8)':'rgba(40,0,0,0.8)';
+    mmCtx.lineWidth=isPlayer?1.2:1;
+    mmCtx.stroke();
+  });
+
+  // --- Camera viewport rectangle ---
+  const viewLeft=S.cam.x;
+  const viewTop=S.cam.y;
+  const viewRight=S.cam.x+canvas.width;
+  const viewBottom=S.cam.y+canvas.height;
+
+  const vx1=viewLeft*sc+offsetX;
+  const vy1=viewTop*sc+offsetY;
+  const vx2=viewRight*sc+offsetX;
+  const vy2=viewBottom*sc+offsetY;
+
+  mmCtx.strokeStyle='rgba(255,255,255,0.6)';
+  mmCtx.lineWidth=1.5;
+  mmCtx.setLineDash([3,2]);
+  mmCtx.strokeRect(vx1,vy1,vx2-vx1,vy2-vy1);
+  mmCtx.setLineDash([]);
+
+  // --- Legend ---
+  const legendY=mh-legendH+4;
+  mmCtx.fillStyle='#0a0a1a';mmCtx.fillRect(0,mh-legendH,mw,legendH);
+  const legendItems=[
+    {color:MM_TERRAIN_COLORS[3],label:'Water'},
+    {color:MM_TERRAIN_COLORS[1],label:'Forest'},
+    {color:MM_TERRAIN_COLORS[2],label:'Mtn'},
+    {color:MM_TERRAIN_COLORS[0],label:'Plains'},
+    {color:'#ffd700',label:'Castle'},
+    {color:'#53d8fb',label:'You'},
+    {color:'#e94560',label:'Enemy'},
+  ];
+  const itemW=mw/legendItems.length;
+  mmCtx.font='8px sans-serif';
+  mmCtx.textAlign='center';
+  legendItems.forEach((it,i)=>{
+    const cx=i*itemW+itemW/2;
+    mmCtx.fillStyle=it.color;
+    mmCtx.fillRect(cx-12,legendY,6,6);
+    mmCtx.fillStyle='#8a9bb5';
+    mmCtx.fillText(it.label,cx+2,legendY+5.5);
+  });
+}
+
+// --- Minimap click-to-focus and drag support ---
+(function(){
+  let mmDragging=false;
+  function minimapToWorld(e){
+    const rect=mmCanvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left;
+    const my=e.clientY-rect.top;
+    const mw=mmCanvas.width,mh=mmCanvas.height;
+    const legendH=18;
+    const mapH=mh-legendH;
+    const sx=mw/(COLS*HEX_W),sy=mapH/(ROWS*HEX_H*0.75);
+    const sc=Math.min(sx,sy);
+    const offsetX=mw/2-COLS*HEX_W*sc/2;
+    const offsetY=8;
+    const worldX=(mx-offsetX)/sc;
+    const worldY=(my-offsetY)/sc;
+    return {x:worldX,y:worldY};
+  }
+  function centerOnMinimapClick(e){
+    const w=minimapToWorld(e);
+    S.cam.x=w.x-canvas.width/2;
+    S.cam.y=w.y-canvas.height/2;
+    clampCam();
+  }
+  mmCanvas.addEventListener('mousedown',e=>{
+    mmDragging=true;
+    centerOnMinimapClick(e);
+    e.preventDefault();
+  });
+  mmCanvas.addEventListener('mousemove',e=>{
+    if(mmDragging)centerOnMinimapClick(e);
+  });
+  window.addEventListener('mouseup',()=>{mmDragging=false;});
+  mmCanvas.addEventListener('click',e=>{
+    centerOnMinimapClick(e);
+  });
+})();
+
+// ============================================================
+// ПУТЬ И ПЕРЕМЕЩЕНИЕ
+// ============================================================
+// [PATCH 4] findReachable: использует unit.move (остаток), возвращает costMap
+function findReachable(unit){
+  const moveCells=new Set(),attackCells=new Set();
+  const visited={};
+  const costMap={};
+  const queue=[{q:unit.q,r:unit.r,cost:0}];
+  visited[hexKey(unit.q,unit.r)]=0;
+  costMap[hexKey(unit.q,unit.r)]=0;
+  while(queue.length){
+    const cur=queue.shift();
+    for(const n of hexNeighbors(cur.q,cur.r)){
+      const cell=S.map[hexKey(n.q,n.r)];if(!cell)continue;
+      const mc=T_MOVE[cell.terrain];if(mc>=99)continue;
+      const totalCost=cur.cost+mc;
+      const k=hexKey(n.q,n.r);
+      if(visited[k]!==undefined&&visited[k]<=totalCost)continue;
+      if(totalCost>unit.move)continue;  // [PATCH 4] unit.move вместо unit.maxMove
+      const occ=S.units.find(u=>u.q===n.q&&u.r===n.r);
+      visited[k]=totalCost;
+      costMap[k]=totalCost;
+      if(occ&&occ.team!==unit.team){attackCells.add(k);}
+      else if(occ&&occ.team===unit.team){continue;}
+      else{moveCells.add(k);queue.push({q:n.q,r:n.r,cost:totalCost});}
+    }
+  }
+  if(unit.range>1){
+    S.units.filter(u=>u.team!==unit.team).forEach(e=>{
+      if(hexDist(unit.q,unit.r,e.q,e.r)<=unit.range)attackCells.add(hexKey(e.q,e.r));
+    });
+  }
+  return{moveCells,attackCells,costMap};
+}
+
+function findAttackTargets(unit){
+  return S.units.filter(u=>u.team!==unit.team&&hexDist(unit.q,unit.r,u.q,u.r)<=unit.range);
+}
+
+// [TASK 6] findPath: BFS pathfinding from (fromQ,fromR) to (toQ,toR) for a given unit
+function findPath(fromQ,fromR,toQ,toR,unit){
+  const visited={};
+  const parent={};
+  const costMap={};
+  const queue=[{q:fromQ,r:fromR,cost:0}];
+  const startKey=hexKey(fromQ,fromR);
+  visited[startKey]=0;
+  costMap[startKey]=0;
+  parent[startKey]=null;
+
+  while(queue.length){
+    const cur=queue.shift();
+    for(const n of hexNeighbors(cur.q,cur.r)){
+      const cell=S.map[hexKey(n.q,n.r)];
+      if(!cell)continue;
+      const mc=T_MOVE[cell.terrain];
+      if(mc>=99)continue;
+      const totalCost=cur.cost+mc;
+      const k=hexKey(n.q,n.r);
+      if(visited[k]!==undefined&&visited[k]<=totalCost)continue;
+      if(totalCost>unit.move)continue;
+      // Can't pass through enemy units
+      const occ=S.units.find(u=>u.q===n.q&&u.r===n.r);
+      if(occ&&occ.team!==unit.team)continue;
+      // Can pass through friendly units but not stop on them
+      visited[k]=totalCost;
+      costMap[k]=totalCost;
+      parent[k]=hexKey(cur.q,cur.r);
+      queue.push({q:n.q,r:n.r,cost:totalCost});
+    }
+  }
+
+  // Reconstruct path
+  const targetKey=hexKey(toQ,toR);
+  if(parent[targetKey]===undefined)return null; // no path
+
+  const path=[];
+  let current=targetKey;
+  while(current){
+    const [q,r]=current.split(',').map(Number);
+    path.unshift({q,r,cost:costMap[current]||0});
+    current=parent[current];
+  }
+  return path;
+}
+
+// [TASK 6] computeMaxReach: mark cells at the boundary of reachable area
+function computeMaxReach(unit,costMap){
+  const maxReach=new Set();
+  if(!unit||unit.move<=0)return maxReach;
+  for(const [k,cost] of Object.entries(costMap)){
+    if(cost===unit.move&&k!==hexKey(unit.q,unit.r)){
+      maxReach.add(k);
+    }
+  }
+  return maxReach;
+}
+
+// ============================================================
+// БОЙ
+// ============================================================
+function combat(atk,def){
+  const tDef=T_DEF[S.map[hexKey(def.q,def.r)]?.terrain||0]||0;
+  const dmg=Math.max(1,atk.atk-def.def-tDef+Math.floor(Math.random()*4)-1);
+  def.hp-=dmg;atk.attacked=true;atk.moved=true;atk.move=0;
+  addLog(`${atk.name} \u2192 ${def.name}: ${dmg} урона`,atk.team==='player'?'player':'enemy');
+
+  if(def.hp>0&&hexDist(atk.q,atk.r,def.q,def.r)<=def.range){
+    const cdmg=Math.max(1,Math.floor(def.atk*0.6)-atk.def+Math.floor(Math.random()*2));
+    atk.hp-=cdmg;
+    addLog(`${def.name} контратакует: ${cdmg}`,def.team==='player'?'player':'enemy');
+  }
+
+  if(def.hp<=0){addLog(`${def.name} уничтожен!`,'system');S.units=S.units.filter(u=>u!==def);
+    atk.xp+=10;checkLvl(atk);if(atk.team==='player')S.pp+=1;}
+  if(atk.hp<=0){addLog(`${atk.name} уничтожен!`,'system');S.units=S.units.filter(u=>u!==atk);}
+  if(S.selectedUnit&&S.selectedUnit.hp<=0)S.selectedUnit=null;
+  clearHL();updateUI();checkVictory();
+}
+
+// [EFFECTS] Combat wrapper: intercepts combat calls to add hit/death visual effects
+// Does NOT modify the original combat function internals
+const _originalCombat = combat;
+combat = function(atk, def) {
+  const atkHpBefore = atk.hp;
+  const defHpBefore = def.hp;
+  const atkQ = atk.q, atkR = atk.r;
+  const defQ = def.q, defR = def.r;
+  const defColor = def.color;
+  const atkColor = atk.color;
+  _originalCombat(atk, def);
+  // Hit effect on defender
+  const dmgDealt = defHpBefore - def.hp;
+  if (dmgDealt > 0) addEffect({type:'hit', q:defQ, r:defR, t:0, maxT:20, damage:dmgDealt});
+  // Death effect on defender
+  if (def.hp <= 0) {
+    addEffect({type:'death', q:defQ, r:defR, t:0, maxT:25, color:defColor});
+    if(def.team==='enemy') S.stats.unitsKilled++;
+  }
+  // Counterattack hit on attacker
+  const counterDmg = atkHpBefore - atk.hp;
+  if (counterDmg > 0 && atkHpBefore > 0) addEffect({type:'hit', q:atkQ, r:atkR, t:0, maxT:20, damage:counterDmg});
+  // Death effect on attacker
+  if (atk.hp <= 0) addEffect({type:'death', q:atkQ, r:atkR, t:0, maxT:25, color:atkColor});
+};
+
+function checkLvl(u){
+  const need=u.level*15;
+  if(u.xp>=need){u.level++;u.xp-=need;u.maxHp+=8;u.hp=Math.min(u.hp+8,u.maxHp);
+    u.atk+=2;u.def+=1;addLog(`${u.name} \u2192 уровень ${u.level}!`,'system');}
+}
+
+// ============================================================
+// AI
+// ============================================================
+// [PATCH 6] Улучшенный AI: перегенерация целей, пропуск мёртвых, безопасное продолжение
+function enemyTurn(){
+  if(S.phase==='gameover')return;
+  S.phase='enemy';addLog('--- Ход противника ---','enemy');updatePhaseIndicator();
+  const enemies=[...S.units.filter(u=>u.team==='enemy')];
+  for(let i=0;i<enemies.length;i++){
+    const e=enemies[i];
+    if(e.hp<=0)continue;
+    // [PATCH 6] Перегенерация целей после каждого действия
+    const players=S.units.filter(u=>u.team==='player'&&u.hp>0);
+    if(!players.length)break;
+    let closest=null,cDist=Infinity;
+    players.forEach(p=>{const d=hexDist(e.q,e.r,p.q,p.r);if(d<cDist){cDist=d;closest=p;}});
+    if(!closest)continue;
+    if(cDist<=e.range){
+      combat(e,closest);
+      // [PATCH 6] Если атакующий погиб при контратаке — пропустить
+      if(e.hp<=0)continue;
+    }else{
+      const{moveCells}=findReachable(e);
+      let best=null,bDist=Infinity;
+      moveCells.forEach(k=>{const[cq,cr]=k.split(',').map(Number);
+        const d=hexDist(cq,cr,closest.q,closest.r);if(d<bDist){bDist=d;best={q:cq,r:cr};}});
+      if(best){e.q=best.q;e.r=best.r;e.moved=true;
+        const targets=findAttackTargets(e);
+        if(targets.length&&!e.attacked){
+          combat(e,targets[0]);
+          // [PATCH 6] Если атакующий погиб — не продолжать
+          if(e.hp<=0)continue;
+        }
+      }
+    }
+    // [PATCH 6] Прервать цикл если gameover
+    if(S.phase==='gameover')break;
+  }
+  // [PATCH 1] Таймер через _enemyTurnTimer для возможности отмены
+  _enemyTurnTimer=setTimeout(()=>{
+    _enemyTurnTimer=null;
+    startPlayerTurn();
+  },500);
+}
+
+// ============================================================
+// ХОДЫ
+// ============================================================
+// [PATCH 1] startPlayerTurn: очистка устаревших таймеров, guard gameover
+function startPlayerTurn(){
+  if(S.phase==='gameover')return;
+  if(_enemyTurnTimer!==null){clearTimeout(_enemyTurnTimer);_enemyTurnTimer=null;}
+  S.turn++;S.phase='player';
+  S.buildings.forEach(b=>{b.recruitedThisTurn=false;});
+  S.units.filter(u=>u.team==='player').forEach(u=>{u.moved=false;u.attacked=false;u.move=u.maxMove;});
+
+  // [TECH TREE] Complete current research if enough PP accumulated
+  if(S.currentResearch){
+    const tech=TECHS[S.currentResearch];
+    if(tech){
+      S.researchProgress+=getSciencePerTurn();
+      if(S.researchProgress>=tech.cost){
+        completeResearch();
+      }else{
+        addLog(`${tech.name}: ${S.researchProgress}/${tech.cost} ОП`,'system');
+      }
+    }
+  }
+
+  let fg=0,fd=0;
+  S.units.filter(u=>u.team==='player').forEach(u=>{
+    const t=S.map[hexKey(u.q,u.r)]?.terrain;
+    if(t===TERRAIN.DESERT)fg++;if(t===TERRAIN.PLAINS||t===TERRAIN.HILLS)fd++;
+  });
+  // ОП от зданий
+  let buildingOP=0;
+  S.buildings.forEach(b=>{buildingOP+=BT[b.type].opp;});
+
+  S.res.gold+=fg+3;S.res.food+=fd+2;S.pp+=2+buildingOP;
+  addLog(`--- Ход ${S.turn} ---`,'system');
+  if(fg||fd||buildingOP)addLog(`+${fg+3} золота, +${fd+2} еды, +${2+buildingOP} ОП`,'player');
+
+  // [TECH TREE] Tech bonuses to food and PP
+  let foodBonus=0;
+  if(S.researched.has('gathering'))foodBonus+=countTerrain(TERRAIN.PLAINS);
+  if(S.researched.has('agriculture'))foodBonus+=2;
+  if(foodBonus>0){S.res.food+=foodBonus;addLog(`+${foodBonus} еды (технологии)`,'player');}
+
+  let ppBonus=0;
+  if(S.researched.has('campfires'))ppBonus+=1;
+  if(S.researched.has('religion'))ppBonus+=2;
+  if(S.researched.has('education'))ppBonus+=2;
+  if(S.researched.has('alchemy'))ppBonus+=3;
+  if(ppBonus>0){S.pp+=ppBonus;addLog(`+${ppBonus} ОП (технологии)`,'player');}
+
+  clearHL();S.selectedUnit=null;computeThreats();updateUI();
+  // [TASK 9] Show turn start toast
+  const income=projectIncome();
+  showTurnToast(`Ход ${S.turn} | +${income.gold} золота, +${income.food} еды, +${income.pp} ОП`);
+  updatePhaseIndicator();
+}
+
+// [PATCH 1] endTurn: фаза enemy-turn-pending + блокировка повторного запуска
+function endTurn(){
+  if(!isInputAllowed())return;
+  S.phase='enemy-turn-pending';
+  S.selectedUnit=null;clearHL();updatePhaseIndicator();
+  S.units.filter(u=>u.team==='enemy').forEach(u=>{u.moved=false;u.attacked=false;u.move=u.maxMove;});
+  // [PATCH 1] Отменить предыдущий таймер если вдруг остался
+  if(_enemyTurnTimer!==null){clearTimeout(_enemyTurnTimer);_enemyTurnTimer=null;}
+  _enemyTurnTimer=setTimeout(()=>{
+    _enemyTurnTimer=null;
+    enemyTurn();
+  },200);
+}
+
+// ============================================================
+// СТРОИТЕЛЬСТВО
+// ============================================================
+// [PATCH 3] canBuild: блокировать строительство при ЛЮБОМ юните на клетке
+function canBuild(type,q,r){
+  const cell=S.map[hexKey(q,r)];if(!cell)return false;
+  if(cell.terrain===TERRAIN.MOUNTAIN||cell.terrain===TERRAIN.WATER)return false;
+  if(S.buildings.find(b=>b.q===q&&b.r===r))return false;
+  if(S.units.find(u=>u.q===q&&u.r===r))return false;  // [PATCH 3] любой юнит, не только вражеский
+  // Радиус от замка
+  const castle=S.buildings.find(b=>b.type==='castle');
+  if(!castle)return false;
+  if(hexDist(castle.q,castle.r,q,r)>3)return false;
+  const cost=BT[type].cost;
+  return S.res.gold>=cost.gold&&S.res.wood>=cost.wood;
+}
+
+function build(type,q,r){
+  if(!canBuild(type,q,r))return false;
+  const cost=BT[type].cost;
+  S.res.gold-=cost.gold;S.res.wood-=cost.wood;
+  S.buildings.push(makeBuilding(type,q,r));
+  addLog(`Построено: ${BT[type].name} (${q},${r})`,'system');
+  updateUI();return true;
+}
+
+// ============================================================
+// НАЁМ ЮНИТОВ (RECRUIT UX)
+// ============================================================
+const RES_NAMES = {gold:'золота',food:'еды',wood:'дерева',stone:'камня'};
+function rName(r){return RES_NAMES[r]||r;}
+
+function isHexFreeForSpawn(q,r){
+  const cell=S.map[hexKey(q,r)];
+  if(!cell)return false;
+  if(T_MOVE[cell.terrain]>=99)return false;
+  if(S.units.find(u=>u.q===q&&u.r===r))return false;
+  if(S.buildings.find(b=>b.q===q&&b.r===r))return false;
+  return true;
+}
+
+function findSpawnHex(bq,br){
+  for(const n of hexNeighbors(bq,br)){
+    if(isHexFreeForSpawn(n.q,n.r))return n;
+  }
+  for(const n2 of hexNeighbors(bq,br)){
+    for(const n of hexNeighbors(n2.q,n2.r)){
+      if(isHexFreeForSpawn(n.q,n.r))return n;
+    }
+  }
+  return null;
+}
+
+function canRecruit(unitType,buildingQ,buildingR){
+  const ut=UT[unitType];
+  if(!ut)return false;
+  if(ut.team!=='player')return false;
+  if(ut.minEpoch>S.epoch)return false;
+  const cost=ut.cost||{};
+  for(const[res,amount] of Object.entries(cost)){
+    if((S.res[res]||0)<amount)return false;
+  }
+  const spawnHex=findSpawnHex(buildingQ,buildingR);
+  if(!spawnHex)return false;
+  const building=S.buildings.find(b=>b.q===buildingQ&&b.r===buildingR);
+  if(building&&building.recruitedThisTurn)return false;
+  return true;
+}
+
+function getRecruitStatus(unitType,buildingQ,buildingR){
+  const ut=UT[unitType];
+  if(!ut)return {can:false,reason:'Неизвестный тип'};
+  if(ut.team!=='player')return {can:false,reason:'Нельзя нанять'};
+  if(!ut.cost)return {can:false,reason:'Нельзя нанять'};
+  if(ut.minEpoch>S.epoch)return {can:false,reason:`Нужна Эпоха ${ut.minEpoch} (сейчас ${S.epoch})`};
+  const cost=ut.cost||{};
+  for(const[res,amount] of Object.entries(cost)){
+    if((S.res[res]||0)<amount)return {can:false,reason:`Мало ${rName(res)}: нужно ${amount}, есть ${S.res[res]||0}`};
+  }
+  const spawnHex=findSpawnHex(buildingQ,buildingR);
+  if(!spawnHex)return {can:false,reason:'Нет свободной клетки рядом'};
+  const building=S.buildings.find(b=>b.q===buildingQ&&b.r===buildingR);
+  if(building&&building.recruitedThisTurn)return {can:false,reason:'Наём уже произведён в этом ходу'};
+  return {can:true,reason:''};
+}
+
+function recruitUnit(unitType,buildingQ,buildingR){
+  if(!canRecruit(unitType,buildingQ,buildingR))return false;
+  const ut=UT[unitType];
+  const cost=ut.cost||{};
+  for(const[res,amount] of Object.entries(cost)){
+    S.res[res]-=amount;
+  }
+  const spawn=findSpawnHex(buildingQ,buildingR);
+  if(!spawn)return false;
+  const unit=makeUnit(unitType,spawn.q,spawn.r);
+  unit.moved=true;unit.attacked=false;unit.move=0;
+  S.units.push(unit);
+  const building=S.buildings.find(b=>b.q===buildingQ&&b.r===buildingR);
+  if(building)building.recruitedThisTurn=true;
+  addEffect({type:'spawn',q:spawn.q,r:spawn.r,t:0,maxT:30,team:'player'});
+  addLog(`Нанят: ${ut.name} (${spawn.q},${spawn.r}) — ${Object.entries(cost).map(([r,a])=>`${a} ${rName(r)}`).join(', ')}`,'player');
+  clearHL();updateUI();
+  return true;
+}
+
+// ============================================================
+// ВВОД
+// ============================================================
+// [PATCH 2] mousedown: guard gameover + isInputAllowed
+canvas.addEventListener('mousedown',e=>{
+  if(S.phase==='gameover')return;
+  if(e.button===1||e.button===2){S.dragging=true;S.dragStart={x:e.clientX,y:e.clientY};
+    S.camStart={x:S.cam.x,y:S.cam.y};e.preventDefault();return;}
+  if(!isInputAllowed())return;
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left+S.cam.x;
+  const my=e.clientY-rect.top+S.cam.y;
+  const ox=canvas.width/2,oy=60;
+  const hex=pixelToHex(mx-ox,my-oy);
+  if(S.map[hexKey(hex.q,hex.r)])handleClick(hex.q,hex.r);
+});
+
+canvas.addEventListener('mousemove',e=>{
+  if(S.dragging){S.cam.x=S.camStart.x-(e.clientX-S.dragStart.x);
+    S.cam.y=S.camStart.y-(e.clientY-S.dragStart.y);clampCam();return;}
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left+S.cam.x;
+  const my=e.clientY-rect.top+S.cam.y;
+  const ox=canvas.width/2,oy=60;
+  const hex=pixelToHex(mx-ox,my-oy);
+  const cell=S.map[hexKey(hex.q,hex.r)];
+  // [TASK 2+3] Set hover hex for highlight system
+  if(cell){
+    S.hoverHex={q:hex.q,r:hex.r};
+  }else{
+    S.hoverHex=null;
+    // [TASK 6] Clear path highlights when mouse leaves map
+    S.pathHighlights=new Set();S.pathCostMap={};
+  }
+
+  // [TASK 6] Compute path preview on hover when unit is selected
+  if(S.selectedUnit&&S.hoverHex&&S.moveHighlights.has(hexKey(S.hoverHex.q,S.hoverHex.r))){
+    const path=findPath(S.selectedUnit.q,S.selectedUnit.r,S.hoverHex.q,S.hoverHex.r,S.selectedUnit);
+    if(path&&path.length>1){
+      const newPathHL=new Set();
+      const newPathCost={};
+      path.forEach(p=>{
+        const k=hexKey(p.q,p.r);
+        newPathHL.add(k);
+        newPathCost[k]=p.cost;
+      });
+      S.pathHighlights=newPathHL;
+      S.pathCostMap=newPathCost;
+    }else{
+      S.pathHighlights=new Set();
+      S.pathCostMap={};
+    }
+  }else if(S.selectedUnit&&S.hoverHex&&!S.moveHighlights.has(hexKey(S.hoverHex.q,S.hoverHex.r))){
+    // Hovering over non-reachable cell — clear path
+    S.pathHighlights=new Set();
+    S.pathCostMap={};
+  }
+
+  if(cell){
+    const unit=S.units.find(u=>u.q===hex.q&&u.r===hex.r);
+    const bld=S.buildings.find(b=>b.q===hex.q&&b.r===hex.r);
+    // [TASK 1] Layered tooltip: unit -> building -> tile with separators
+    let txt='';
+    if(unit){
+      const teamTag=unit.team==='player'?'[Союз]':'[Враг]';
+      txt+=teamTag+' '+unit.name+' HP:'+unit.hp+'/'+unit.maxHp+' ATK:'+unit.atk+' DEF:'+unit.def;
+    }
+    if(bld){
+      if(txt)txt+=' ─ ';
+      txt+=bld.name+': '+BT[bld.type].desc;
+      if(BT[bld.type].canRecruit)txt+=' [Найм: R]';
+    }
+    {
+      if(txt)txt+=' ─ ';
+      txt+=T_NAMES[cell.terrain]+' ('+hex.q+','+hex.r+')';
+      const mc=T_MOVE[cell.terrain];const df=T_DEF[cell.terrain];
+      txt+=' Ход:'+(mc>=99?'—':mc)+' Защ:'+(df>0?'+':'')+df;
+    }
+    // [TASK 6] Show total move cost in tooltip if path preview is active
+    if(S.selectedUnit&&S.pathHighlights.size>0){
+      const hKey=hexKey(hex.q,hex.r);
+      if(S.pathCostMap[hKey]!==undefined){
+        txt+=' ─ Путь: '+S.pathCostMap[hKey]+'/'+S.selectedUnit.move;
+      }
+    }
+    const tt=document.getElementById('tooltip');tt.textContent=txt;tt.style.display='block';
+    tt.style.left=(e.clientX+12)+'px';tt.style.top=(e.clientY+12)+'px';
+  }else document.getElementById('tooltip').style.display='none';
+});
+
+canvas.addEventListener('mouseup',()=>S.dragging=false);
+canvas.addEventListener('mouseleave',()=>{S.dragging=false;S.hoverHex=null;S.pathHighlights=new Set();S.pathCostMap={};document.getElementById('tooltip').style.display='none';});
+
+// [TECH TREE] Click handler for tech tree canvas
+document.getElementById('tech-canvas').addEventListener('click',function(e){
+  const rect=this.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const nodes=window._techNodePositions||{};
+  Object.values(nodes).forEach(node=>{
+    if(mx>=node.x&&mx<=node.x+node.w&&my>=node.y&&my<=node.y+node.h){
+      if(canResearch(node.tech.id)){
+        startResearch(node.tech.id);
+        renderTechTree();
+      }
+    }
+  });
+});
+
+// [TECH TREE] Close button
+document.getElementById('tech-close').addEventListener('click',()=>{
+  document.getElementById('tech-overlay').style.display='none';
+});
+
+// [PATCH 2] keydown: guard gameover + isInputAllowed для действий
+document.addEventListener('keydown',e=>{
+  if(S.phase==='gameover')return;
+  const sp=30;
+  if(e.key==='ArrowLeft')S.cam.x-=sp;else if(e.key==='ArrowRight')S.cam.x+=sp;
+  else if(e.key==='ArrowUp')S.cam.y-=sp;else if(e.key==='ArrowDown')S.cam.y+=sp;
+  else if(e.key==='Escape'){
+    const techOverlay=document.getElementById('tech-overlay');
+    if(techOverlay.style.display!=='none'){
+      techOverlay.style.display='none';
+    }else if(S.phase==='recruiting'){hideRecruitMenu();}
+    else{S.selectedUnit=null;clearHL();updateUI();}
+  }
+  else if(e.key==='t'||e.key==='T'){
+    const techOverlay=document.getElementById('tech-overlay');
+    if(techOverlay.style.display==='none'){
+      techOverlay.style.display='block';
+      renderTechTree();
+    }else{
+      techOverlay.style.display='none';
+    }
+  }
+  else if(e.key==='r'||e.key==='R'){
+    if(S.phase==='recruiting'){hideRecruitMenu();}
+    else if(isInputAllowed()){
+      // Try to open recruit menu for building under hover/click
+      const hq=S.hoverHex;
+      if(hq){
+        const b=S.buildings.find(b=>b.q===hq.q&&b.r===hq.r);
+        if(b&&BT[b.type].canRecruit&&BT[b.type].recruits&&BT[b.type].recruits.length){
+          showRecruitMenu(b.q,b.r);
+        }
+      }
+    }
+  }
+  else if(e.key==='b'||e.key==='B'){if(isInputAllowed())tryBuildMode();}
+  clampCam();
+});
+
+// [PATCH 1+2] btn-end-turn: endTurn уже содержит isInputAllowed guard
+document.getElementById('btn-end-turn').addEventListener('click',endTurn);
+// [PATCH 2] btn-attack: guard isInputAllowed
+document.getElementById('btn-attack').addEventListener('click',()=>{
+  if(!isInputAllowed()||!S.selectedUnit)return;
+  const t=findAttackTargets(S.selectedUnit);if(t.length)combat(S.selectedUnit,t[0]);
+});
+
+let buildMode=null;
+// [PATCH 2] btn-build: guard isInputAllowed
+document.getElementById('btn-build').addEventListener('click',()=>{
+  if(!isInputAllowed())return;
+  if(!buildMode){
+    buildMode='barracks';
+    addLog('Режим строительства: выберите клетку для Казарм (B \u2014 сменить тип, Esc \u2014 отмена)','system');
+  }
+  tryBuildAtSelected();
+});
+
+function tryBuildMode(){
+  if(!buildMode)buildMode='barracks';
+  else if(buildMode==='barracks')buildMode='library';
+  else buildMode=null;
+  if(buildMode)addLog(`Строительство: ${BT[buildMode].name} (${BT[buildMode].cost.gold} золота, ${BT[buildMode].cost.wood} дерева)`,'system');
+  else addLog('Режим строительства отключён','system');
+}
+
+function tryBuildAtSelected(){
+  if(!buildMode||!S.selectedUnit)return;
+  const u=S.selectedUnit;
+  if(canBuild(buildMode,u.q,u.r)){
+    build(buildMode,u.q,u.r);
+    buildMode=null;
+  }else{
+    addLog('Нельзя строить здесь! (нужна свободная клетка в радиусе замка, ресурсы)','enemy');
+  }
+}
+
+// [PATCH 2+4] handleClick: guard isInputAllowed, расход u.move по стоимости пути
+function handleClick(q,r){
+  if(!isInputAllowed())return;
+  const clickedUnit=S.units.find(u=>u.q===q&&u.r===r);
+  const clickedBuilding=S.buildings.find(b=>b.q===q&&b.r===r);
+  const k=hexKey(q,r);
+
+  // Режим строительства
+  if(buildMode){
+    if(canBuild(buildMode,q,r)){build(buildMode,q,r);buildMode=null;computeThreats();return;}
+    else{addLog('Нельзя строить здесь!','enemy');buildMode=null;return;}
+  }
+
+  if(S.selectedUnit){
+    const su=S.selectedUnit;
+    // [PATCH 4] Проверка su.move>0 вместо !su.moved, вычитание стоимости
+    if(S.moveHighlights.has(k)&&su.move>0){
+      const cost=S.lastCostMap[k]||1;
+      const oldQ=su.q,oldR=su.r;
+      su.q=q;su.r=r;su.move=Math.max(0,su.move-cost);su.moved=true;
+      addEffect({type:'trail',fromQ:oldQ,fromR:oldR,toQ:q,toR:r,t:0,maxT:15});
+      addLog(`${su.name} \u2192 (${q},${r}) (-${cost} ход)`,'player');
+      const cell=S.map[k];
+      if(cell&&cell.terrain===TERRAIN.RUINS){
+        const g=10+Math.floor(Math.random()*15);S.res.gold+=g;S.pp+=5;
+        addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;
+      }
+      clearHL();
+      // [PATCH 4] Если ещё есть ход — пересчитать доступные клетки
+      if(su.move>0&&!su.attacked){
+        const{moveCells,attackCells,costMap}=findReachable(su);
+        S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
+        // [TASK 6] Compute max-reach boundary after partial move
+        S.maxReachHighlights=computeMaxReach(su,costMap);
+      }else if(!su.attacked){
+        const t=findAttackTargets(su);
+        if(t.length)S.attackHighlights=new Set(t.map(x=>hexKey(x.q,x.r)));
+      }
+      computeThreats();updateUI();return;
+    }
+    if(S.attackHighlights.has(k)&&!su.attacked){
+      const target=S.units.find(u=>u.q===q&&u.r===r&&u.team!==su.team);
+      if(target){combat(su,target);computeThreats();return;}
+    }
+    // [TASK 1] Click priority: unit -> building -> tile
+    if(clickedUnit&&clickedUnit.team==='player'){selectUnit(clickedUnit);return;}
+    if(clickedUnit&&clickedUnit.team==='enemy'){
+      // Show enemy unit info in the unit-info panel
+      showEnemyInfo(clickedUnit);return;
+    }
+    S.selectedUnit=null;clearHL();updateUI();return;
+  }
+
+  // [TASK 1] No unit selected: priority unit -> building -> tile
+  if(clickedUnit&&clickedUnit.team==='player')selectUnit(clickedUnit);
+  else if(clickedUnit&&clickedUnit.team==='enemy')showEnemyInfo(clickedUnit);
+  else if(clickedBuilding&&BT[clickedBuilding.type].canRecruit&&!clickedUnit){
+    // Building with recruits and no unit on it
+    const bt=BT[clickedBuilding.type];
+    if(bt.recruits&&bt.recruits.length){
+      showRecruitMenu(q,r);
+    } else {
+      addLog(`Здание: ${clickedBuilding.name} — нажмите R для найма`,'system');
+    }
+    updateCellInfo(q,r);
+  }
+  else updateCellInfo(q,r);
+}
+
+// [PATCH 4] selectUnit: проверка u.move>0 вместо !u.moved, сохранение costMap
+function selectUnit(u){
+  S.selectedUnit=u;clearHL();
+  if(u.move>0){const{moveCells,attackCells,costMap}=findReachable(u);
+    S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
+    // [TASK 6] Compute max-reach boundary
+    S.maxReachHighlights=computeMaxReach(u,costMap);
+  }
+  else if(!u.attacked){const t=findAttackTargets(u);S.attackHighlights=new Set(t.map(x=>hexKey(x.q,x.r)));}
+  updateUI();
+}
+
+
+// [TASK 2+3] Compute threat zones: all hexes attackable by enemy units
+function computeThreats(){
+  S.threatHighlights=new Set();
+  S.units.filter(u=>u.team==='enemy'&&u.hp>0).forEach(e=>{
+    // Melee/ranged: all hexes within range
+    for(let dq=-e.range;dq<=e.range;dq++){
+      for(let dr=Math.max(-e.range,-dq-e.range);dr<=Math.min(e.range,-dq+e.range);dr++){
+        const tq=e.q+dq,tr=e.r+dr;
+        if(tq===e.q&&tr===e.r)continue;
+        const cell=S.map[hexKey(tq,tr)];
+        if(cell)S.threatHighlights.add(hexKey(tq,tr));
+      }
+    }
+  });
+}
+
+// [TASK 1] Show enemy unit info in the sidebar unit-info panel
+function showEnemyInfo(u){
+  const ud=document.getElementById('unit-info');
+  ud.innerHTML='';
+  const h3=document.createElement('h3');
+  h3.textContent=u.name+' [Враг]';
+  h3.style.color='#e94560';
+  ud.appendChild(h3);
+  const stats=document.createElement('div');
+  stats.className='stats';
+  const statData=[
+    ['HP:',u.hp+'/'+u.maxHp],
+    ['Атака:',u.atk],
+    ['Защита:',u.def],
+    ['Дальность:',u.range],
+  ];
+  statData.forEach(([label,val])=>{
+    const sl=document.createElement('span');sl.className='stat-label';sl.textContent=label;
+    const sv=document.createElement('span');sv.className='stat-val';sv.textContent=String(val);
+    stats.appendChild(sl);stats.appendChild(sv);
+  });
+  ud.appendChild(stats);
+  updateCellInfo(u.q,u.r);
+}
+function clearHL(){S.moveHighlights=new Set();S.attackHighlights=new Set();S.threatHighlights=new Set();S.pathHighlights=new Set();S.recruitHighlights=new Set();S.pathCostMap={};S.maxReachHighlights=new Set();}
+
+function clampCam(){
+  const mw=COLS*HEX_W+200,mh=ROWS*HEX_H+200;
+  S.cam.x=Math.max(-200,Math.min(mw-canvas.width,S.cam.x));
+  S.cam.y=Math.max(-200,Math.min(mh-canvas.height,S.cam.y));
+}
+
+// ============================================================
+// UI
+// ============================================================
+function updateUI(){
+  const epochName=EPOCH_NAMES[S.epoch]||'Примитивы';
+  const romanNumerals=['I','II','III','IV','V'];
+  const roman=romanNumerals[S.epoch]||String(S.epoch+1);
+  document.getElementById('epoch-display').textContent=`◆ Эпоха ${roman}: ${epochName}`;
+  document.getElementById('turn-display').textContent=`⚔ Ход: ${S.turn}`;
+
+  // [TASK 9] Research display in center
+  const researchEl=document.getElementById('research-display');
+  if(S.currentResearch){
+    const tech=TECHS[S.currentResearch];
+    researchEl.textContent=`🔬 Изучается: ${tech?.name||''} (${S.researchProgress}/${tech?.cost||0} ОП)`;
+  }else{
+    researchEl.textContent='🔬 Свободно — выберите технологию (T)';
+  }
+
+  // [TASK 9] Resources with income preview
+  const income=projectIncome();
+  document.getElementById('gold-display').textContent=S.res.gold;
+  document.getElementById('food-display').textContent=S.res.food;
+  document.getElementById('wood-display').textContent=S.res.wood;
+  document.getElementById('stone-display').textContent=S.res.stone;
+  document.getElementById('pp-display').textContent=S.pp;
+  document.getElementById('science-display').textContent=income.science;
+
+  document.getElementById('gold-income').textContent=income.gold>0?`(+${income.gold})`:'';
+  document.getElementById('food-income').textContent=income.food>0?`(+${income.food})`:'';
+  document.getElementById('pp-income').textContent=income.pp>0?`(+${income.pp})`:'';
+
+  // [PATCH 7] unit-info: textContent/createElement вместо innerHTML
+  const ud=document.getElementById('unit-info');
+  ud.innerHTML='';
+  if(S.selectedUnit){
+    const u=S.selectedUnit;
+
+    const h3=document.createElement('h3');
+    h3.textContent=u.name+' ';
+    const small=document.createElement('small');
+    small.style.color='#f1c40f';
+    small.textContent='Ур.'+u.level;
+    h3.appendChild(small);
+    ud.appendChild(h3);
+
+    const stats=document.createElement('div');
+    stats.className='stats';
+    const statData=[
+      ['HP:',u.hp+'/'+u.maxHp],
+      ['Атака:',u.atk],
+      ['Защита:',u.def],
+      ['Движение:',u.move+'/'+u.maxMove],
+      ['Дальность:',u.range],
+      ['Опыт:',u.xp+'/'+(u.level*15)]
+    ];
+    statData.forEach(([label,val])=>{
+      const sl=document.createElement('span');sl.className='stat-label';sl.textContent=label;
+      const sv=document.createElement('span');sv.className='stat-val';sv.textContent=String(val);
+      stats.appendChild(sl);stats.appendChild(sv);
+    });
+    ud.appendChild(stats);
+
+    const p=document.createElement('p');
+    p.style.cssText='margin-top:5px;font-size:10px;color:#667';
+    p.textContent=(u.move>0?'Может двигаться':'Ход сделан')+' | '+(u.attacked?'Атаковал':'Может атаковать');
+    ud.appendChild(p);
+  }else{
+    const h3=document.createElement('h3');h3.textContent='Юнит';ud.appendChild(h3);
+    const p=document.createElement('p');p.textContent='Выберите юнит';ud.appendChild(p);
+  }
+
+  const ab=document.getElementById('btn-attack');
+  if(S.selectedUnit&&!S.selectedUnit.attacked){
+    const t=findAttackTargets(S.selectedUnit);
+    ab.disabled=!t.length;ab.textContent=t.length?`Атаковать (${t.length})`:'Атаковать';
+  }else{ab.disabled=true;ab.textContent='Атаковать';}
+
+  const bb=document.getElementById('btn-build');
+  if(S.selectedUnit){
+    const u=S.selectedUnit;
+    const canBarracks=canBuild('barracks',u.q,u.r);
+    const canLibrary=canBuild('library',u.q,u.r);
+    bb.disabled=!canBarracks&&!canLibrary;
+    bb.textContent=canBarracks?'Строить (Казармы)':canLibrary?'Строить (Библиотека)':'Строить';
+  }else{bb.disabled=true;bb.textContent='Строить';}
+}
+
+// [PATCH 7] cell-info: textContent/createElement вместо innerHTML
+function updateCellInfo(q,r){
+  const cell=S.map[hexKey(q,r)];if(!cell)return;
+  const d=document.getElementById('cell-info');
+  d.innerHTML='';
+  const mc=T_MOVE[cell.terrain];const df=T_DEF[cell.terrain];
+  const bld=S.buildings.find(b=>b.q===q&&b.r===r);
+
+  const h3=document.createElement('h3');
+  h3.textContent='Гекс ('+q+', '+r+')';
+  d.appendChild(h3);
+
+  const p1=document.createElement('p');
+  const b=document.createElement('b');b.textContent=T_NAMES[cell.terrain];
+  p1.appendChild(b);d.appendChild(p1);
+
+  const p2=document.createElement('p');
+  p2.textContent='Стоимость хода: ';
+  const s2=document.createElement('span');s2.className='val';s2.textContent=mc>=99?'Непроходимо':String(mc);
+  p2.appendChild(s2);d.appendChild(p2);
+
+  const p3=document.createElement('p');
+  p3.textContent='Бонус защиты: ';
+  const s3=document.createElement('span');s3.className='val';s3.textContent=(df>0?'+':'')+String(df);
+  p3.appendChild(s3);d.appendChild(p3);
+
+  if(bld){
+    const p4=document.createElement('p');
+    p4.textContent='Здание: ';
+    const s4=document.createElement('span');s4.className='val';s4.textContent=bld.name;
+    p4.appendChild(s4);d.appendChild(p4);
+  }
+}
+
+function addLog(text,cls=''){
+  const d=document.getElementById('log');const e=document.createElement('div');
+  e.className=`entry ${cls}`;e.textContent=text;d.appendChild(e);d.scrollTop=d.scrollHeight;
+}
+
+// ============================================================
+// ТЕХНОЛОГИИ: РЕНДЕРИНГ ДЕРЕВА
+// ============================================================
+function renderTechTree(){
+  const overlay=document.getElementById('tech-overlay');
+  const tc=document.getElementById('tech-canvas');
+  const tctx=tc.getContext('2d');
+  tc.width=window.innerWidth;
+  tc.height=window.innerHeight;
+  tctx.fillStyle='#0a0a1a';
+  tctx.fillRect(0,0,tc.width,tc.height);
+
+  const nodeW=140,nodeH=55,gapY=15;
+  const epochX=[40,220,400,580,760];
+  const epochHeaders=['Эпоха 0','Эпоха I','Эпоха II','Эпоха III','Эпоха IV'];
+
+  // Header
+  tctx.fillStyle='#e0c97f';tctx.font='bold 16px Segoe UI,Arial';tctx.textAlign='center';
+  tctx.fillText('ДЕРЕВО ТЕХНОЛОГИЙ',tc.width/2,25);
+  tctx.font='11px Segoe UI,Arial';tctx.fillStyle='#8a9bb5';
+  tctx.fillText(`Эпоха: ${S.epoch} | ОП: ${S.pp} | Наука/ход: ${getSciencePerTurn()}`,tc.width/2,42);
+
+  // Epoch headers
+  epochHeaders.forEach((name,i)=>{
+    tctx.fillStyle=S.epoch>=i?'#e0c97f':'#555';
+    tctx.font='bold 10px Segoe UI,Arial';tctx.textAlign='center';
+    tctx.fillText(name,epochX[i]+nodeW/2,62);
+  });
+
+  // Layout nodes by epoch
+  const nodes={};
+  const epochBuckets=[[],[],[],[],[]];
+  Object.values(TECHS).forEach(t=>epochBuckets[t.epoch].push(t));
+
+  const startY=80;
+  epochBuckets.forEach((bucket,epoch)=>{
+    bucket.forEach((tech,idx)=>{
+      nodes[tech.id]={
+        x:epochX[epoch],
+        y:startY+idx*(nodeH+gapY),
+        w:nodeW,h:nodeH,tech
+      };
+    });
+  });
+
+  // Draw connections
+  tctx.lineWidth=2;
+  Object.values(nodes).forEach(node=>{
+    node.tech.requires.forEach(reqId=>{
+      const parent=nodes[reqId];
+      if(!parent)return;
+      const fromX=parent.x+parent.w,fromY=parent.y+parent.h/2;
+      const toX=node.x,toY=node.y+node.h/2;
+      tctx.strokeStyle=S.researched.has(reqId)?'#53d8fb':'#333';
+      tctx.beginPath();
+      tctx.moveTo(fromX,fromY);
+      tctx.bezierCurveTo(fromX+40,fromY,toX-40,toY,toX,toY);
+      tctx.stroke();
+    });
+  });
+
+  // Draw nodes — store positions for click detection
+  window._techNodePositions=nodes;
+
+  Object.values(nodes).forEach(node=>{
+    const{x,y,w,h,tech}=node;
+    const status=getTechStatus(tech.id);
+    const isCurrent=S.currentResearch===tech.id;
+
+    // Background
+    const bgColors={
+      researched:'#1a5a10',researching:'#2a4a10',available:'#1b2838',
+      'epoch-locked':'#111',locked:'#0d1117',expensive:'#1b2028'
+    };
+    tctx.fillStyle=bgColors[status.status]||'#0d1117';
+    const borderColors={
+      researched:'#2ecc71',researching:'#f39c12',available:'#e0c97f',
+      'epoch-locked':'#333',locked:'#444',expensive:'#c0392b'
+    };
+    tctx.strokeStyle=borderColors[status.status]||'#333';
+    tctx.lineWidth=isCurrent?3:status.status==='researched'?2:1;
+
+    // Rounded rect
+    const r=6;
+    tctx.beginPath();
+    tctx.moveTo(x+r,y);tctx.lineTo(x+w-r,y);tctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    tctx.lineTo(x+w,y+h-r);tctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    tctx.lineTo(x+r,y+h);tctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    tctx.lineTo(x,y+r);tctx.quadraticCurveTo(x,y,x+r,y);
+    tctx.closePath();tctx.fill();tctx.stroke();
+
+    // Name
+    const textColors={researched:'#2ecc71',researching:'#f39c12',available:'#e0c97f',
+      'epoch-locked':'#555',locked:'#667',expensive:'#c0392b'};
+    tctx.fillStyle=textColors[status.status]||'#667';
+    tctx.font='bold 11px Segoe UI,Arial';tctx.textAlign='center';tctx.textBaseline='middle';
+    tctx.fillText(tech.name,x+w/2,y+h/2-8);
+
+    // Cost/status
+    tctx.font='9px Segoe UI,Arial';tctx.fillStyle='#8a9bb5';
+    const statusText={
+      researched:'✓ Изучено',researching:`${S.researchProgress}/${tech.cost} ОП`,
+      available:`ОП: ${tech.cost}`,'epoch-locked':`Эпоха ${tech.epoch}`,
+      locked:`Нужен: ${tech.requires.map(r=>TECHS[r]?.name||r).join(', ')}`,
+      expensive:`ОП: ${tech.cost} (мало)`
+    };
+    tctx.fillText(statusText[status.status]||'',x+w/2,y+h/2+8);
+
+    // Effect
+    tctx.font='8px Segoe UI,Arial';tctx.fillStyle='#667';
+    tctx.fillText(tech.effect.substring(0,25),x+w/2,y+h/2+20);
+  });
+}
+
+// [PATCH 2] checkVictory: отмена таймеров, проверка hp>0
+function checkVictory(){
+  const enemiesAlive=S.units.filter(u=>u.team==='enemy'&&u.hp>0).length;
+  const playersAlive=S.units.filter(u=>u.team==='player'&&u.hp>0).length;
+  if(!enemiesAlive){
+    addLog('ПОБЕДА!','system');S.phase='gameover';
+    if(_enemyTurnTimer!==null){clearTimeout(_enemyTurnTimer);_enemyTurnTimer=null;}
+    setTimeout(()=>showGameOver(true),200);
+  }else if(!playersAlive){
+    addLog('ПОРАЖЕНИЕ!','system');S.phase='gameover';
+    if(_enemyTurnTimer!==null){clearTimeout(_enemyTurnTimer);_enemyTurnTimer=null;}
+    setTimeout(()=>showGameOver(false),200);
+  }
+}
+
+// ============================================================
+// [TASK 9] GAME OVER OVERLAY
+// ============================================================
+function showGameOver(victory){
+  const overlay=document.getElementById('gameover-overlay');
+  const title=document.getElementById('gameover-title');
+  const subtitle=document.getElementById('gameover-subtitle');
+  const stats=document.getElementById('gameover-stats');
+
+  if(victory){
+    title.textContent='ПОБЕДА!';
+    title.style.color='#e0c97f';
+    subtitle.textContent='Все враги уничтожены!';
+  }else{
+    title.textContent='ПОРАЖЕНИЕ';
+    title.style.color='#e94560';
+    subtitle.textContent='Все ваши юниты уничтожены...';
+  }
+
+  stats.innerHTML=
+    `Ходов: ${S.turn}<br>`+
+    `Юнитов уничтожено: ${S.stats.unitsKilled}<br>`+
+    `Технологий изучено: ${S.researched.size}<br>`+
+    `Эпоха: ${S.epoch} — ${EPOCH_NAMES[S.epoch]}<br>`+
+    `Зданий построено: ${S.buildings.length}`;
+
+  overlay.classList.add('visible');
+  updatePhaseIndicator();
+}
+
+document.getElementById('btn-restart').addEventListener('click',()=>location.reload());
+
+// ============================================================
+// [TASK 9] PROJECT INCOME
+// ============================================================
+function projectIncome(){
+  let fg=0,fd=0;
+  S.units.filter(u=>u.team==='player').forEach(u=>{
+    const t=S.map[hexKey(u.q,u.r)]?.terrain;
+    if(t===TERRAIN.DESERT)fg++;if(t===TERRAIN.PLAINS||t===TERRAIN.HILLS)fd++;
+  });
+  let buildingOP=0;
+  S.buildings.forEach(b=>{buildingOP+=BT[b.type].opp;});
+  let goldIncome=fg+3;
+  let foodIncome=fd+2;
+  let ppIncome=2+buildingOP;
+
+  if(S.researched.has('gathering'))foodIncome+=countTerrain(TERRAIN.PLAINS);
+  if(S.researched.has('agriculture'))foodIncome+=2;
+  if(S.researched.has('campfires'))ppIncome+=1;
+  if(S.researched.has('religion'))ppIncome+=2;
+  if(S.researched.has('education'))ppIncome+=2;
+  if(S.researched.has('alchemy'))ppIncome+=3;
+
+  return {gold:goldIncome,food:foodIncome,pp:ppIncome,science:getSciencePerTurn()};
+}
+
+// ============================================================
+// [TASK 9] PHASE INDICATOR & INPUT LOCK FEEDBACK
+// ============================================================
+function updatePhaseIndicator(){
+  const indicator=document.getElementById('phase-indicator');
+  const dim=document.getElementById('canvas-dim');
+  indicator.className='';
+  indicator.textContent='';
+
+  if(S.phase==='enemy'||S.phase==='enemy-turn-pending'){
+    indicator.textContent='⟳ Ход противника...';
+    indicator.className='enemy-turn';
+    canvas.style.cursor='default';
+    dim.style.display='none';
+  }else if(S.phase==='recruiting'){
+    indicator.textContent='Найм юнитов';
+    indicator.className='recruiting-phase';
+    canvas.style.cursor='default';
+    dim.style.display='block';
+  }else if(S.phase==='gameover'){
+    indicator.style.display='none';
+    dim.style.display='none';
+    canvas.style.cursor='default';
+    return;
+  }else{
+    // player phase
+    indicator.style.display='none';
+    dim.style.display='none';
+    canvas.style.cursor='pointer';
+  }
+}
+
+// ============================================================
+// [TASK 9] TURN START TOAST
+// ============================================================
+let _toastTimer=null;
+function showTurnToast(text){
+  const toast=document.getElementById('turn-toast');
+  toast.textContent=text;
+  toast.classList.add('show');
+  if(_toastTimer)clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>{
+    toast.classList.remove('show');
+    _toastTimer=null;
+  },2000);
+}
+
+// ============================================================
+// ИГРОВОЙ ЦИКЛ
+// ============================================================
+function loop(){render();requestAnimationFrame(loop);}
+
+// [PATCH 5] init: вызов startPlayerTurn() для консистентного первого хода
+function init(){
+  resizeCanvas();genMap();spawnUnits();
+  const startPos=hexToPixel(2,2);
+  S.cam.x=startPos.x-canvas.width/2;S.cam.y=startPos.y-canvas.height/2;clampCam();
+  addLog('Realms of War \u2014 v3 Спрайты','system');
+  addLog('Клик \u2014 выбрать/переместить/атаковать','system');
+  addLog('B \u2014 режим строительства, Esc \u2014 отмена','system');
+  startPlayerTurn();  // [PATCH 5] Единая точка старта: turn=1, доход, сброс флагов
+  loop();
+}
+
+window.addEventListener('resize',resizeCanvas);
+window.addEventListener('contextmenu',e=>e.preventDefault());
+
+// Загрузка спрайтов, затем старт
+loadSprites(init);
+
+// ============================================================
+// RECRUIT MODAL: Show/Hide + Card rendering
+// ============================================================
+function showRecruitMenu(buildingQ,buildingR){
+  const building=S.buildings.find(b=>b.q===buildingQ&&b.r===buildingR);
+  if(!building)return;
+  const bt=BT[building.type];
+  if(!bt.recruits||!bt.recruits.length)return;
+
+  const overlay=document.getElementById('recruit-overlay');
+  const list=document.getElementById('recruit-list');
+  list.innerHTML='';
+
+  bt.recruits.forEach(unitType=>{
+    const ut=UT[unitType];
+    if(!ut||ut.team!=='player')return;
+    const status=getRecruitStatus(unitType,buildingQ,buildingR);
+    const cost=ut.cost||{};
+
+    const card=document.createElement('div');
+    card.style.cssText='background:#1b2838;border:1px solid '+(status.can?'#2ecc71':'#e94560')+';border-radius:4px;padding:8px;margin-bottom:6px;cursor:'+(status.can?'pointer':'not-allowed')+';opacity:'+(status.can?'1':'0.6');
+
+    const nameEl=document.createElement('div');
+    nameEl.style.cssText='color:#e0c97f;font-weight:bold;font-size:13px;margin-bottom:4px';
+    nameEl.textContent=ut.name;
+    card.appendChild(nameEl);
+
+    const statsEl=document.createElement('div');
+    statsEl.style.cssText='font-size:10px;color:#8a9bb5;margin-bottom:4px';
+    statsEl.textContent=`HP:${ut.hp} ATK:${ut.atk} DEF:${ut.def} MOV:${ut.move} RNG:${ut.range}`;
+    card.appendChild(statsEl);
+
+    const costEl=document.createElement('div');
+    costEl.style.cssText='font-size:10px;color:#ffd700;margin-bottom:4px';
+    costEl.textContent='Стоимость: '+Object.entries(cost).map(([r,a])=>`${a} ${rName(r)}`).join(', ');
+    card.appendChild(costEl);
+
+    if(ut.minEpoch>0){
+      const epochEl=document.createElement('div');
+      epochEl.style.cssText='font-size:9px;color:'+(S.epoch>=ut.minEpoch?'#2ecc71':'#e94560');
+      epochEl.textContent=S.epoch>=ut.minEpoch?`Эпоха ${ut.minEpoch} ✓`:`Требуется Эпоха ${ut.minEpoch} (сейчас ${S.epoch})`;
+      card.appendChild(epochEl);
+    }
+
+    if(!status.can){
+      const reasonEl=document.createElement('div');
+      reasonEl.style.cssText='font-size:9px;color:#e94560;margin-top:2px';
+      reasonEl.textContent='\u26A0 '+status.reason;
+      card.appendChild(reasonEl);
+    }
+
+    if(status.can){
+      card.addEventListener('click',()=>{
+        recruitUnit(unitType,buildingQ,buildingR);
+        if(building.recruitedThisTurn)hideRecruitMenu();
+        else showRecruitMenu(buildingQ,buildingR);
+      });
+    }
+
+    list.appendChild(card);
+  });
+
+  overlay.style.display='flex';
+  S.phase='recruiting';
+  updatePhaseIndicator();
+}
+
+function hideRecruitMenu(){
+  document.getElementById('recruit-overlay').style.display='none';
+  if(S.phase==='recruiting')S.phase='player';
+  updatePhaseIndicator();
+}
+
+document.getElementById('btn-close-recruit').addEventListener('click',hideRecruitMenu);
+</script>
+
+<div id="recruit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:50;align-items:center;justify-content:center">
+  <div style="background:#0d1b2a;border:2px solid #e0c97f;border-radius:8px;padding:16px;width:320px;max-height:80vh;overflow-y:auto">
+    <h3 style="color:#e0c97f;text-align:center;margin-bottom:12px">НАЁМ ЮНИТОВ</h3>
+    <div id="recruit-list"></div>
+    <div style="text-align:center;margin-top:10px">
+      <button id="btn-close-recruit" style="background:#e94560;color:#fff;border:none;border-radius:3px;padding:6px 16px;cursor:pointer;font-size:12px">Закрыть (Esc)</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
