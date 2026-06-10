@@ -420,7 +420,11 @@ function makeUnit(type,q,r) {
   return{type,q,r,name:t.name,hp:t.hp,maxHp:t.hp,atk:t.atk,def:t.def,
     move:t.move,maxMove:t.move,range:t.range,team:t.team,
     color:t.color,sprite:t.sprite,size:t.size,
-    moved:false,attacked:false,level:1,xp:0};
+    moved:false,attacked:false,level:1,xp:0,
+    facing:1, // 1=right, -1=left
+    animT:Math.random()*1000, // animation phase offset
+    walkAnim:0, // 0=idle, >0 = walking frame
+    visualX:0,visualY:0}; // interpolated screen position
 }
 
 function makeBuilding(type,q,r) {
@@ -993,809 +997,241 @@ function drawHex3D(cx,cy,terrain,highlight){
   }
 }
 
+
 // ============================================================
-// 3D ISOMETRIC UNIT FIGURINES (Civilization-style miniatures)
+// CIVILIZATION-STYLE UNIT RENDERER — standing figures on terrain
 // ============================================================
 
-// Helper: darken a hex color by a factor
 function darkenColor(hex,factor){
   const c=hexToRgb(hex);
   return rgbStr(c.r*factor,c.g*factor,c.b*factor);
 }
-// Helper: lighten a hex color by blending toward white
 function lightenColor(hex,factor){
   const c=hexToRgb(hex);
   return rgbStr(c.r+(255-c.r)*factor,c.g+(255-c.g)*factor,c.b+(255-c.b)*factor);
 }
-// Helper: blend two hex colors
-function blendColors(hex1,hex2,t){
-  const a=hexToRgb(hex1),b=hexToRgb(hex2);
-  return rgbStr(a.r+(b.r-a.r)*t,a.g+(b.g-a.g)*t,a.b+(b.b-a.b)*t);
-}
 
-// ---- 3D Drawing Primitives ----
-
-// Draw a 3D elliptical base platform (team-colored pedestal)
-function draw3DBase(cx,groundY,rx,ry,h,baseColor){
-  ctx.save();
-  const c=hexToRgb(baseColor);
-  // Front face of base (dark)
-  ctx.beginPath();
-  ctx.ellipse(cx,groundY+h,rx,ry,0,0,Math.PI);
-  ctx.lineTo(cx-rx,groundY);
-  ctx.ellipse(cx,groundY,rx,ry,0,Math.PI,0,true);
-  ctx.closePath();
-  const frontGrad=ctx.createLinearGradient(cx-rx,groundY,cx+rx,groundY+h);
-  frontGrad.addColorStop(0,rgbStr(c.r*0.7,c.g*0.7,c.b*0.7));
-  frontGrad.addColorStop(0.4,rgbStr(c.r*0.45,c.g*0.45,c.b*0.45));
-  frontGrad.addColorStop(1,rgbStr(c.r*0.3,c.g*0.3,c.b*0.3));
-  ctx.fillStyle=frontGrad;ctx.fill();
-  ctx.strokeStyle=rgbStr(c.r*0.2,c.g*0.2,c.b*0.2);ctx.lineWidth=1;ctx.stroke();
-  // Top face of base (bright, lit from top-left)
-  ctx.beginPath();
-  ctx.ellipse(cx,groundY,rx,ry,0,0,Math.PI*2);
-  const topGrad=ctx.createRadialGradient(cx-rx*0.25,groundY-ry*0.2,rx*0.1,cx,groundY,rx);
-  topGrad.addColorStop(0,rgbStr(Math.min(255,c.r*1.3),Math.min(255,c.g*1.3),Math.min(255,c.b*1.3)));
-  topGrad.addColorStop(0.6,rgbStr(c.r*0.9,c.g*0.9,c.b*0.9));
-  topGrad.addColorStop(1,rgbStr(c.r*0.65,c.g*0.65,c.b*0.65));
-  ctx.fillStyle=topGrad;ctx.fill();
-  ctx.strokeStyle=rgbStr(c.r*0.3,c.g*0.3,c.b*0.3);ctx.lineWidth=1;ctx.stroke();
-  // Specular highlight on top
-  ctx.beginPath();
-  ctx.ellipse(cx-rx*0.2,groundY-ry*0.15,rx*0.35,ry*0.25,-0.2,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.18)';ctx.fill();
-  ctx.restore();
-}
-
-// Draw a 3D sphere (for heads, orbs)
-function draw3DSphere(cx,cy,r,baseColor,highlightColor){
-  ctx.save();
-  const c=hexToRgb(baseColor);
-  // Main sphere
-  const grad=ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.1,cx,cy,r);
-  if(highlightColor){
-    const hc=hexToRgb(highlightColor);
-    grad.addColorStop(0,rgbStr(Math.min(255,hc.r*1.2),Math.min(255,hc.g*1.2),Math.min(255,hc.b*1.2)));
-    grad.addColorStop(0.5,rgbStr(hc.r*0.8,hc.g*0.8,hc.b*0.8));
-    grad.addColorStop(1,rgbStr(c.r*0.35,c.g*0.35,c.b*0.35));
-  } else {
-    grad.addColorStop(0,rgbStr(Math.min(255,c.r*1.4),Math.min(255,c.g*1.4),Math.min(255,c.b*1.4)));
-    grad.addColorStop(0.45,rgbStr(c.r*0.9,c.g*0.9,c.b*0.9));
-    grad.addColorStop(1,rgbStr(c.r*0.3,c.g*0.3,c.b*0.3));
-  }
+// ---- Small figure primitives ----
+function drawHead(cx,cy,r,skinColor){
+  const grad=ctx.createRadialGradient(cx-r*0.3,cy-r*0.35,r*0.1,cx,cy,r);
+  const sc=hexToRgb(skinColor);
+  grad.addColorStop(0,rgbStr(Math.min(255,sc.r*1.3),Math.min(255,sc.g*1.3),Math.min(255,sc.b*1.3)));
+  grad.addColorStop(0.55,rgbStr(sc.r,sc.g,sc.b));
+  grad.addColorStop(1,rgbStr(sc.r*0.55,sc.g*0.55,sc.b*0.55));
   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
   ctx.fillStyle=grad;ctx.fill();
-  ctx.strokeStyle=rgbStr(c.r*0.2,c.g*0.2,c.b*0.2);ctx.lineWidth=0.8;ctx.stroke();
-  // Specular dot
-  ctx.beginPath();ctx.arc(cx-r*0.28,cy-r*0.28,r*0.18,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.55)';ctx.fill();
-  ctx.restore();
+  ctx.strokeStyle=rgbStr(sc.r*0.35,sc.g*0.35,sc.b*0.35);ctx.lineWidth=0.7;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx+r*0.2,cy-r*0.1,r*0.15,0,Math.PI*2);ctx.fillStyle='#2a2a2a';ctx.fill();
+  ctx.beginPath();ctx.arc(cx-r*0.25,cy-r*0.25,r*0.2,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.25)';ctx.fill();
 }
-
-// Draw a 3D cylinder (for bodies, limbs)
-function draw3DCylinder(cx,topY,botY,topW,botW,color){
-  ctx.save();
+function drawTorso(cx,topY,botY,topW,botW,color){
   const c=hexToRgb(color);
-  const topRY=topW*0.3; // ellipse vertical radius at top
-  const botRY=botW*0.3; // ellipse vertical radius at bottom
-  // Body side (front face) with gradient
-  ctx.beginPath();
-  ctx.ellipse(cx,botY,botW,botRY,0,0,Math.PI); // bottom arc
-  ctx.lineTo(cx-topW,topY);
-  ctx.ellipse(cx,topY,topW,topRY,0,Math.PI,0,true); // top arc (reverse)
-  ctx.closePath();
-  const sideGrad=ctx.createLinearGradient(cx-botW,topY,cx+botW,botY);
-  sideGrad.addColorStop(0,rgbStr(Math.min(255,c.r*1.15),Math.min(255,c.g*1.15),Math.min(255,c.b*1.15)));
-  sideGrad.addColorStop(0.35,rgbStr(c.r*0.85,c.g*0.85,c.b*0.85));
-  sideGrad.addColorStop(0.7,rgbStr(c.r*0.6,c.g*0.6,c.b*0.6));
-  sideGrad.addColorStop(1,rgbStr(c.r*0.35,c.g*0.35,c.b*0.35));
-  ctx.fillStyle=sideGrad;ctx.fill();
-  ctx.strokeStyle=rgbStr(c.r*0.2,c.g*0.2,c.b*0.2);ctx.lineWidth=0.8;ctx.stroke();
-  // Top ellipse (bright, lit)
-  ctx.beginPath();
-  ctx.ellipse(cx,topY,topW,topRY,0,0,Math.PI*2);
-  const topGrad=ctx.createRadialGradient(cx-topW*0.2,topY-topRY*0.2,topW*0.1,cx,topY,topW);
-  topGrad.addColorStop(0,rgbStr(Math.min(255,c.r*1.3),Math.min(255,c.g*1.3),Math.min(255,c.b*1.3)));
-  topGrad.addColorStop(0.6,rgbStr(c.r*0.85,c.g*0.85,c.b*0.85));
-  topGrad.addColorStop(1,rgbStr(c.r*0.55,c.g*0.55,c.b*0.55));
-  ctx.fillStyle=topGrad;ctx.fill();
-  ctx.strokeStyle=rgbStr(c.r*0.25,c.g*0.25,c.b*0.25);ctx.lineWidth=0.6;ctx.stroke();
+  const grad=ctx.createLinearGradient(cx-botW,topY,cx+botW,botY);
+  grad.addColorStop(0,rgbStr(Math.min(255,c.r*1.15),Math.min(255,c.g*1.15),Math.min(255,c.b*1.15)));
+  grad.addColorStop(0.4,rgbStr(c.r*0.9,c.g*0.9,c.b*0.9));
+  grad.addColorStop(1,rgbStr(c.r*0.5,c.g*0.5,c.b*0.5));
+  ctx.beginPath();ctx.moveTo(cx-topW,topY);ctx.lineTo(cx+topW,topY);ctx.lineTo(cx+botW,botY);ctx.lineTo(cx-botW,botY);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();ctx.strokeStyle=rgbStr(c.r*0.3,c.g*0.3,c.b*0.3);ctx.lineWidth=0.7;ctx.stroke();
+}
+function drawLegs(cx,hipY,footY,legSpread,color,walkPhase){
+  const c=hexToRgb(color);const legColor=rgbStr(c.r*0.65,c.g*0.65,c.b*0.65);const bootColor=rgbStr(c.r*0.35,c.g*0.35,c.b*0.35);
+  const swing=Math.sin(walkPhase)*3;
+  [-1,1].forEach((dir,i)=>{const sw=(i===0?1:-1)*swing;const lx=cx+dir*legSpread;
+    ctx.beginPath();ctx.moveTo(lx,hipY);ctx.lineTo(lx+sw,footY-3);ctx.strokeStyle=legColor;ctx.lineWidth=3;ctx.lineCap='round';ctx.stroke();
+    ctx.beginPath();ctx.ellipse(lx+sw,footY,3.5,2,0,0,Math.PI*2);ctx.fillStyle=bootColor;ctx.fill();});
+}
+function drawArm(cx,shoulderY,elbowY,handX,handY,color,side){
+  const c=hexToRgb(color);ctx.beginPath();ctx.moveTo(cx+side*4,shoulderY);ctx.quadraticCurveTo(cx+side*8,elbowY,handX,handY);
+  ctx.strokeStyle=rgbStr(c.r*0.75,c.g*0.75,c.b*0.75);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
+}
+function drawSmallShield(cx,cy,r,color){
+  const c=hexToRgb(color);const grad=ctx.createRadialGradient(cx-r*0.2,cy-r*0.2,r*0.1,cx,cy,r);
+  grad.addColorStop(0,rgbStr(Math.min(255,c.r*1.4),Math.min(255,c.g*1.4),Math.min(255,c.b*1.4)));
+  grad.addColorStop(0.5,rgbStr(c.r*0.85,c.g*0.85,c.b*0.85));grad.addColorStop(1,rgbStr(c.r*0.4,c.g*0.4,c.b*0.4));
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
+  ctx.strokeStyle=rgbStr(c.r*0.25,c.g*0.25,c.b*0.25);ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,r*0.25,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fill();
+}
+function drawHeldSword(handX,handY,angle,len){
+  ctx.save();ctx.translate(handX,handY);ctx.rotate(angle);
+  const bladeGrad=ctx.createLinearGradient(-1.5,-len,1.5,0);
+  bladeGrad.addColorStop(0,'rgba(255,255,255,0.9)');bladeGrad.addColorStop(0.5,'rgba(200,210,220,1)');bladeGrad.addColorStop(1,'rgba(140,150,165,0.8)');
+  ctx.strokeStyle=bladeGrad;ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,-len);ctx.lineTo(0,0);ctx.stroke();
+  ctx.strokeStyle='#8B6914';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-4,0);ctx.lineTo(4,0);ctx.stroke();
   ctx.restore();
 }
-
-// Draw a 3D cone (for hats, spikes)
-function draw3DCone(cx,baseY,topY,baseRX,baseRY,baseColor){
-  ctx.save();
-  const c=hexToRgb(baseColor);
-  // Side of cone
-  ctx.beginPath();
-  ctx.moveTo(cx,topY); // tip
-  ctx.ellipse(cx,baseY,baseRX,baseRY,0,0,Math.PI); // base arc
-  ctx.closePath();
-  const coneGrad=ctx.createLinearGradient(cx-baseRX,baseY,cx+baseRX,topY);
-  coneGrad.addColorStop(0,rgbStr(Math.min(255,c.r*1.2),Math.min(255,c.g*1.2),Math.min(255,c.b*1.2)));
-  coneGrad.addColorStop(0.4,rgbStr(c.r*0.85,c.g*0.85,c.b*0.85));
-  coneGrad.addColorStop(1,rgbStr(c.r*0.4,c.g*0.4,c.b*0.4));
-  ctx.fillStyle=coneGrad;ctx.fill();
-  ctx.strokeStyle=rgbStr(c.r*0.2,c.g*0.2,c.b*0.2);ctx.lineWidth=0.8;ctx.stroke();
-  // Base ellipse (top-visible part)
-  ctx.beginPath();
-  ctx.ellipse(cx,baseY,baseRX,baseRY,0,Math.PI,0); // only the back half is visible
-  ctx.strokeStyle=rgbStr(c.r*0.3,c.g*0.3,c.b*0.3);ctx.lineWidth=0.6;ctx.stroke();
-  ctx.restore();
+function drawHeldSpear(handX,handY,shaftLen){
+  const shaftGrad=ctx.createLinearGradient(handX-1.5,handY-shaftLen,handX+1.5,handY);
+  shaftGrad.addColorStop(0,'#a07030');shaftGrad.addColorStop(0.5,'#8B5A20');shaftGrad.addColorStop(1,'#5a3818');
+  ctx.strokeStyle=shaftGrad;ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(handX,handY);ctx.lineTo(handX,handY-shaftLen);ctx.stroke();
+  const tipGrad=ctx.createLinearGradient(handX-3,handY-shaftLen-6,handX+3,handY-shaftLen);
+  tipGrad.addColorStop(0,'rgba(255,255,255,0.95)');tipGrad.addColorStop(1,'rgba(140,150,165,0.8)');
+  ctx.fillStyle=tipGrad;ctx.beginPath();ctx.moveTo(handX,handY-shaftLen-6);ctx.lineTo(handX-3,handY-shaftLen+1);ctx.lineTo(handX+3,handY-shaftLen+1);ctx.closePath();ctx.fill();
 }
-
-// Draw a 3D shield (rounded, with metallic rim)
-function draw3DShield(cx,cy,r,color,rimColor){
-  ctx.save();
-  const c=hexToRgb(color);
-  // Shield body (3D curved disc)
-  const sGrad=ctx.createRadialGradient(cx-r*0.25,cy-r*0.2,r*0.1,cx,cy,r);
-  sGrad.addColorStop(0,rgbStr(Math.min(255,c.r*1.4),Math.min(255,c.g*1.4),Math.min(255,c.b*1.4)));
-  sGrad.addColorStop(0.5,rgbStr(c.r*0.85,c.g*0.85,c.b*0.85));
-  sGrad.addColorStop(1,rgbStr(c.r*0.4,c.g*0.4,c.b*0.4));
-  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
-  ctx.fillStyle=sGrad;ctx.fill();
-  // Rim
-  const rc=hexToRgb(rimColor);
-  ctx.strokeStyle=rgbStr(Math.min(255,rc.r*1.2),Math.min(255,rc.g*1.2),Math.min(255,rc.b*1.2));
-  ctx.lineWidth=2.5;ctx.stroke();
-  // Rim highlight (top-left bright edge)
-  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI*0.8,-Math.PI*0.15);
-  ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1.5;ctx.stroke();
-  // Center boss (metallic bump)
-  const bossGrad=ctx.createRadialGradient(cx-r*0.1,cy-r*0.1,0,cx,cy,r*0.3);
-  bossGrad.addColorStop(0,'rgba(255,255,255,0.6)');
-  bossGrad.addColorStop(0.5,rgbStr(rc.r*0.8,rc.g*0.8,rc.b*0.8));
-  bossGrad.addColorStop(1,rgbStr(rc.r*0.4,rc.g*0.4,rc.b*0.4));
-  ctx.beginPath();ctx.arc(cx,cy,r*0.25,0,Math.PI*2);
-  ctx.fillStyle=bossGrad;ctx.fill();
-  ctx.restore();
+function drawHeldBow(handX,handY,angle,bowR){
+  ctx.save();ctx.translate(handX,handY);ctx.rotate(angle);
+  const woodGrad=ctx.createLinearGradient(-2,0,2,0);woodGrad.addColorStop(0,'#5a3010');woodGrad.addColorStop(0.4,'#a07030');woodGrad.addColorStop(1,'#6a4018');
+  ctx.strokeStyle=woodGrad;ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();ctx.arc(0,0,bowR,Math.PI*0.3,Math.PI*1.7);ctx.stroke();
+  const a1=Math.PI*0.3,a2=Math.PI*1.7;ctx.strokeStyle='rgba(220,215,200,0.8)';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.moveTo(bowR*Math.cos(a1),bowR*Math.sin(a1));ctx.lineTo(bowR*Math.cos(a2),bowR*Math.sin(a2));ctx.stroke();ctx.restore();
 }
-
-// Draw a 3D sword/blade
-function draw3DSword(x1,y1,x2,y2,bladeLen,guardW,color){
-  ctx.save();
-  // Blade (metallic gradient)
-  const bladeGrad=ctx.createLinearGradient(x1-2,y1,x1+2,y1);
-  bladeGrad.addColorStop(0,'rgba(180,190,200,0.6)');
-  bladeGrad.addColorStop(0.3,'rgba(240,245,255,1)');
-  bladeGrad.addColorStop(0.5,'rgba(255,255,255,1)');
-  bladeGrad.addColorStop(0.7,'rgba(200,210,220,1)');
-  bladeGrad.addColorStop(1,'rgba(130,140,155,0.8)');
-  ctx.strokeStyle=bladeGrad;
-  ctx.lineWidth=3;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-  // Blade edge highlight
-  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(x1-0.5,y1);ctx.lineTo(x2-0.5,y2);ctx.stroke();
-  // Guard (crossguard)
-  const gx=x1,gy=y1;
-  ctx.strokeStyle='#8B6914';ctx.lineWidth=3;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(gx-guardW,gy);ctx.lineTo(gx+guardW,gy);ctx.stroke();
-  // Guard highlight
-  ctx.strokeStyle='rgba(255,220,100,0.5)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(gx-guardW+1,gy-1);ctx.lineTo(gx+guardW-1,gy-1);ctx.stroke();
-  // Pommel
-  ctx.beginPath();ctx.arc(gx,gy+4,2.5,0,Math.PI*2);
-  const pomGrad=ctx.createRadialGradient(gx-0.5,gy+3.5,0,gx,gy+4,2.5);
-  pomGrad.addColorStop(0,'#d4a520');pomGrad.addColorStop(1,'#8B6914');
-  ctx.fillStyle=pomGrad;ctx.fill();
-  ctx.restore();
+function drawHeldStaff(handX,handY,shaftLen){
+  ctx.strokeStyle='#5a3820';ctx.lineWidth=2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(handX,handY);ctx.lineTo(handX,handY-shaftLen);ctx.stroke();
+  const orbY=handY-shaftLen-3;const orbGlow=ctx.createRadialGradient(handX,orbY,0,handX,orbY,8);
+  orbGlow.addColorStop(0,'rgba(120,200,255,0.5)');orbGlow.addColorStop(0.5,'rgba(80,160,255,0.15)');orbGlow.addColorStop(1,'rgba(60,120,255,0)');
+  ctx.fillStyle=orbGlow;ctx.beginPath();ctx.arc(handX,orbY,8,0,Math.PI*2);ctx.fill();
+  const orbGrad=ctx.createRadialGradient(handX-1,orbY-1,1,handX,orbY,4);orbGrad.addColorStop(0,'#d0f0ff');orbGrad.addColorStop(0.5,'#60b0ff');orbGrad.addColorStop(1,'#2060a0');
+  ctx.beginPath();ctx.arc(handX,orbY,4,0,Math.PI*2);ctx.fillStyle=orbGrad;ctx.fill();
 }
-
-// Draw a 3D bow with string
-function draw3DBow(cx,cy,bowR,angle,color){
-  ctx.save();
-  ctx.translate(cx,cy);ctx.rotate(angle);
-  // Bow body (wooden, with 3D shading)
-  const woodGrad=ctx.createLinearGradient(-3,0,3,0);
-  woodGrad.addColorStop(0,'#5a3010');woodGrad.addColorStop(0.3,'#8B5A20');
-  woodGrad.addColorStop(0.6,'#a07030');woodGrad.addColorStop(1,'#6a4018');
-  ctx.strokeStyle=woodGrad;ctx.lineWidth=3.5;ctx.lineCap='round';
-  ctx.beginPath();ctx.arc(0,0,bowR,Math.PI*0.35,Math.PI*1.65);ctx.stroke();
-  // Bow highlight edge
-  ctx.strokeStyle='rgba(200,160,80,0.4)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.arc(-1,0,bowR,Math.PI*0.4,Math.PI*1.6);ctx.stroke();
-  // String
-  const sAngle1=Math.PI*0.35, sAngle2=Math.PI*1.65;
-  const sx1=bowR*Math.cos(sAngle1),sy1=bowR*Math.sin(sAngle1);
-  const sx2=bowR*Math.cos(sAngle2),sy2=bowR*Math.sin(sAngle2);
-  ctx.strokeStyle='rgba(220,215,200,0.85)';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.stroke();
-  ctx.restore();
-}
-
-// Draw a 3D spear/polearm
-function draw3DSpear(cx,topY,shaftLen,shaftColor,tipColor){
-  ctx.save();
-  // Shaft
-  const shaftGrad=ctx.createLinearGradient(cx-1.5,topY,cx+1.5,topY);
-  shaftGrad.addColorStop(0,'rgba(80,50,20,0.7)');shaftGrad.addColorStop(0.4,shaftColor);
-  shaftGrad.addColorStop(0.6,lightenColor(shaftColor,0.2));shaftGrad.addColorStop(1,'rgba(60,35,10,0.7)');
-  ctx.strokeStyle=shaftGrad;ctx.lineWidth=2.5;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(cx,topY);ctx.lineTo(cx,topY+shaftLen);ctx.stroke();
-  // Spear tip (metallic)
-  const tipY=topY-6;
-  const tipGrad=ctx.createLinearGradient(cx-4,tipY,cx+4,tipY);
-  tipGrad.addColorStop(0,'rgba(150,160,175,0.8)');tipGrad.addColorStop(0.3,'rgba(220,225,235,1)');
-  tipGrad.addColorStop(0.5,'rgba(255,255,255,1)');tipGrad.addColorStop(0.7,'rgba(200,205,215,1)');
-  tipGrad.addColorStop(1,'rgba(120,130,145,0.8)');
-  ctx.fillStyle=tipGrad;
-  ctx.beginPath();ctx.moveTo(cx,tipY-4);ctx.lineTo(cx-3.5,topY+1);ctx.lineTo(cx+3.5,topY+1);ctx.closePath();
-  ctx.fill();ctx.strokeStyle='rgba(80,85,95,0.7)';ctx.lineWidth=0.6;ctx.stroke();
-  ctx.restore();
-}
-
 
 // ============================================================
-// 3D UNIT FIGURINE RENDERER — one per unit type
+// CIVILIZATION-STYLE UNIT RENDERER per type
 // ============================================================
-
-function drawUnit3D(type,cx,cy,size,color,team){
-  const s=size;
-  const groundY=cy; // ground level
-  const isPlayer=team==='player';
-  const baseColor=isPlayer?'#2874a6':'#922b21'; // team base color
-  const baseColorLt=isPlayer?'#3498db':'#c0392b';
-
-  ctx.save();
-  ctx.lineJoin='round';
-  ctx.lineCap='round';
-
-  // ---- 3D Base platform ----
-  draw3DBase(cx,groundY,s*0.8,s*0.28,4,baseColorLt);
+function drawUnit3D(type,cx,groundY,size,color,team,facing,walkPhase,idleBob){
+  const s=size;const f=facing;const bob=idleBob;const isWalking=walkPhase>0;const wp=isWalking?walkPhase*0.8:0;const by=groundY-bob;
+  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.beginPath();ctx.ellipse(cx,groundY+2,s*0.5,s*0.15,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
 
   if(type==='hero'){
-    // === HERO: Tall regal figurine with crown and cape ===
-    // Cape (behind body)
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.45,groundY-s*0.85);ctx.quadraticCurveTo(cx-s*0.65,groundY-s*0.3,cx-s*0.35,groundY-s*0.05);
-    ctx.lineTo(cx+s*0.35,groundY-s*0.05);
-    ctx.quadraticCurveTo(cx+s*0.65,groundY-s*0.3,cx+s*0.45,groundY-s*0.85);
-    ctx.closePath();
-    const capeGrad=ctx.createLinearGradient(cx-s*0.5,groundY-s*0.8,cx+s*0.5,groundY);
-    capeGrad.addColorStop(0,lightenColor(color,0.15));capeGrad.addColorStop(0.5,color);capeGrad.addColorStop(1,darkenColor(color,0.5));
-    ctx.fillStyle=capeGrad;ctx.fill();
-    ctx.strokeStyle=darkenColor(color,0.35);ctx.lineWidth=1;ctx.stroke();
-    // Body (3D cylinder, wide shoulders tapering to waist)
-    draw3DCylinder(cx,groundY-s*0.85,groundY-s*0.15,s*0.32,s*0.25,color);
-    // Belt
-    ctx.beginPath();ctx.ellipse(cx,groundY-s*0.55,s*0.28,s*0.08,0,0,Math.PI*2);
-    ctx.fillStyle='#8B6914';ctx.fill();ctx.strokeStyle='#5a4510';ctx.lineWidth=0.8;ctx.stroke();
-    // Belt buckle (gold highlight)
-    ctx.beginPath();ctx.arc(cx,groundY-s*0.55,3,0,Math.PI*2);
-    const buckGrad=ctx.createRadialGradient(cx-1,groundY-s*0.56,0,cx,groundY-s*0.55,3);
-    buckGrad.addColorStop(0,'#f0d060');buckGrad.addColorStop(1,'#8B6914');
-    ctx.fillStyle=buckGrad;ctx.fill();
-    // Head
-    draw3DSphere(cx,groundY-s*1.1,s*0.18,'#f0d0a0','#f5ddb8');
-    // Crown (3D golden)
-    const crownBaseY=groundY-s*1.28;
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.22,crownBaseY+s*0.12);ctx.lineTo(cx-s*0.15,crownBaseY-s*0.08);
-    ctx.lineTo(cx-s*0.05,crownBaseY+s*0.04);ctx.lineTo(cx,crownBaseY-s*0.14);
-    ctx.lineTo(cx+s*0.05,crownBaseY+s*0.04);ctx.lineTo(cx+s*0.15,crownBaseY-s*0.08);
-    ctx.lineTo(cx+s*0.22,crownBaseY+s*0.12);ctx.closePath();
-    const crGrad=ctx.createLinearGradient(cx-s*0.2,crownBaseY-s*0.1,cx+s*0.2,crownBaseY+s*0.1);
-    crGrad.addColorStop(0,'#ffe050');crGrad.addColorStop(0.4,'#f0c030');crGrad.addColorStop(1,'#a08020');
-    ctx.fillStyle=crGrad;ctx.fill();
-    ctx.strokeStyle='#806010';ctx.lineWidth=0.8;ctx.stroke();
-    // Crown gems
-    ctx.beginPath();ctx.arc(cx,crownBaseY-s*0.08,1.5,0,Math.PI*2);
-    ctx.fillStyle='#e74c3c';ctx.fill();
-    // Sword (in right hand, pointing up)
-    draw3DSword(cx+s*0.22,groundY-s*0.75,cx+s*0.22,groundY-s*1.5,10,s*0.15);
-    // Shoulder armor pads
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();ctx.ellipse(cx+dir*s*0.32,groundY-s*0.82,s*0.12,s*0.08,dir*0.3,0,Math.PI*2);
-      const padGrad=ctx.createRadialGradient(cx+dir*s*0.3,groundY-s*0.84,s*0.02,cx+dir*s*0.32,groundY-s*0.82,s*0.12);
-      padGrad.addColorStop(0,lightenColor(color,0.3));padGrad.addColorStop(1,darkenColor(color,0.5));
-      ctx.fillStyle=padGrad;ctx.fill();ctx.strokeStyle=darkenColor(color,0.3);ctx.lineWidth=0.8;ctx.stroke();
-    });
-
+    const h=s*1.8;const headY=by-h+s*0.15;const shoulderY=by-h*0.7;const hipY=by-h*0.35;const footY=by;
+    ctx.beginPath();ctx.moveTo(cx-f*3,shoulderY);ctx.quadraticCurveTo(cx-f*8,hipY,cx-f*5,footY);ctx.lineTo(cx+f*2,footY);ctx.quadraticCurveTo(cx+f*2,hipY,cx+f*2,shoulderY);ctx.closePath();
+    const capeGrad=ctx.createLinearGradient(cx,shoulderY,cx,footY);capeGrad.addColorStop(0,lightenColor(color,0.1));capeGrad.addColorStop(1,darkenColor(color,0.5));ctx.fillStyle=capeGrad;ctx.fill();
+    drawLegs(cx,hipY,footY,3,darkenColor(color,0.5),wp);drawTorso(cx,shoulderY,hipY,s*0.28,s*0.2,color);
+    ctx.fillStyle='#8B6914';ctx.fillRect(cx-s*0.22,hipY-2,s*0.44,3);ctx.beginPath();ctx.arc(cx,hipY-1,2,0,Math.PI*2);ctx.fillStyle='#f0d060';ctx.fill();
+    drawArm(cx,shoulderY+2,shoulderY+s*0.2,cx-f*s*0.35,shoulderY+s*0.35,color,-f);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.15,cx+f*s*0.3,shoulderY+s*0.1,color,f);
+    drawHeldSword(cx+f*s*0.3,shoulderY+s*0.1,-0.3-f*0.3,s*0.7);
+    [-1,1].forEach(dir=>{ctx.beginPath();ctx.ellipse(cx+dir*s*0.28,shoulderY+1,s*0.1,s*0.06,dir*0.2,0,Math.PI*2);ctx.fillStyle=lightenColor(color,0.15);ctx.fill();});
+    drawHead(cx,headY,s*0.15,'#f0d0a0');
+    const crY=headY-s*0.15;ctx.beginPath();ctx.moveTo(cx-s*0.15,crY);ctx.lineTo(cx-s*0.1,crY-s*0.12);ctx.lineTo(cx,crY-s*0.06);ctx.lineTo(cx+s*0.1,crY-s*0.12);ctx.lineTo(cx+s*0.15,crY);ctx.closePath();
+    ctx.fillStyle='#f0c030';ctx.fill();ctx.beginPath();ctx.arc(cx,crY-s*0.06,1.2,0,Math.PI*2);ctx.fillStyle='#e74c3c';ctx.fill();
   }else if(type==='spearman'){
-    // === SPEARMAN: Sturdy figure with shield and spear ===
-    // Body (3D cylinder)
-    draw3DCylinder(cx,groundY-s*0.7,groundY-s*0.1,s*0.25,s*0.2,color);
-    // Shield (left side, 3D)
-    draw3DShield(cx-s*0.28,groundY-s*0.45,s*0.22,color,'#a0a8b0');
-    // Shield cross emblem
-    ctx.strokeStyle=darkenColor(color,0.35);ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(cx-s*0.28,groundY-s*0.62);ctx.lineTo(cx-s*0.28,groundY-s*0.28);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx-s*0.44,groundY-s*0.45);ctx.lineTo(cx-s*0.12,groundY-s*0.45);ctx.stroke();
-    // Spear (right side, vertical)
-    draw3DSpear(cx+s*0.2,groundY-s*0.7,s*0.95,'#8B5A20','#c0c0c0');
-    // Head with helmet
-    draw3DSphere(cx,groundY-s*0.92,s*0.16,'#f0d0a0','#f5ddb8');
-    // Helmet (dome over head)
-    ctx.beginPath();ctx.arc(cx,groundY-s*0.95,s*0.18,Math.PI,0);
-    const helmGrad=ctx.createRadialGradient(cx-2,groundY-s*0.98,1,cx,groundY-s*0.95,s*0.18);
-    helmGrad.addColorStop(0,'#b0b8c0');helmGrad.addColorStop(0.6,'#808890');helmGrad.addColorStop(1,'#505560');
-    ctx.fillStyle=helmGrad;ctx.fill();ctx.strokeStyle='#404550';ctx.lineWidth=0.8;ctx.stroke();
-    // Nose guard
-    ctx.beginPath();ctx.moveTo(cx,groundY-s*1.1);ctx.lineTo(cx,groundY-s*0.88);
-    ctx.strokeStyle='#707880';ctx.lineWidth=1.5;ctx.stroke();
-
+    const h=s*1.6;const headY=by-h+s*0.12;const shoulderY=by-h*0.68;const hipY=by-h*0.32;const footY=by;
+    drawLegs(cx,hipY,footY,3,darkenColor(color,0.5),wp);drawTorso(cx,shoulderY,hipY,s*0.22,s*0.18,color);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.18,cx-f*s*0.3,shoulderY+s*0.3,color,-f);drawSmallShield(cx-f*s*0.3,shoulderY+s*0.25,s*0.15,color);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.1,cx+f*s*0.2,shoulderY-s*0.05,color,f);drawHeldSpear(cx+f*s*0.2,shoulderY-s*0.05,h*0.85);
+    drawHead(cx,headY,s*0.13,'#f0d0a0');
+    ctx.beginPath();ctx.arc(cx,headY-s*0.02,s*0.15,Math.PI,0);const helmGrad=ctx.createLinearGradient(cx-s*0.15,headY-s*0.15,cx+s*0.1,headY);helmGrad.addColorStop(0,'#b0b8c0');helmGrad.addColorStop(1,'#606870');ctx.fillStyle=helmGrad;ctx.fill();ctx.strokeStyle='#404850';ctx.lineWidth=0.6;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,headY-s*0.17);ctx.lineTo(cx,headY+s*0.02);ctx.strokeStyle='#707880';ctx.lineWidth=1.2;ctx.stroke();
   }else if(type==='scout'){
-    // === SCOUT: Slim agile figure with hood ===
-    // Body (slim cylinder)
-    draw3DCylinder(cx,groundY-s*0.6,groundY-s*0.08,s*0.18,s*0.14,color);
-    // Cloak edges (flowing)
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.25,groundY-s*0.55);ctx.quadraticCurveTo(cx-s*0.35,groundY-s*0.2,cx-s*0.2,groundY);
-    ctx.strokeStyle=darkenColor(color,0.5);ctx.lineWidth=1.5;ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx+s*0.25,groundY-s*0.55);ctx.quadraticCurveTo(cx+s*0.35,groundY-s*0.2,cx+s*0.2,groundY);
-    ctx.stroke();
-    // Head
-    draw3DSphere(cx,groundY-s*0.78,s*0.13,'#f0d0a0','#f5ddb8');
-    // Hood (3D cone/dome)
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.2,groundY-s*0.78);ctx.quadraticCurveTo(cx-s*0.22,groundY-s*1.1,cx,groundY-s*1.15);
-    ctx.quadraticCurveTo(cx+s*0.22,groundY-s*1.1,cx+s*0.2,groundY-s*0.78);ctx.closePath();
-    const hoodGrad=ctx.createLinearGradient(cx-s*0.2,groundY-s*1.1,cx+s*0.15,groundY-s*0.8);
-    hoodGrad.addColorStop(0,lightenColor(color,0.15));hoodGrad.addColorStop(0.5,color);hoodGrad.addColorStop(1,darkenColor(color,0.5));
-    ctx.fillStyle=hoodGrad;ctx.fill();ctx.strokeStyle=darkenColor(color,0.3);ctx.lineWidth=0.8;ctx.stroke();
-    // Binoculars (two small lenses)
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();ctx.arc(cx+dir*4,groundY-s*0.78,2.5,0,Math.PI*2);
-      const lensGrad=ctx.createRadialGradient(cx+dir*4-0.5,groundY-s*0.79,0,cx+dir*4,groundY-s*0.78,2.5);
-      lensGrad.addColorStop(0,'#88aacc');lensGrad.addColorStop(0.5,'#4a6080');lensGrad.addColorStop(1,'#2a3040');
-      ctx.fillStyle=lensGrad;ctx.fill();ctx.strokeStyle='#1a2030';ctx.lineWidth=0.8;ctx.stroke();
-      // Lens glare
-      ctx.beginPath();ctx.arc(cx+dir*4-0.8,groundY-s*0.79,0.8,0,Math.PI*2);
-      ctx.fillStyle='rgba(255,255,255,0.5)';ctx.fill();
-    });
-    // Bridge between lenses
-    ctx.fillStyle='#3a4050';ctx.fillRect(cx-1,groundY-s*0.79,2,1.5);
-    // Dagger at belt
-    ctx.strokeStyle='#c0c0c0';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(cx+s*0.18,groundY-s*0.5);ctx.lineTo(cx+s*0.22,groundY-s*0.3);ctx.stroke();
-    ctx.fillStyle='#8B6914';ctx.fillRect(cx+s*0.16,groundY-s*0.5,3,2);
-
+    const h=s*1.5;const headY=by-h+s*0.1;const shoulderY=by-h*0.65;const hipY=by-h*0.3;const footY=by;
+    drawLegs(cx,hipY,footY,2.5,darkenColor(color,0.5),wp);
+    ctx.beginPath();ctx.moveTo(cx-f*2,shoulderY);ctx.quadraticCurveTo(cx-f*6,hipY,cx-f*4,footY);ctx.strokeStyle=darkenColor(color,0.55);ctx.lineWidth=1.5;ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx+f*2,shoulderY);ctx.quadraticCurveTo(cx+f*5,hipY,cx+f*3,footY);ctx.stroke();
+    drawTorso(cx,shoulderY,hipY,s*0.16,s*0.12,color);
+    ctx.strokeStyle='#c0c8d0';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx+f*3,hipY-3);ctx.lineTo(cx+f*4,hipY+5);ctx.stroke();
+    drawArm(cx,shoulderY+2,shoulderY+s*0.15,cx-f*3,shoulderY+s*0.2,color,-f);drawArm(cx,shoulderY+2,shoulderY+s*0.15,cx+f*3,shoulderY+s*0.2,color,f);
+    drawHead(cx,headY,s*0.12,'#f0d0a0');
+    ctx.beginPath();ctx.moveTo(cx-s*0.14,headY+s*0.05);ctx.quadraticCurveTo(cx,headY-s*0.2,cx+s*0.14,headY+s*0.05);ctx.quadraticCurveTo(cx,headY-s*0.1,cx-s*0.14,headY+s*0.05);ctx.closePath();ctx.fillStyle=darkenColor(color,0.55);ctx.fill();
+    ctx.beginPath();ctx.arc(cx+f*3,headY-s*0.02,2,0,Math.PI*2);ctx.fillStyle='#4a6080';ctx.fill();ctx.beginPath();ctx.arc(cx+f*3-0.5,headY-s*0.03,0.7,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,0.4)';ctx.fill();
   }else if(type==='archer_p'){
-    // === PLAYER ARCHER: Figure with bow and quiver ===
-    // Body
-    draw3DCylinder(cx,groundY-s*0.65,groundY-s*0.08,s*0.2,s*0.16,color);
-    // Quiver on back (angled cylinder)
-    ctx.save();ctx.translate(cx+s*0.12,groundY-s*0.55);ctx.rotate(-0.2);
-    draw3DCylinder(0,-s*0.15,s*0.35,3,2.5,'#6B3A10');
-    // Arrow fletchings sticking out
-    ctx.strokeStyle='#8B5A20';ctx.lineWidth=1;
-    for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(i*1.5,-s*0.2);ctx.lineTo(i*2,-s*0.35);ctx.stroke();}
-    // Feather colors
-    ctx.fillStyle='rgba(255,255,255,0.7)';
-    for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(i*2,-s*0.35);ctx.lineTo(i*2-1.5,-s*0.42);ctx.lineTo(i*2+0.5,-s*0.38);ctx.closePath();ctx.fill();}
-    ctx.restore();
-    // Head
-    draw3DSphere(cx,groundY-s*0.85,s*0.14,'#f0d0a0','#f5ddb8');
-    // Hood
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.18,groundY-s*0.82);ctx.quadraticCurveTo(cx,groundY-s*1.12,cx+s*0.18,groundY-s*0.82);ctx.closePath();
-    const archHood=ctx.createLinearGradient(cx-s*0.15,groundY-s*1.05,cx+s*0.1,groundY-s*0.82);
-    archHood.addColorStop(0,lightenColor(color,0.1));archHood.addColorStop(0.5,color);archHood.addColorStop(1,darkenColor(color,0.45));
-    ctx.fillStyle=archHood;ctx.fill();ctx.strokeStyle=darkenColor(color,0.3);ctx.lineWidth=0.8;ctx.stroke();
-    // Bow (3D, right side)
-    draw3DBow(cx+s*0.3,groundY-s*0.45,s*0.35,0.15,'#8B5A20');
-    // Arrow nocked (horizontal line from bow center)
-    ctx.strokeStyle='#a08050';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(cx+s*0.05,groundY-s*0.45);ctx.lineTo(cx-s*0.3,groundY-s*0.45);ctx.stroke();
-    // Arrow tip
-    ctx.fillStyle='#c0c8d0';
-    ctx.beginPath();ctx.moveTo(cx-s*0.35,groundY-s*0.45);ctx.lineTo(cx-s*0.3,groundY-s*0.48);ctx.lineTo(cx-s*0.3,groundY-s*0.42);ctx.closePath();ctx.fill();
-    // Arm holding bow (simple cylinder)
-    draw3DCylinder(cx+s*0.15,groundY-s*0.65,groundY-s*0.4,2.5,2,color);
-
+    const h=s*1.55;const headY=by-h+s*0.1;const shoulderY=by-h*0.66;const hipY=by-h*0.32;const footY=by;
+    ctx.save();ctx.translate(cx-f*3,shoulderY+5);ctx.rotate(f*0.15);ctx.fillStyle='#5a3a18';ctx.fillRect(-2,-s*0.2,4,s*0.4);
+    for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(i*1.5,-s*0.2);ctx.lineTo(i*2,-s*0.28);ctx.strokeStyle='#8B5A20';ctx.lineWidth=0.8;ctx.stroke();}
+    ctx.fillStyle='rgba(255,255,255,0.5)';for(let i=-1;i<=1;i++){ctx.beginPath();ctx.moveTo(i*2,-s*0.28);ctx.lineTo(i*2-1,-s*0.32);ctx.lineTo(i*2+0.5,-s*0.3);ctx.closePath();ctx.fill();}ctx.restore();
+    drawLegs(cx,hipY,footY,2.5,darkenColor(color,0.5),wp);drawTorso(cx,shoulderY,hipY,s*0.18,s*0.14,color);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.15,cx+f*s*0.25,shoulderY+s*0.05,color,f);drawHeldBow(cx+f*s*0.25,shoulderY+s*0.05,f*0.2,s*0.3);
+    ctx.strokeStyle='#a08050';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx+f*s*0.05,shoulderY+s*0.05);ctx.lineTo(cx-f*s*0.2,shoulderY+s*0.05);ctx.stroke();
+    drawArm(cx,shoulderY+2,shoulderY+s*0.15,cx-f*s*0.2,shoulderY+s*0.1,color,-f);
+    drawHead(cx,headY,s*0.12,'#f0d0a0');
+    ctx.beginPath();ctx.moveTo(cx-s*0.14,headY+s*0.04);ctx.quadraticCurveTo(cx,headY-s*0.18,cx+s*0.14,headY+s*0.04);ctx.closePath();ctx.fillStyle=darkenColor(color,0.65);ctx.fill();
   }else if(type==='knight'){
-    // === KNIGHT: Heavy armored figure with sword and shield ===
-    // Cape (behind)
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.4,groundY-s*0.9);ctx.quadraticCurveTo(cx-s*0.55,groundY-s*0.4,cx-s*0.3,groundY);
-    ctx.lineTo(cx+s*0.3,groundY);ctx.quadraticCurveTo(cx+s*0.55,groundY-s*0.4,cx+s*0.4,groundY-s*0.9);
-    ctx.closePath();
-    const kCapeGrad=ctx.createLinearGradient(cx-s*0.4,groundY-s*0.8,cx+s*0.4,groundY);
-    kCapeGrad.addColorStop(0,lightenColor(color,0.1));kCapeGrad.addColorStop(0.5,darkenColor(color,0.8));kCapeGrad.addColorStop(1,darkenColor(color,0.35));
-    ctx.fillStyle=kCapeGrad;ctx.fill();ctx.strokeStyle=darkenColor(color,0.25);ctx.lineWidth=1;ctx.stroke();
-    // Body (wider, armored)
-    draw3DCylinder(cx,groundY-s*0.85,groundY-s*0.1,s*0.35,s*0.28,color);
-    // Armor plates (horizontal lines on body)
-    for(let i=0;i<3;i++){
-      const ay=groundY-s*0.3-i*s*0.18;
-      const aw=s*0.28-i*0.02;
-      ctx.beginPath();ctx.ellipse(cx,ay,aw,aw*0.25,0,0,Math.PI*2);
-      ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=0.8;ctx.stroke();
-    }
-    // Shield (left side, larger)
-    draw3DShield(cx-s*0.3,groundY-s*0.5,s*0.25,color,'#b0b8c8');
-    // Shield cross emblem
-    ctx.strokeStyle=darkenColor(color,0.3);ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(cx-s*0.3,groundY-s*0.7);ctx.lineTo(cx-s*0.3,groundY-s*0.3);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(cx-s*0.48,groundY-s*0.5);ctx.lineTo(cx-s*0.12,groundY-s*0.5);ctx.stroke();
-    // Sword (right hand, angled)
-    ctx.save();ctx.translate(cx+s*0.28,groundY-s*0.5);ctx.rotate(-0.5);
-    draw3DSword(0,0,0,-s*0.75,s*0.2,'#c0c0c0');
-    ctx.restore();
-    // Head with great helm
-    // Helmet bucket shape
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.16,groundY-s*0.95);ctx.lineTo(cx-s*0.14,groundY-s*1.2);
-    ctx.quadraticCurveTo(cx,groundY-s*1.35,cx+s*0.14,groundY-s*1.2);
-    ctx.lineTo(cx+s*0.16,groundY-s*0.95);ctx.closePath();
-    const helmGrad=ctx.createLinearGradient(cx-s*0.14,groundY-s*1.3,cx+s*0.14,groundY-s*0.95);
-    helmGrad.addColorStop(0,'#d0d5dc');helmGrad.addColorStop(0.3,'#a0a8b4');helmGrad.addColorStop(0.7,'#707880');helmGrad.addColorStop(1,'#505560');
-    ctx.fillStyle=helmGrad;ctx.fill();ctx.strokeStyle='#404550';ctx.lineWidth=1;ctx.stroke();
-    // Visor slit
-    ctx.fillStyle='#1a1a22';ctx.fillRect(cx-s*0.1,groundY-s*1.1,s*0.2,2.5);
-    // Breathing holes
-    for(let i=0;i<3;i++){
-      ctx.beginPath();ctx.moveTo(cx-s*0.06+i*6,groundY-s*1.04);ctx.lineTo(cx-s*0.06+i*6,groundY-s*1.0);
-      ctx.strokeStyle='#404550';ctx.lineWidth=0.8;ctx.stroke();
-    }
-    // Plume on top
-    ctx.beginPath();ctx.moveTo(cx,groundY-s*1.32);ctx.quadraticCurveTo(cx+s*0.2,groundY-s*1.5,cx+s*0.1,groundY-s*1.6);
-    ctx.strokeStyle=color;ctx.lineWidth=3;ctx.lineCap='round';ctx.stroke();
-    // Shoulder pauldrons
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();ctx.ellipse(cx+dir*s*0.35,groundY-s*0.82,s*0.14,s*0.1,dir*0.3,0,Math.PI*2);
-      const pGrad=ctx.createRadialGradient(cx+dir*s*0.33,groundY-s*0.84,s*0.02,cx+dir*s*0.35,groundY-s*0.82,s*0.14);
-      pGrad.addColorStop(0,'#c8d0d8');pGrad.addColorStop(0.5,'#9098a0');pGrad.addColorStop(1,'#505860');
-      ctx.fillStyle=pGrad;ctx.fill();ctx.strokeStyle='#404850';ctx.lineWidth=0.8;ctx.stroke();
-    });
-
+    const h=s*1.7;const headY=by-h+s*0.1;const shoulderY=by-h*0.65;const hipY=by-h*0.3;const footY=by;
+    ctx.beginPath();ctx.moveTo(cx-f*4,shoulderY);ctx.quadraticCurveTo(cx-f*8,hipY,cx-f*5,footY);ctx.lineTo(cx+f*2,footY);ctx.quadraticCurveTo(cx+f*3,hipY,cx+f*2,shoulderY);ctx.closePath();ctx.fillStyle=darkenColor(color,0.5);ctx.fill();
+    drawLegs(cx,hipY,footY,4,darkenColor(color,0.4),wp);drawTorso(cx,shoulderY,hipY,s*0.3,s*0.24,color);
+    for(let i=0;i<3;i++){const ay=hipY-2-i*5;ctx.beginPath();ctx.moveTo(cx-s*0.2+i,ay);ctx.lineTo(cx+s*0.2-i,ay);ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=0.6;ctx.stroke();}
+    drawArm(cx,shoulderY+2,shoulderY+s*0.2,cx-f*s*0.35,shoulderY+s*0.3,color,-f);drawSmallShield(cx-f*s*0.35,shoulderY+s*0.25,s*0.17,color);
+    drawArm(cx,shoulderY+2,shoulderY-s*0.05,cx+f*s*0.3,shoulderY-s*0.15,color,f);drawHeldSword(cx+f*s*0.3,shoulderY-s*0.15,-0.8-f*0.2,s*0.6);
+    [-1,1].forEach(dir=>{ctx.beginPath();ctx.ellipse(cx+dir*s*0.3,shoulderY+1,s*0.1,s*0.07,dir*0.2,0,Math.PI*2);const pGrad=ctx.createRadialGradient(cx+dir*s*0.28,shoulderY-1,s*0.02,cx+dir*s*0.3,shoulderY+1,s*0.1);pGrad.addColorStop(0,'#c8d0d8');pGrad.addColorStop(0.5,'#9098a0');pGrad.addColorStop(1,'#505860');ctx.fillStyle=pGrad;ctx.fill();});
+    ctx.beginPath();ctx.moveTo(cx-s*0.12,headY+s*0.08);ctx.lineTo(cx-s*0.1,headY-s*0.12);ctx.quadraticCurveTo(cx,headY-s*0.2,cx+s*0.1,headY-s*0.12);ctx.lineTo(cx+s*0.12,headY+s*0.08);ctx.closePath();
+    const helmGrad=ctx.createLinearGradient(cx-s*0.1,headY-s*0.15,cx+s*0.1,headY+s*0.08);helmGrad.addColorStop(0,'#d0d5dc');helmGrad.addColorStop(0.5,'#9098a0');helmGrad.addColorStop(1,'#505860');ctx.fillStyle=helmGrad;ctx.fill();ctx.strokeStyle='#404550';ctx.lineWidth=0.8;ctx.stroke();
+    ctx.fillStyle='#1a1a22';ctx.fillRect(cx-s*0.07,headY-s*0.04,s*0.14,2);
+    ctx.beginPath();ctx.moveTo(cx,headY-s*0.18);ctx.quadraticCurveTo(cx+f*4,headY-s*0.3,cx+f*3,headY-s*0.35);ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
   }else if(type==='mage'){
-    // === MAGE: Robed figure with pointed hat and staff ===
-    // Robe (wider, flowing)
-    draw3DCylinder(cx,groundY-s*0.65,groundY-s*0.05,s*0.2,s*0.35,color);
-    // Robe folds (vertical shading lines)
-    for(let i=-2;i<=2;i++){
-      const fx=cx+i*s*0.08;
-      ctx.beginPath();ctx.moveTo(fx,groundY-s*0.65);ctx.quadraticCurveTo(fx+i*2,groundY-s*0.35,fx+i*3,groundY-s*0.08);
-      ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=0.8;ctx.stroke();
-    }
-    // Robe highlight edge
-    ctx.beginPath();ctx.ellipse(cx,groundY-s*0.05,s*0.34,s*0.1,0,Math.PI,0);
-    ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.lineWidth=1;ctx.stroke();
-    // Staff (left side)
-    const staffX=cx-s*0.32;
-    ctx.strokeStyle='#5a3820';ctx.lineWidth=2.5;
-    ctx.beginPath();ctx.moveTo(staffX,groundY);ctx.lineTo(staffX,groundY-s*1.55);ctx.stroke();
-    // Staff highlight
-    ctx.strokeStyle='rgba(180,140,80,0.3)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(staffX-0.5,groundY);ctx.lineTo(staffX-0.5,groundY-s*1.55);ctx.stroke();
-    // Staff crystal orb on top
-    const orbY=groundY-s*1.6;
-    // Orb glow
-    const orbGlow=ctx.createRadialGradient(staffX,orbY,0,staffX,orbY,s*0.3);
-    orbGlow.addColorStop(0,'rgba(120,200,255,0.5)');orbGlow.addColorStop(0.5,'rgba(80,160,255,0.2)');orbGlow.addColorStop(1,'rgba(60,120,255,0)');
-    ctx.fillStyle=orbGlow;ctx.beginPath();ctx.arc(staffX,orbY,s*0.3,0,Math.PI*2);ctx.fill();
-    draw3DSphere(staffX,orbY,s*0.1,'#40a0ff','#a0e0ff');
-    // Sparkle particles around orb
-    const t=Date.now()*0.003;
-    for(let i=0;i<4;i++){
-      const angle=t+i*Math.PI*0.5;
-      const dist=s*0.18+Math.sin(t*2+i)*s*0.05;
-      const px=staffX+Math.cos(angle)*dist;
-      const py=orbY+Math.sin(angle)*dist*0.6;
-      ctx.beginPath();ctx.arc(px,py,1.2,0,Math.PI*2);
-      ctx.fillStyle=`rgba(150,220,255,${0.4+Math.sin(t*3+i)*0.3})`;ctx.fill();
-    }
-    // Head
-    draw3DSphere(cx,groundY-s*0.85,s*0.12,'#f0d0a0','#f5ddb8');
-    // Pointed hat (3D cone)
-    draw3DCone(cx,groundY-s*0.95,groundY-s*1.5,s*0.22,s*0.06,color);
-    // Hat brim
-    ctx.beginPath();ctx.ellipse(cx,groundY-s*0.95,s*0.25,s*0.07,0,0,Math.PI*2);
-    const brimGrad=ctx.createRadialGradient(cx-s*0.05,groundY-s*0.96,s*0.03,cx,groundY-s*0.95,s*0.25);
-    brimGrad.addColorStop(0,lightenColor(color,0.2));brimGrad.addColorStop(0.5,color);brimGrad.addColorStop(1,darkenColor(color,0.4));
-    ctx.fillStyle=brimGrad;ctx.fill();ctx.strokeStyle=darkenColor(color,0.25);ctx.lineWidth=0.8;ctx.stroke();
-    // Hat band (gold)
-    ctx.beginPath();ctx.ellipse(cx,groundY-s*0.98,s*0.18,s*0.05,0,0,Math.PI*2);
-    ctx.strokeStyle='#c0a030';ctx.lineWidth=1.5;ctx.stroke();
-    // Beard (gray, flowing)
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.08,groundY-s*0.78);ctx.quadraticCurveTo(cx,groundY-s*0.6,cx+s*0.08,groundY-s*0.78);
-    ctx.quadraticCurveTo(cx,groundY-s*0.55,cx-s*0.08,groundY-s*0.78);
-    ctx.fillStyle='rgba(180,180,190,0.6)';ctx.fill();
-    // Hands (skin-colored, holding staff)
-    draw3DSphere(cx-s*0.25,groundY-s*0.65,3,'#e0b888','#f0c898');
-
+    const h=s*1.6;const headY=by-h+s*0.1;const shoulderY=by-h*0.65;const hipY=by-h*0.25;const footY=by;
+    const robeGrad=ctx.createLinearGradient(cx-s*0.25,shoulderY,cx+s*0.25,footY);robeGrad.addColorStop(0,lightenColor(color,0.1));robeGrad.addColorStop(0.5,color);robeGrad.addColorStop(1,darkenColor(color,0.5));
+    ctx.beginPath();ctx.moveTo(cx-s*0.15,shoulderY);ctx.quadraticCurveTo(cx-s*0.3,hipY,cx-s*0.25,footY);ctx.lineTo(cx+s*0.25,footY);ctx.quadraticCurveTo(cx+s*0.3,hipY,cx+s*0.15,shoulderY);ctx.closePath();ctx.fillStyle=robeGrad;ctx.fill();
+    for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(cx+i*3,shoulderY+s*0.3);ctx.quadraticCurveTo(cx+i*4,hipY,cx+i*5,footY);ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=0.5;ctx.stroke();}
+    drawHeldStaff(cx-f*s*0.25,shoulderY+s*0.1,h*0.75);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.15,cx-f*s*0.2,shoulderY+s*0.2,color,-f);
+    drawHead(cx,headY,s*0.11,'#f0d0a0');
+    ctx.beginPath();ctx.moveTo(cx-s*0.15,headY+s*0.05);ctx.lineTo(cx+f*2,headY-s*0.35);ctx.lineTo(cx+s*0.15,headY+s*0.05);ctx.closePath();
+    const hatGrad=ctx.createLinearGradient(cx-s*0.1,headY-s*0.3,cx+s*0.1,headY);hatGrad.addColorStop(0,lightenColor(color,0.15));hatGrad.addColorStop(1,darkenColor(color,0.4));ctx.fillStyle=hatGrad;ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx,headY+s*0.04,s*0.17,s*0.04,0,0,Math.PI*2);ctx.fillStyle=darkenColor(color,0.5);ctx.fill();
+    ctx.beginPath();ctx.moveTo(cx-s*0.05,headY+s*0.1);ctx.quadraticCurveTo(cx,headY+s*0.22,cx+s*0.05,headY+s*0.1);ctx.fillStyle='rgba(180,180,190,0.5)';ctx.fill();
   }else if(type==='goblin'){
-    // === GOBLIN: Small hunched creature ===
-    // Body (hunched, wider at bottom)
-    draw3DCylinder(cx,groundY-s*0.45,groundY-s*0.05,s*0.2,s*0.22,color);
-    // Hunched back
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.2,groundY-s*0.45);ctx.quadraticCurveTo(cx,groundY-s*0.65,cx+s*0.2,groundY-s*0.45);
-    ctx.strokeStyle=darkenColor(color,0.5);ctx.lineWidth=1;ctx.stroke();
-    // Head (green sphere, bigger proportionally)
-    draw3DSphere(cx,groundY-s*0.6,s*0.17,'#7ab040','#90c858');
-    // Ears (pointed, 3D cones)
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();
-      ctx.moveTo(cx+dir*s*0.15,groundY-s*0.62);ctx.lineTo(cx+dir*s*0.38,groundY-s*0.82);ctx.lineTo(cx+dir*s*0.1,groundY-s*0.58);
-      ctx.closePath();
-      const earGrad=ctx.createLinearGradient(cx+dir*s*0.15,groundY-s*0.6,cx+dir*s*0.38,groundY-s*0.8);
-      earGrad.addColorStop(0,'#90c858');earGrad.addColorStop(1,'#5a8028');
-      ctx.fillStyle=earGrad;ctx.fill();ctx.strokeStyle='#4a6820';ctx.lineWidth=0.8;ctx.stroke();
-    });
-    // Eyes (glowing yellow)
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();ctx.arc(cx+dir*s*0.06,groundY-s*0.63,2.2,0,Math.PI*2);
-      const eyeGrad=ctx.createRadialGradient(cx+dir*s*0.06,groundY-s*0.64,0,cx+dir*s*0.06,groundY-s*0.63,2.2);
-      eyeGrad.addColorStop(0,'#ff8');eyeGrad.addColorStop(0.5,'#ff0');eyeGrad.addColorStop(1,'#a80');
-      ctx.fillStyle=eyeGrad;ctx.fill();
-      // Pupil
-      ctx.beginPath();ctx.ellipse(cx+dir*s*0.06,groundY-s*0.63,1,1.8,0,0,Math.PI*2);
-      ctx.fillStyle='#220';ctx.fill();
-    });
-    // Mouth (snarl)
-    ctx.beginPath();ctx.moveTo(cx-s*0.06,groundY-s*0.53);ctx.quadraticCurveTo(cx,groundY-s*0.5,cx+s*0.06,groundY-s*0.53);
-    ctx.strokeStyle='#3a5018';ctx.lineWidth=1;ctx.stroke();
-    // Crude club (right hand)
-    ctx.save();ctx.translate(cx+s*0.22,groundY-s*0.35);ctx.rotate(0.4);
-    ctx.fillStyle='#5a3820';ctx.fillRect(-1.5,-2,3,s*0.3);
-    // Club head (wider)
-    ctx.beginPath();ctx.ellipse(0,-3,4,3.5,0,0,Math.PI*2);
-    const clubGrad=ctx.createRadialGradient(-1,-4,0,0,-3,4);
-    clubGrad.addColorStop(0,'#7a5830');clubGrad.addColorStop(1,'#3a2510');
-    ctx.fillStyle=clubGrad;ctx.fill();ctx.strokeStyle='#2a1808';ctx.lineWidth=0.8;ctx.stroke();
-    ctx.restore();
-    // Loincloth
-    ctx.beginPath();
-    ctx.moveTo(cx-s*0.15,groundY-s*0.2);ctx.lineTo(cx-s*0.1,groundY);ctx.lineTo(cx+s*0.1,groundY);ctx.lineTo(cx+s*0.15,groundY-s*0.2);
-    ctx.closePath();
-    ctx.fillStyle='#5a4020';ctx.fill();
-
+    const h=s*1.2;const headY=by-h+s*0.08;const shoulderY=by-h*0.55;const hipY=by-h*0.2;const footY=by;
+    drawLegs(cx,hipY,footY,3,'#5a8028',wp);drawTorso(cx,shoulderY,hipY,s*0.16,s*0.18,color);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.1,cx+f*s*0.25,shoulderY+s*0.2,color,f);
+    ctx.save();ctx.translate(cx+f*s*0.25,shoulderY+s*0.2);ctx.rotate(0.4);ctx.fillStyle='#5a3820';ctx.fillRect(-1.5,-1,3,s*0.15);ctx.beginPath();ctx.ellipse(0,-2,3.5,3,0,0,Math.PI*2);ctx.fillStyle='#7a5830';ctx.fill();ctx.restore();
+    drawArm(cx,shoulderY+2,shoulderY+s*0.1,cx-f*3,shoulderY+s*0.15,color,-f);
+    drawHead(cx,headY,s*0.14,'#7ab040');
+    [[-1],[1]].forEach(([dir])=>{ctx.beginPath();ctx.moveTo(cx+dir*s*0.12,headY-s*0.04);ctx.lineTo(cx+dir*s*0.25,headY-s*0.2);ctx.lineTo(cx+dir*s*0.08,headY);ctx.closePath();ctx.fillStyle='#90c858';ctx.fill();});
+    [[-1],[1]].forEach(([dir])=>{ctx.beginPath();ctx.arc(cx+dir*s*0.05+f*2,headY-s*0.02,1.8,0,Math.PI*2);ctx.fillStyle='#ff0';ctx.fill();ctx.beginPath();ctx.ellipse(cx+dir*s*0.05+f*2,headY-s*0.02,0.7,1.2,0,0,Math.PI*2);ctx.fillStyle='#220';ctx.fill();});
   }else if(type==='archer'){
-    // === ENEMY ARCHER (goblin archer): Small figure with bow ===
-    // Body (slim, hunched)
-    draw3DCylinder(cx,groundY-s*0.5,groundY-s*0.05,s*0.17,s*0.18,color);
-    // Head (green)
-    draw3DSphere(cx,groundY-s*0.68,s*0.14,'#7ab040','#90c858');
-    // Small ears
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();
-      ctx.moveTo(cx+dir*s*0.12,groundY-s*0.7);ctx.lineTo(cx+dir*s*0.28,groundY-s*0.85);ctx.lineTo(cx+dir*s*0.08,groundY-s*0.66);
-      ctx.closePath();
-      ctx.fillStyle='#7ab040';ctx.fill();ctx.strokeStyle='#4a6820';ctx.lineWidth=0.6;ctx.stroke();
-    });
-    // Eyes
-    [[-1],[1]].forEach(([dir])=>{
-      ctx.beginPath();ctx.arc(cx+dir*s*0.05,groundY-s*0.7,1.8,0,Math.PI*2);
-      const eyeGrad=ctx.createRadialGradient(cx+dir*s*0.05,groundY-s*0.71,0,cx+dir*s*0.05,groundY-s*0.7,1.8);
-      eyeGrad.addColorStop(0,'#ff8');eyeGrad.addColorStop(0.5,'#ff0');eyeGrad.addColorStop(1,'#a80');
-      ctx.fillStyle=eyeGrad;ctx.fill();
-      ctx.beginPath();ctx.ellipse(cx+dir*s*0.05,groundY-s*0.7,0.8,1.5,0,0,Math.PI*2);
-      ctx.fillStyle='#220';ctx.fill();
-    });
-    // Bow (left side)
-    draw3DBow(cx-s*0.25,groundY-s*0.4,s*0.3,-0.15,'#6a4018');
-    // Arrow
-    ctx.strokeStyle='#a08050';ctx.lineWidth=1.2;
-    ctx.beginPath();ctx.moveTo(cx-s*0.05,groundY-s*0.4);ctx.lineTo(cx+s*0.3,groundY-s*0.4);ctx.stroke();
-    ctx.fillStyle='#c0c8d0';
-    ctx.beginPath();ctx.moveTo(cx+s*0.35,groundY-s*0.4);ctx.lineTo(cx+s*0.3,groundY-s*0.43);ctx.lineTo(cx+s*0.3,groundY-s*0.37);ctx.closePath();ctx.fill();
-    // Quiver
-    ctx.save();ctx.translate(cx+s*0.1,groundY-s*0.45);ctx.rotate(0.15);
-    draw3DCylinder(0,-s*0.1,s*0.25,2.5,2,'#5a3a18');
-    ctx.restore();
-
+    const h=s*1.25;const headY=by-h+s*0.08;const shoulderY=by-h*0.55;const hipY=by-h*0.22;const footY=by;
+    drawLegs(cx,hipY,footY,2.5,'#5a8028',wp);drawTorso(cx,shoulderY,hipY,s*0.14,s*0.16,color);
+    drawArm(cx,shoulderY+2,shoulderY+s*0.12,cx+f*s*0.2,shoulderY+s*0.05,color,f);drawHeldBow(cx+f*s*0.2,shoulderY+s*0.05,f*0.2,s*0.25);
+    ctx.strokeStyle='#a08050';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx+f*s*0.05,shoulderY+s*0.05);ctx.lineTo(cx-f*s*0.15,shoulderY+s*0.05);ctx.stroke();
+    drawArm(cx,shoulderY+2,shoulderY+s*0.12,cx-f*3,shoulderY+s*0.12,color,-f);
+    ctx.save();ctx.translate(cx+f*3,shoulderY+3);ctx.rotate(f*0.1);ctx.fillStyle='#5a3a18';ctx.fillRect(-2,-s*0.08,3,s*0.2);ctx.restore();
+    drawHead(cx,headY,s*0.12,'#7ab040');
+    [[-1],[1]].forEach(([dir])=>{ctx.beginPath();ctx.moveTo(cx+dir*s*0.1,headY-s*0.02);ctx.lineTo(cx+dir*s*0.2,headY-s*0.15);ctx.lineTo(cx+dir*s*0.06,headY+s*0.02);ctx.closePath();ctx.fillStyle='#7ab040';ctx.fill();});
+    [[-1],[1]].forEach(([dir])=>{ctx.beginPath();ctx.arc(cx+dir*s*0.04+f*2,headY-s*0.01,1.5,0,Math.PI*2);ctx.fillStyle='#ff0';ctx.fill();ctx.beginPath();ctx.ellipse(cx+dir*s*0.04+f*2,headY-s*0.01,0.5,1,0,0,Math.PI*2);ctx.fillStyle='#220';ctx.fill();});
   }else if(type==='wolf'){
-    // === WOLF: 3D four-legged beast ===
-    // Body (horizontal 3D cylinder)
-    ctx.save();
-    ctx.translate(cx,groundY-s*0.35);
-    // Main body ellipse with 3D shading
-    ctx.beginPath();ctx.ellipse(0,0,s*0.5,s*0.2,0,0,Math.PI*2);
-    const wolfBodyGrad=ctx.createRadialGradient(-s*0.1,-s*0.05,s*0.05,0,0,s*0.5);
-    wolfBodyGrad.addColorStop(0,lightenColor(color,0.25));wolfBodyGrad.addColorStop(0.4,color);wolfBodyGrad.addColorStop(1,darkenColor(color,0.35));
-    ctx.fillStyle=wolfBodyGrad;ctx.fill();
-    ctx.strokeStyle=darkenColor(color,0.2);ctx.lineWidth=1;ctx.stroke();
-    // Belly (lighter underside)
-    ctx.beginPath();ctx.ellipse(0,s*0.08,s*0.4,s*0.1,0,0,Math.PI);
-    ctx.fillStyle=lightenColor(color,0.3);ctx.fill();
-    // Head (3D sphere, forward-right)
-    draw3DSphere(s*0.38,-s*0.15,s*0.18,color,lightenColor(color,0.15));
-    // Snout (3D small cylinder/protrusion)
-    ctx.beginPath();ctx.ellipse(s*0.52,-s*0.17,s*0.12,s*0.08,-0.2,0,Math.PI*2);
-    const snoutGrad=ctx.createRadialGradient(s*0.5,-s*0.19,s*0.02,s*0.52,-s*0.17,s*0.12);
-    snoutGrad.addColorStop(0,lightenColor(color,0.2));snoutGrad.addColorStop(1,darkenColor(color,0.55));
-    ctx.fillStyle=snoutGrad;ctx.fill();ctx.strokeStyle=darkenColor(color,0.3);ctx.lineWidth=0.8;ctx.stroke();
-    // Nose
-    ctx.beginPath();ctx.arc(s*0.6,-s*0.18,2.5,0,Math.PI*2);
-    ctx.fillStyle='#1a1a1a';ctx.fill();
-    // Nose highlight
-    ctx.beginPath();ctx.arc(s*0.59,-s*0.19,1,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fill();
-    // Ears (3D cones)
-    [[-0.05],[0.1]].forEach(([off])=>{
-      ctx.beginPath();
-      ctx.moveTo(s*0.35+off,-s*0.28);ctx.lineTo(s*0.32+off,-s*0.5);ctx.lineTo(s*0.42+off,-s*0.3);
-      ctx.closePath();
-      const earGrad=ctx.createLinearGradient(s*0.35+off,-s*0.28,s*0.32+off,-s*0.5);
-      earGrad.addColorStop(0,color);earGrad.addColorStop(1,darkenColor(color,0.5));
-      ctx.fillStyle=earGrad;ctx.fill();ctx.strokeStyle=darkenColor(color,0.3);ctx.lineWidth=0.6;ctx.stroke();
-      // Inner ear
-      ctx.beginPath();
-      ctx.moveTo(s*0.36+off,-s*0.3);ctx.lineTo(s*0.34+off,-s*0.45);ctx.lineTo(s*0.4+off,-s*0.31);
-      ctx.closePath();ctx.fillStyle=lightenColor(color,0.3);ctx.fill();
-    });
-    // Eye (glowing)
-    ctx.beginPath();ctx.arc(s*0.42,-s*0.19,2.5,0,Math.PI*2);
-    const wolfEyeGrad=ctx.createRadialGradient(s*0.41,-s*0.2,0,s*0.42,-s*0.19,2.5);
-    wolfEyeGrad.addColorStop(0,'#ffa');wolfEyeGrad.addColorStop(0.4,'#ff4');wolfEyeGrad.addColorStop(1,'#a80');
-    ctx.fillStyle=wolfEyeGrad;ctx.fill();
-    ctx.beginPath();ctx.ellipse(s*0.42,-s*0.19,1,2,0,0,Math.PI*2);ctx.fillStyle='#220';ctx.fill();
-    // Legs (4, with 3D shading)
-    const legPositions=[[-0.3,0.12],[-0.1,0.12],[0.15,0.12],[0.3,0.12]];
-    legPositions.forEach(([lx,ly],i)=>{
-      const legTop=ly;const legBot=ly+s*0.35;
-      // Front legs slightly forward, back legs slightly back
-      const lean=i<2?-1:1;
-      const legGrad=ctx.createLinearGradient(lx-2,legTop,lx+2,legBot);
-      legGrad.addColorStop(0,color);legGrad.addColorStop(1,darkenColor(color,0.5));
-      ctx.strokeStyle=legGrad;ctx.lineWidth=3;ctx.lineCap='round';
-      ctx.beginPath();ctx.moveTo(lx,legTop);ctx.lineTo(lx+lean*2,legBot);ctx.stroke();
-      // Paw
-      ctx.beginPath();ctx.ellipse(lx+lean*2,legBot,3,1.5,0,0,Math.PI*2);
-      ctx.fillStyle=darkenColor(color,0.6);ctx.fill();
-    });
-    // Tail (curved, 3D)
-    ctx.beginPath();
-    ctx.moveTo(-s*0.48,-s*0.05);ctx.quadraticCurveTo(-s*0.65,-s*0.3,-s*0.55,-s*0.45);
-    const tailGrad=ctx.createLinearGradient(-s*0.48,-s*0.05,-s*0.55,-s*0.45);
-    tailGrad.addColorStop(0,color);tailGrad.addColorStop(1,darkenColor(color,0.4));
-    ctx.strokeStyle=tailGrad;ctx.lineWidth=3.5;ctx.lineCap='round';ctx.stroke();
-    // Tail tip highlight
-    ctx.beginPath();ctx.arc(-s*0.55,-s*0.45,2.5,0,Math.PI*2);
-    ctx.fillStyle=lightenColor(color,0.15);ctx.fill();
-    ctx.restore();
-
+    const bodyY=by-s*0.35;const bodyW=s*0.5;const bodyH=s*0.18;const runPhase=wp*1.2;
+    const bGrad=ctx.createRadialGradient(cx-bodyW*0.15,bodyY-bodyH*0.3,bodyH*0.2,cx,bodyY,bodyW);bGrad.addColorStop(0,lightenColor(color,0.2));bGrad.addColorStop(0.4,color);bGrad.addColorStop(1,darkenColor(color,0.4));
+    ctx.beginPath();ctx.ellipse(cx,bodyY,bodyW,bodyH,0,0,Math.PI*2);ctx.fillStyle=bGrad;ctx.fill();
+    ctx.beginPath();ctx.ellipse(cx,bodyY+bodyH*0.3,bodyW*0.8,bodyH*0.3,0,0,Math.PI);ctx.fillStyle=lightenColor(color,0.25);ctx.fill();
+    const headCx=cx+f*bodyW*0.75;const headCy=bodyY-bodyH*0.6;const headR=s*0.15;
+    const hGrad=ctx.createRadialGradient(headCx-headR*0.3,headCy-headR*0.3,headR*0.1,headCx,headCy,headR);hGrad.addColorStop(0,lightenColor(color,0.2));hGrad.addColorStop(1,darkenColor(color,0.45));
+    ctx.beginPath();ctx.arc(headCx,headCy,headR,0,Math.PI*2);ctx.fillStyle=hGrad;ctx.fill();
+    const snoutX=headCx+f*headR*0.9;ctx.beginPath();ctx.ellipse(snoutX,headCy+headR*0.1,headR*0.5,headR*0.35,f*0.2,0,Math.PI*2);ctx.fillStyle=darkenColor(color,0.5);ctx.fill();
+    ctx.beginPath();ctx.arc(snoutX+f*headR*0.4,headCy+headR*0.05,2,0,Math.PI*2);ctx.fillStyle='#1a1a1a';ctx.fill();
+    ctx.beginPath();ctx.arc(headCx+f*headR*0.2,headCy-headR*0.15,2,0,Math.PI*2);ctx.fillStyle='#ff4';ctx.fill();ctx.beginPath();ctx.ellipse(headCx+f*headR*0.2,headCy-headR*0.15,0.8,1.5,0,0,Math.PI*2);ctx.fillStyle='#220';ctx.fill();
+    [[-0.15],[0.15]].forEach(([off])=>{ctx.beginPath();ctx.moveTo(headCx+off,headCy-headR*0.7);ctx.lineTo(headCx+off-2,headCy-headR*1.4);ctx.lineTo(headCx+off+3,headCy-headR*0.8);ctx.closePath();ctx.fillStyle=color;ctx.fill();});
+    [[-bodyW*0.5],[-bodyW*0.2],[bodyW*0.2],[bodyW*0.5]].forEach(([lx],i)=>{const swing=Math.sin(runPhase+i*Math.PI)*3;
+      ctx.beginPath();ctx.moveTo(cx+lx,bodyY+bodyH*0.5);ctx.lineTo(cx+lx+swing,by);ctx.strokeStyle=darkenColor(color,0.5);ctx.lineWidth=2.5;ctx.lineCap='round';ctx.stroke();
+      ctx.beginPath();ctx.ellipse(cx+lx+swing,by,2.5,1.2,0,0,Math.PI*2);ctx.fillStyle=darkenColor(color,0.6);ctx.fill();});
+    const tailX=cx-f*bodyW*0.9;ctx.beginPath();ctx.moveTo(tailX,bodyY);ctx.quadraticCurveTo(tailX-f*5,bodyY-bodyH*1.5,tailX-f*3,bodyY-bodyH*2);ctx.strokeStyle=color;ctx.lineWidth=3;ctx.lineCap='round';ctx.stroke();
   }else{
-    // === GENERIC FALLBACK: 3D chess-piece style ===
-    draw3DCylinder(cx,groundY-s*0.6,groundY-s*0.05,s*0.2,s*0.22,color);
-    draw3DSphere(cx,groundY-s*0.8,s*0.15,color,lightenColor(color,0.2));
-    ctx.font=`bold ${s*0.5}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle='#fff';ctx.fillText('?',cx,groundY-s*0.8);
+    const h=s*1.5;const headY=by-h+s*0.1;const shoulderY=by-h*0.65;const hipY=by-h*0.3;const footY=by;
+    drawLegs(cx,hipY,footY,3,darkenColor(color,0.5),wp);drawTorso(cx,shoulderY,hipY,s*0.18,s*0.15,color);drawHead(cx,headY,s*0.12,'#f0d0a0');
   }
-
   ctx.restore();
 }
 
-// drawUnitFallback: draws the 3D figurine with team base ring
 function drawUnitFallback(u,cx,cy){
-  // Draw the 3D figurine directly
-  drawUnit3D(u.type,cx,cy,u.size,u.color,u.team);
+  drawUnit3D(u.type,cx,cy,u.size,u.color,u.team,u.facing,u.walkAnim,Math.sin(Date.now()*0.003+u.animT)*1.5);
 }
 
 // ============================================================
-// ENHANCED drawSpriteUnit — 3D figurine with overlays
+// drawSpriteUnit — Civilization-style unit on terrain
 // ============================================================
 function drawSpriteUnit(u,cx,cy){
   const terrain=S.map[hexKey(u.q,u.r)]?.terrain||0;
-  const h=TERRAIN_HEIGHT[terrain];
   const isSelected=S.selectedUnit&&S.selectedUnit===u;
-  // groundY: where the figurine stands (on top of the hex)
   const groundY=cy;
-
-  // --- Directional shadow (offset by scene light direction) ---
-  const shadowOffX=4;
-  const shadowOffY=5;
-  ctx.beginPath();
-  ctx.ellipse(cx+shadowOffX,groundY+shadowOffY,u.size*0.8,u.size*0.25,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();
-
-  // --- Selection visuals (behind the figurine) ---
+  if(u.walkAnim>0)u.walkAnim--;
+  const idleBob=Math.sin(Date.now()*0.003+u.animT)*1.5;
+  const walkBounce=u.walkAnim>0?Math.abs(Math.sin(u.walkAnim*0.5))*2:0;
+  ctx.beginPath();ctx.ellipse(cx,groundY+3,u.size*0.45,u.size*0.12,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
   if(isSelected){
-    // Ground selection circle
-    ctx.save();
-    ctx.beginPath();ctx.ellipse(cx,groundY+2,u.size+6,u.size*0.35+2,0,0,Math.PI*2);
-    ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(Date.now()*0.004)})`;
-    ctx.lineWidth=2.5;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
-    ctx.restore();
-    // Pulsing glow behind figurine
-    const pulse=0.4+0.3*Math.sin(Date.now()*0.005);
-    const glowGrad=ctx.createRadialGradient(cx,groundY-u.size*0.5,u.size*0.3,cx,groundY-u.size*0.5,u.size*1.5);
-    glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.35})`);
-    glowGrad.addColorStop(1,'rgba(241,196,15,0)');
-    ctx.fillStyle=glowGrad;
-    ctx.beginPath();ctx.arc(cx,groundY-u.size*0.5,u.size*1.5,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.beginPath();ctx.ellipse(cx,groundY+2,u.size*0.6,u.size*0.18,0,0,Math.PI*2);ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(Date.now()*0.004)})`;ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+    const pulse=0.3+0.2*Math.sin(Date.now()*0.005);const glowGrad=ctx.createRadialGradient(cx,groundY-u.size*0.7,u.size*0.2,cx,groundY-u.size*0.7,u.size*1.2);glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.25})`);glowGrad.addColorStop(1,'rgba(241,196,15,0)');ctx.fillStyle=glowGrad;ctx.beginPath();ctx.arc(cx,groundY-u.size*0.7,u.size*1.2,0,Math.PI*2);ctx.fill();
   }
-
-  // --- Draw 3D figurine (always, replaces flat sprites) ---
-  drawUnit3D(u.type,cx,groundY,u.size,u.color,u.team);
-
-  // --- HP bar with border/outline ---
-  const bw=u.size*2.2,bh=4;
-  const bx=cx-bw/2;
-  // Position HP bar above the figurine's head
-  const topOfFigure=groundY-u.size*1.7; // approximate top of tallest units
-  const by=topOfFigure-6;
-  const ratio=u.hp/u.maxHp;
-  // Border/outline
-  ctx.strokeStyle='#000';ctx.lineWidth=1;
-  ctx.strokeRect(bx-0.5,by-0.5,bw+1,bh+1);
-  // Background
-  ctx.fillStyle='#1a1a1a';ctx.fillRect(bx,by,bw,bh);
-  // HP fill with gradient
-  const hpColor=ratio>.5?'#2ecc71':ratio>.25?'#f39c12':'#e94560';
-  const hpGrad=ctx.createLinearGradient(bx,by,bx,by+bh);
-  hpGrad.addColorStop(0,lightenColor(hpColor.startsWith('#')?hpColor:'#2ecc71',0.2));
-  hpGrad.addColorStop(1,hpColor);
-  ctx.fillStyle=hpGrad;
-  ctx.fillRect(bx,by,Math.max(0,bw*ratio),bh);
-  // HP text
-  if(bw>28){
-    ctx.font='bold 6px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle='#fff';ctx.fillText(`${u.hp}/${u.maxHp}`,cx,by+bh/2);
-  }
-
-  // --- Level indicator (star icon for level 2+) ---
-  if(u.level>1){
-    const lx=cx+bw/2+8,ly=by+2;
-    const starCx=lx,starCy=ly,starR=5,starIR=2.5;
-    ctx.beginPath();
-    for(let i=0;i<10;i++){
-      const r=i%2===0?starR:starIR;
-      const angle=Math.PI/2*3+i*Math.PI/5;
-      const sx=starCx+Math.cos(angle)*r,sy=starCy+Math.sin(angle)*r;
-      if(i===0)ctx.moveTo(sx,sy);else ctx.lineTo(sx,sy);
-    }
-    ctx.closePath();ctx.fillStyle='#f1c40f';ctx.fill();
-    ctx.fillStyle='#fff';ctx.font='bold 6px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(`${u.level}`,starCx,starCy+0.5);
-  }
-
-  // --- Status icons ---
-  const statusY=groundY+u.size*0.6;
-  // Attacked icon (grayed-out sword)
-  if(u.attacked){
-    const sx=cx-u.size-2,sy=statusY;
-    ctx.save();ctx.globalAlpha=0.6;
-    ctx.strokeStyle='#888';ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.moveTo(sx,sy-5);ctx.lineTo(sx+4,sy-1);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(sx-2,sy-1);ctx.lineTo(sx+2,sy-1);ctx.lineTo(sx+6,sy+3);ctx.stroke();
-    ctx.restore();
-  }
-  // Movement dots (remaining move points)
-  if(u.move>0&&!u.attacked){
-    const dots=Math.min(u.move,5);
-    for(let i=0;i<dots;i++){
-      const dx=cx-u.size+4+i*5,dy=statusY;
-      ctx.beginPath();ctx.arc(dx,dy,2,0,Math.PI*2);
-      ctx.fillStyle=u.team==='player'?'#53d8fb':'#e94560';ctx.fill();
-    }
-  }
-  // Defensive terrain icon (shield) — forest or hills
-  const defBonus=T_DEF[terrain]||0;
-  if(defBonus>0){
-    const sx=cx+u.size+4,sy=statusY-2;
-    ctx.save();ctx.globalAlpha=0.7;
-    ctx.strokeStyle='#4a90d9';ctx.lineWidth=1.2;
-    ctx.beginPath();
-    ctx.moveTo(sx,sy-4);ctx.lineTo(sx-3,sy-2);ctx.lineTo(sx-3,sy+1);
-    ctx.quadraticCurveTo(sx,sy+4,sx+3,sy+1);ctx.lineTo(sx+3,sy-2);ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // --- Movement remaining dots below unit (when selected) ---
-  if(isSelected&&u.move>0){
-    const moveDots=Math.min(u.move,5);
-    const dotsStartX=cx-(moveDots-1)*3;
-    for(let i=0;i<moveDots;i++){
-      ctx.beginPath();ctx.arc(dotsStartX+i*6,groundY+10,2.5,0,Math.PI*2);
-      ctx.fillStyle='rgba(241,196,15,0.8)';ctx.fill();
-      ctx.strokeStyle='rgba(241,196,15,0.4)';ctx.lineWidth=1;ctx.stroke();
-    }
-  }
-
-  // [PATCH 4] Затемнение: юнит полностью истощён (ход=0 и атаковал)
-  if(u.move<=0&&u.attacked&&u.team==='player'){
-    ctx.beginPath();ctx.ellipse(cx,groundY-u.size*0.5,u.size*0.9,u.size*0.7,0,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fill();
-  }
+  ctx.beginPath();ctx.ellipse(cx,groundY+1,u.size*0.35,u.size*0.1,0,0,Math.PI*2);ctx.fillStyle=u.team==='player'?'rgba(83,216,251,0.2)':'rgba(233,69,96,0.2)';ctx.fill();
+  drawUnit3D(u.type,cx,groundY,u.size,u.color,u.team,u.facing,u.walkAnim,idleBob+walkBounce);
+  const bw=u.size*2,bh=3.5;const bx=cx-bw/2;const topY=groundY-u.size*1.8-walkBounce;const by=topY-5;const ratio=u.hp/u.maxHp;
+  ctx.strokeStyle='#000';ctx.lineWidth=0.8;ctx.strokeRect(bx-0.5,by-0.5,bw+1,bh+1);ctx.fillStyle='#1a1a1a';ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle=ratio>.5?'#2ecc71':ratio>.25?'#f39c12':'#e94560';ctx.fillRect(bx,by,Math.max(0,bw*ratio),bh);
+  if(bw>24){ctx.font='bold 5px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText(`${u.hp}/${u.maxHp}`,cx,by+bh/2);}
+  if(u.level>1){ctx.fillStyle='#f1c40f';ctx.font='bold 7px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('\u2605',cx+bw/2+6,by+1);}
+  const statusY=groundY+8;
+  if(u.attacked){ctx.save();ctx.globalAlpha=0.5;ctx.strokeStyle='#888';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx-3,statusY-4);ctx.lineTo(cx+1,statusY);ctx.stroke();ctx.beginPath();ctx.moveTo(cx-2,statusY);ctx.lineTo(cx+1,statusY);ctx.lineTo(cx+4,statusY+3);ctx.stroke();ctx.restore();}
+  if(u.move>0&&!u.attacked){const dots=Math.min(u.move,5);for(let i=0;i<dots;i++){ctx.beginPath();ctx.arc(cx-u.size+4+i*4,statusY,1.5,0,Math.PI*2);ctx.fillStyle=u.team==='player'?'#53d8fb':'#e94560';ctx.fill();}}
+  const defBonus=T_DEF[terrain]||0;if(defBonus>0){ctx.save();ctx.globalAlpha=0.6;ctx.strokeStyle='#4a90d9';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx+u.size+3,statusY-3);ctx.lineTo(cx+u.size,statusY-1);ctx.lineTo(cx+u.size,statusY+1);ctx.quadraticCurveTo(cx+u.size+3,statusY+3,cx+u.size+6,statusY+1);ctx.lineTo(cx+u.size+6,statusY-1);ctx.closePath();ctx.stroke();ctx.restore();}
+  if(u.move<=0&&u.attacked&&u.team==='player'){ctx.beginPath();ctx.ellipse(cx,groundY-u.size*0.6,u.size*0.5,u.size*0.7,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();}
 }
 
 function drawSpriteBuilding(b,cx,cy){
@@ -2306,7 +1742,7 @@ function enemyTurn(){
       let best=null,bDist=Infinity;
       moveCells.forEach(k=>{const[cq,cr]=k.split(',').map(Number);
         const d=hexDist(cq,cr,closest.q,closest.r);if(d<bDist){bDist=d;best={q:cq,r:cr};}});
-      if(best){e.q=best.q;e.r=best.r;e.moved=true;
+      if(best){if(best.q>e.q||(best.q===e.q&&best.r>e.r))e.facing=1;else e.facing=-1;e.q=best.q;e.r=best.r;e.moved=true;e.walkAnim=12;
         const targets=findAttackTargets(e);
         if(targets.length&&!e.attacked){
           combat(e,targets[0]);
@@ -2711,7 +2147,10 @@ function handleClick(q,r){
     if(S.moveHighlights.has(k)&&su.move>0){
       const cost=S.lastCostMap[k]||1;
       const oldQ=su.q,oldR=su.r;
+      // Set facing direction based on movement
+      if(q>oldQ||(q===oldQ&&r>oldR))su.facing=1; else su.facing=-1;
       su.q=q;su.r=r;su.move=Math.max(0,su.move-cost);su.moved=true;
+      su.walkAnim=12; // walk animation frames
       addEffect({type:'trail',fromQ:oldQ,fromR:oldR,toQ:q,toR:r,t:0,maxT:15});
       addLog(`${su.name} \u2192 (${q},${r}) (-${cost} ход)`,'player');
       const cell=S.map[k];
