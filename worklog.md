@@ -1,5 +1,36 @@
 # Realms of War - Work Log
 
+## Task ID: 11 — Animated Movement System (Civilization-style)
+
+### Changes Made:
+1. **Movement Animation System**: Added `S.moveAnims` and `S.animLock` to state
+   - `animateMove(unit, path, onComplete)` — creates smooth animation along a path
+   - `updateMoveAnims(dt)` — advances animation progress each frame with smooth-step easing
+   - `getUnitVisualPos(u)` — returns interpolated position during animation, hex position otherwise
+
+2. **Player Movement**: Modified `handleClick()` to use `findPath()` + `animateMove()` instead of instant teleport
+   - Path is computed via BFS (existing findPath function)
+   - Unit smoothly travels hex-by-hex along the path
+   - Input is blocked during animation (`S.animLock`)
+   - On completion: movement cost deducted, reachable cells recalculated
+
+3. **Rendering Updates**:
+   - Units use `getUnitVisualPos()` instead of `hexToPixel()` for animated positions
+   - `drawSpriteUnit()` enhanced: continuous walk animation during movement
+   - Walk bounce stronger during animation, legs move continuously
+   - HP bar and movement dots hidden during animation to avoid visual glitches
+
+4. **Enemy AI**: Updated to use pathfinding for movement, with trail effects
+
+5. **Game Loop**: Changed from simple `requestAnimationFrame` to delta-time based with `updateMoveAnims(dt)`
+
+6. **Turn Management**: `startPlayerTurn()` clears leftover animations and resets visual positions
+
+### Key Parameters:
+- MOVE_ANIM_MS_PER_HEX = 280ms per hex tile
+- Smooth-step easing for natural acceleration/deceleration
+- Direction facing updates per segment
+
 ## Task ID: 0 — Setup
 - Read all files from GitHub repo sobag0404/realms-of-war
 - Downloaded prototype/index.html (41KB, 851 lines)

@@ -265,12 +265,122 @@ const S = {
   researchProgress: 0,
   unlockedUnits: new Set(['hero','spearman']),
   // [TASK 9] Game stats for game-over screen
-  stats:{unitsKilled:0}
+  stats:{unitsKilled:0},
+  // [MOVE ANIM] Movement animation queue
+  moveAnims:[], // active movement animations
+  animLock:false // block input during animations
 };
 
 // [PATCH 1+2] Централизованный guard: блокировка ввода вне фазы player
 function isInputAllowed(){
-  return S.phase === 'player';
+  return S.phase === 'player' && !S.animLock;
+}
+
+// ============================================================
+// [MOVE ANIM] СИСТЕМА АНИМАЦИИ ДВИЖЕНИЯ (Civilization-style)
+// ============================================================
+const MOVE_ANIM_SPEED = 3.5; // hexes per second (speed of movement)
+const MOVE_ANIM_MS_PER_HEX = 280; // ms per hex tile traversal
+
+// Create a movement animation for a unit along a path
+// path: array of {q,r} hex coordinates from start to destination
+// onComplete: callback when animation finishes
+function animateMove(unit, path, onComplete){
+  if(!path || path.length < 2) {
+    if(onComplete) onComplete();
+    return;
+  }
+  S.animLock = true;
+  const anim = {
+    unit: unit,
+    path: path, // [{q,r}, ...]
+    segment: 0, // current segment index (0 = path[0]->path[1])
+    progress: 0, // 0..1 within current segment
+    startTime: performance.now(),
+    onComplete: onComplete
+  };
+  S.moveAnims.push(anim);
+  // Set unit to walking state
+  unit.walkAnim = 999; // will be decremented by render, keep high during anim
+}
+
+// Update all active movement animations
+function updateMoveAnims(dt){
+  const toRemove = [];
+  S.moveAnims.forEach(anim => {
+    const seg = anim.segment;
+    if(seg >= anim.path.length - 1){
+      toRemove.push(anim);
+      return;
+    }
+    // Advance progress
+    anim.progress += dt / (MOVE_ANIM_MS_PER_HEX / 1000);
+
+    // Interpolate position
+    const from = anim.path[seg];
+    const to = anim.path[seg + 1];
+    const fromPos = hexToPixel(from.q, from.r);
+    const toPos = hexToPixel(to.q, to.r);
+    const t = Math.min(1, anim.progress);
+    // Use smooth step for nice easing
+    const st = t * t * (3 - 2 * t);
+    anim.unit.visualX = fromPos.x + (toPos.x - fromPos.x) * st;
+    anim.unit.visualY = fromPos.y + (toPos.y - fromPos.y) * st;
+
+    // Update facing
+    if(to.q > from.q || (to.q === from.q && to.r > from.r)) anim.unit.facing = 1;
+    else anim.unit.facing = -1;
+
+    // Keep walkAnim active
+    anim.unit.walkAnim = 999;
+
+    // Segment complete?
+    if(anim.progress >= 1){
+      anim.segment++;
+      anim.progress = 0;
+      // Update unit's logical hex position
+      anim.unit.q = anim.path[anim.segment].q;
+      anim.unit.r = anim.path[anim.segment].r;
+      // Add trail effect for each hex traversed
+      if(anim.segment > 0){
+        const prev = anim.path[anim.segment - 1];
+        const cur = anim.path[anim.segment];
+        addEffect({type:'trail',fromQ:prev.q,fromR:prev.r,toQ:cur.q,toR:cur.r,t:0,maxT:15});
+      }
+    }
+
+    // Animation complete?
+    if(anim.segment >= anim.path.length - 1){
+      toRemove.push(anim);
+    }
+  });
+
+  toRemove.forEach(anim => {
+    // Finalize: unit at destination
+    const dest = anim.path[anim.path.length - 1];
+    anim.unit.q = dest.q;
+    anim.unit.r = dest.r;
+    anim.unit.visualX = 0; // reset to use hexToPixel
+    anim.unit.visualY = 0;
+    anim.unit.walkAnim = 8; // short wind-down
+    S.moveAnims = S.moveAnims.filter(a => a !== anim);
+    if(anim.onComplete) anim.onComplete();
+    // Check if any more animations running
+    if(S.moveAnims.length === 0){
+      S.animLock = false;
+    }
+  });
+}
+
+// Get the visual position of a unit (animated or static)
+function getUnitVisualPos(u){
+  // Check if unit has an active animation
+  const anim = S.moveAnims.find(a => a.unit === u);
+  if(anim && (anim.unit.visualX || anim.unit.visualY)){
+    return { x: anim.unit.visualX, y: anim.unit.visualY };
+  }
+  // Otherwise use hex position
+  return hexToPixel(u.q, u.r);
 }
 
 // ============================================================
@@ -1202,7 +1312,9 @@ function drawUnit3D(type,cx,groundY,size,color,team,facing,walkPhase,idleBob){
 }
 
 function drawUnitFallback(u,cx,cy){
-  drawUnit3D(u.type,cx,cy,u.size,u.color,u.team,u.facing,u.walkAnim,Math.sin(Date.now()*0.003+u.animT)*1.5);
+  const isAnimating=S.moveAnims.some(a=>a.unit===u);
+  const walkPhase=isAnimating?Date.now()*0.015:u.walkAnim;
+  drawUnit3D(u.type,cx,cy,u.size,u.color,u.team,u.facing,walkPhase,Math.sin(Date.now()*0.003+u.animT)*1.5);
 }
 
 // ============================================================
@@ -1212,16 +1324,21 @@ function drawSpriteUnit(u,cx,cy){
   const terrain=S.map[hexKey(u.q,u.r)]?.terrain||0;
   const isSelected=S.selectedUnit&&S.selectedUnit===u;
   const groundY=cy;
-  if(u.walkAnim>0)u.walkAnim--;
+  // [MOVE ANIM] Don't decrement walkAnim during active move animation
+  const isAnimating=S.moveAnims.some(a=>a.unit===u);
+  if(u.walkAnim>0&&!isAnimating)u.walkAnim--;
   const idleBob=Math.sin(Date.now()*0.003+u.animT)*1.5;
-  const walkBounce=u.walkAnim>0?Math.abs(Math.sin(u.walkAnim*0.5))*2:0;
+  // [MOVE ANIM] Stronger walk bounce during animated movement
+  const walkBounce=isAnimating?Math.abs(Math.sin(Date.now()*0.012))*3:u.walkAnim>0?Math.abs(Math.sin(u.walkAnim*0.5))*2:0;
+  // [MOVE ANIM] Walking leg phase: continuous during animation, discrete otherwise
+  const walkPhase=isAnimating?Date.now()*0.015:u.walkAnim;
   ctx.beginPath();ctx.ellipse(cx,groundY+3,u.size*0.45,u.size*0.12,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
   if(isSelected){
     ctx.save();ctx.beginPath();ctx.ellipse(cx,groundY+2,u.size*0.6,u.size*0.18,0,0,Math.PI*2);ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(Date.now()*0.004)})`;ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);ctx.restore();
     const pulse=0.3+0.2*Math.sin(Date.now()*0.005);const glowGrad=ctx.createRadialGradient(cx,groundY-u.size*0.7,u.size*0.2,cx,groundY-u.size*0.7,u.size*1.2);glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.25})`);glowGrad.addColorStop(1,'rgba(241,196,15,0)');ctx.fillStyle=glowGrad;ctx.beginPath();ctx.arc(cx,groundY-u.size*0.7,u.size*1.2,0,Math.PI*2);ctx.fill();
   }
   ctx.beginPath();ctx.ellipse(cx,groundY+1,u.size*0.35,u.size*0.1,0,0,Math.PI*2);ctx.fillStyle=u.team==='player'?'rgba(83,216,251,0.2)':'rgba(233,69,96,0.2)';ctx.fill();
-  drawUnit3D(u.type,cx,groundY,u.size,u.color,u.team,u.facing,u.walkAnim,idleBob+walkBounce);
+  drawUnit3D(u.type,cx,groundY,u.size,u.color,u.team,u.facing,walkPhase,idleBob+walkBounce);
   const bw=u.size*2,bh=3.5;const bx=cx-bw/2;const topY=groundY-u.size*1.8-walkBounce;const by=topY-5;const ratio=u.hp/u.maxHp;
   ctx.strokeStyle='#000';ctx.lineWidth=0.8;ctx.strokeRect(bx-0.5,by-0.5,bw+1,bh+1);ctx.fillStyle='#1a1a1a';ctx.fillRect(bx,by,bw,bh);
   ctx.fillStyle=ratio>.5?'#2ecc71':ratio>.25?'#f39c12':'#e94560';ctx.fillRect(bx,by,Math.max(0,bw*ratio),bh);
@@ -1229,7 +1346,7 @@ function drawSpriteUnit(u,cx,cy){
   if(u.level>1){ctx.fillStyle='#f1c40f';ctx.font='bold 7px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('\u2605',cx+bw/2+6,by+1);}
   const statusY=groundY+8;
   if(u.attacked){ctx.save();ctx.globalAlpha=0.5;ctx.strokeStyle='#888';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(cx-3,statusY-4);ctx.lineTo(cx+1,statusY);ctx.stroke();ctx.beginPath();ctx.moveTo(cx-2,statusY);ctx.lineTo(cx+1,statusY);ctx.lineTo(cx+4,statusY+3);ctx.stroke();ctx.restore();}
-  if(u.move>0&&!u.attacked){const dots=Math.min(u.move,5);for(let i=0;i<dots;i++){ctx.beginPath();ctx.arc(cx-u.size+4+i*4,statusY,1.5,0,Math.PI*2);ctx.fillStyle=u.team==='player'?'#53d8fb':'#e94560';ctx.fill();}}
+  if(u.move>0&&!u.attacked&&!isAnimating){const dots=Math.min(u.move,5);for(let i=0;i<dots;i++){ctx.beginPath();ctx.arc(cx-u.size+4+i*4,statusY,1.5,0,Math.PI*2);ctx.fillStyle=u.team==='player'?'#53d8fb':'#e94560';ctx.fill();}}
   const defBonus=T_DEF[terrain]||0;if(defBonus>0){ctx.save();ctx.globalAlpha=0.6;ctx.strokeStyle='#4a90d9';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx+u.size+3,statusY-3);ctx.lineTo(cx+u.size,statusY-1);ctx.lineTo(cx+u.size,statusY+1);ctx.quadraticCurveTo(cx+u.size+3,statusY+3,cx+u.size+6,statusY+1);ctx.lineTo(cx+u.size+6,statusY-1);ctx.closePath();ctx.stroke();ctx.restore();}
   if(u.move<=0&&u.attacked&&u.team==='player'){ctx.beginPath();ctx.ellipse(cx,groundY-u.size*0.6,u.size*0.5,u.size*0.7,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.35)';ctx.fill();}
 }
@@ -1299,9 +1416,9 @@ function render(){
     }
   });
 
-  // Юниты
+  // Юниты — use animated visual positions
   S.units.forEach(u=>{
-    const pos=hexToPixel(u.q,u.r);
+    const pos=getUnitVisualPos(u);
     const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
     if(sx>-150&&sx<canvas.width+150&&sy>-200&&sy<canvas.height+150){
       const t=S.map[hexKey(u.q,u.r)]?.terrain||0;
@@ -1742,7 +1859,19 @@ function enemyTurn(){
       let best=null,bDist=Infinity;
       moveCells.forEach(k=>{const[cq,cr]=k.split(',').map(Number);
         const d=hexDist(cq,cr,closest.q,closest.r);if(d<bDist){bDist=d;best={q:cq,r:cr};}});
-      if(best){if(best.q>e.q||(best.q===e.q&&best.r>e.r))e.facing=1;else e.facing=-1;e.q=best.q;e.r=best.r;e.moved=true;e.walkAnim=12;
+      if(best){
+        // [MOVE ANIM] Find path and animate enemy movement
+        const oldEQ=e.q,oldER=e.r;
+        const ePath=findPath(e.q,e.r,best.q,best.r,e);
+        if(ePath&&ePath.length>=2){
+          if(best.q>oldEQ||(best.q===oldEQ&&best.r>oldER))e.facing=1;else e.facing=-1;
+          e.q=best.q;e.r=best.r;e.moved=true;
+          e.walkAnim=12;
+          addEffect({type:'trail',fromQ:oldEQ,fromR:oldER,toQ:best.q,toR:best.r,t:0,maxT:15});
+        }else{
+          if(best.q>e.q||(best.q===e.q&&best.r>e.r))e.facing=1;else e.facing=-1;
+          e.q=best.q;e.r=best.r;e.moved=true;e.walkAnim=12;
+        }
         const targets=findAttackTargets(e);
         if(targets.length&&!e.attacked){
           combat(e,targets[0]);
@@ -1769,8 +1898,10 @@ function startPlayerTurn(){
   if(S.phase==='gameover')return;
   if(_enemyTurnTimer!==null){clearTimeout(_enemyTurnTimer);_enemyTurnTimer=null;}
   S.turn++;S.phase='player';
+  // [MOVE ANIM] Clear any leftover animations
+  S.moveAnims=[];S.animLock=false;
   S.buildings.forEach(b=>{b.recruitedThisTurn=false;});
-  S.units.filter(u=>u.team==='player').forEach(u=>{u.moved=false;u.attacked=false;u.move=u.maxMove;});
+  S.units.filter(u=>u.team==='player').forEach(u=>{u.moved=false;u.attacked=false;u.move=u.maxMove;u.visualX=0;u.visualY=0;});
 
   // [TECH TREE] Complete current research if enough PP accumulated
   if(S.currentResearch){
@@ -2146,30 +2277,57 @@ function handleClick(q,r){
     // [PATCH 4] Проверка su.move>0 вместо !su.moved, вычитание стоимости
     if(S.moveHighlights.has(k)&&su.move>0){
       const cost=S.lastCostMap[k]||1;
-      const oldQ=su.q,oldR=su.r;
-      // Set facing direction based on movement
-      if(q>oldQ||(q===oldQ&&r>oldR))su.facing=1; else su.facing=-1;
-      su.q=q;su.r=r;su.move=Math.max(0,su.move-cost);su.moved=true;
-      su.walkAnim=12; // walk animation frames
-      addEffect({type:'trail',fromQ:oldQ,fromR:oldR,toQ:q,toR:r,t:0,maxT:15});
-      addLog(`${su.name} \u2192 (${q},${r}) (-${cost} ход)`,'player');
-      const cell=S.map[k];
-      if(cell&&cell.terrain===TERRAIN.RUINS){
-        const g=10+Math.floor(Math.random()*15);S.res.gold+=g;S.pp+=5;
-        addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;
+      // [MOVE ANIM] Use pathfinding to get the route, then animate along it
+      const path=findPath(su.q,su.r,q,r,su);
+      if(path&&path.length>=2){
+        const destQ=q,destR=r;
+        clearHL();
+        // Animate movement along path
+        animateMove(su, path, function(){
+          // onComplete: finalize movement
+          su.move=Math.max(0,su.move-cost);su.moved=true;
+          addLog(`${su.name} \u2192 (${destQ},${destR}) (-${cost} ход)`,'player');
+          const cell=S.map[hexKey(destQ,destR)];
+          if(cell&&cell.terrain===TERRAIN.RUINS){
+            const g=10+Math.floor(Math.random()*15);S.res.gold+=g;S.pp+=5;
+            addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;
+          }
+          // If still has movement, recalculate reachable cells
+          if(su.move>0&&!su.attacked){
+            const{moveCells,attackCells,costMap}=findReachable(su);
+            S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
+            S.maxReachHighlights=computeMaxReach(su,costMap);
+          }else if(!su.attacked){
+            const t=findAttackTargets(su);
+            if(t.length)S.attackHighlights=new Set(t.map(x=>hexKey(x.q,x.r)));
+          }
+          computeThreats();updateUI();
+        });
+        return;
+      }else{
+        // Fallback: direct move (shouldn't happen if pathfinding works)
+        const oldQ=su.q,oldR=su.r;
+        if(q>oldQ||(q===oldQ&&r>oldR))su.facing=1; else su.facing=-1;
+        su.q=q;su.r=r;su.move=Math.max(0,su.move-cost);su.moved=true;
+        su.walkAnim=12;
+        addEffect({type:'trail',fromQ:oldQ,fromR:oldR,toQ:q,toR:r,t:0,maxT:15});
+        addLog(`${su.name} \u2192 (${q},${r}) (-${cost} ход)`,'player');
+        const cell=S.map[k];
+        if(cell&&cell.terrain===TERRAIN.RUINS){
+          const g=10+Math.floor(Math.random()*15);S.res.gold+=g;S.pp+=5;
+          addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;
+        }
+        clearHL();
+        if(su.move>0&&!su.attacked){
+          const{moveCells,attackCells,costMap}=findReachable(su);
+          S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
+          S.maxReachHighlights=computeMaxReach(su,costMap);
+        }else if(!su.attacked){
+          const t=findAttackTargets(su);
+          if(t.length)S.attackHighlights=new Set(t.map(x=>hexKey(x.q,x.r)));
+        }
+        computeThreats();updateUI();return;
       }
-      clearHL();
-      // [PATCH 4] Если ещё есть ход — пересчитать доступные клетки
-      if(su.move>0&&!su.attacked){
-        const{moveCells,attackCells,costMap}=findReachable(su);
-        S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
-        // [TASK 6] Compute max-reach boundary after partial move
-        S.maxReachHighlights=computeMaxReach(su,costMap);
-      }else if(!su.attacked){
-        const t=findAttackTargets(su);
-        if(t.length)S.attackHighlights=new Set(t.map(x=>hexKey(x.q,x.r)));
-      }
-      computeThreats();updateUI();return;
     }
     if(S.attackHighlights.has(k)&&!su.attacked){
       const target=S.units.find(u=>u.q===q&&u.r===r&&u.team!==su.team);
@@ -2624,7 +2782,14 @@ function showTurnToast(text){
 // ============================================================
 // ИГРОВОЙ ЦИКЛ
 // ============================================================
-function loop(){render();requestAnimationFrame(loop);}
+let _lastFrameTime=0;
+function loop(ts){
+  const dt=_lastFrameTime?(ts-_lastFrameTime)/1000:0.016;
+  _lastFrameTime=ts;
+  updateMoveAnims(dt);
+  render();
+  requestAnimationFrame(loop);
+}
 
 // [PATCH 5] init: вызов startPlayerTurn() для консистентного первого хода
 function init(){
