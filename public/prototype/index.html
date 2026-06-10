@@ -185,28 +185,29 @@ const totalSprites = Object.keys(SPRITE_FILES).length;
 
 function loadSprites(callback) {
   const bar = document.getElementById('load-bar');
+  let loaded = 0;
+  const total = Object.keys(SPRITE_FILES).length;
+  function onDone(){
+    loaded++;
+    bar.style.width = (loaded / total * 100) + '%';
+    if (loaded === total) {
+      document.getElementById('loading').style.display = 'none';
+      callback();
+    }
+  }
   Object.entries(SPRITE_FILES).forEach(([key, src]) => {
     const img = new Image();
-    img.onload = () => {
-      sprites[key] = img;
-      spritesLoaded++;
-      bar.style.width = (spritesLoaded / totalSprites * 100) + '%';
-      if (spritesLoaded === totalSprites) {
-        document.getElementById('loading').style.display = 'none';
-        callback();
-      }
-    };
-    img.onerror = () => {
-      sprites[key] = null;
-      spritesLoaded++;
-      bar.style.width = (spritesLoaded / totalSprites * 100) + '%';
-      if (spritesLoaded === totalSprites) {
-        document.getElementById('loading').style.display = 'none';
-        callback();
-      }
-    };
+    img.onload = () => { sprites[key] = img; onDone(); };
+    img.onerror = () => { sprites[key] = null; onDone(); };
     img.src = src;
   });
+  // Safety: if sprites take too long (e.g. all 404), start game anyway after 3s
+  setTimeout(() => {
+    if (loaded < total) {
+      document.getElementById('loading').style.display = 'none';
+      callback();
+    }
+  }, 3000);
 }
 
 // ============================================================
@@ -375,12 +376,12 @@ function updateMoveAnims(dt){
 // Get the visual position of a unit (animated or static)
 function getUnitVisualPos(u){
   // Check if unit has an active animation
-  const anim = S.moveAnims.find(a => a.unit === u);
-  if(anim && (anim.unit.visualX || anim.unit.visualY)){
-    return { x: anim.unit.visualX, y: anim.unit.visualY };
+  const anim=S.moveAnims.find(a=>a.unit===u);
+  if(anim){
+    return {x:anim.unit.visualX,y:anim.unit.visualY};
   }
   // Otherwise use hex position
-  return hexToPixel(u.q, u.r);
+  return hexToPixel(u.q,u.r);
 }
 
 // ============================================================
@@ -2081,8 +2082,7 @@ canvas.addEventListener('mousedown',e=>{
   const rect=canvas.getBoundingClientRect();
   const mx=e.clientX-rect.left+S.cam.x;
   const my=e.clientY-rect.top+S.cam.y;
-  const ox=canvas.width/2,oy=60;
-  const hex=pixelToHex(mx-ox,my-oy);
+  const hex=pixelToHex(mx,my);
   if(S.map[hexKey(hex.q,hex.r)])handleClick(hex.q,hex.r);
 });
 
@@ -2092,8 +2092,7 @@ canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect();
   const mx=e.clientX-rect.left+S.cam.x;
   const my=e.clientY-rect.top+S.cam.y;
-  const ox=canvas.width/2,oy=60;
-  const hex=pixelToHex(mx-ox,my-oy);
+  const hex=pixelToHex(mx,my);
   const cell=S.map[hexKey(hex.q,hex.r)];
   // [TASK 2+3] Set hover hex for highlight system
   if(cell){
@@ -2414,9 +2413,9 @@ function showEnemyInfo(u){
 function clearHL(){S.moveHighlights=new Set();S.attackHighlights=new Set();S.threatHighlights=new Set();S.pathHighlights=new Set();S.recruitHighlights=new Set();S.pathCostMap={};S.maxReachHighlights=new Set();}
 
 function clampCam(){
-  const mw=COLS*HEX_W+200,mh=ROWS*HEX_H+200;
-  S.cam.x=Math.max(-200,Math.min(mw-canvas.width,S.cam.x));
-  S.cam.y=Math.max(-200,Math.min(mh-canvas.height,S.cam.y));
+  const mw=COLS*HEX_W+100,mh=ROWS*HEX_H*0.75+100;
+  S.cam.x=Math.max(-canvas.width+100,Math.min(mw-100,S.cam.x));
+  S.cam.y=Math.max(-canvas.height+100,Math.min(mh-100,S.cam.y));
 }
 
 // ============================================================
@@ -2794,8 +2793,11 @@ function loop(ts){
 // [PATCH 5] init: вызов startPlayerTurn() для консистентного первого хода
 function init(){
   resizeCanvas();genMap();spawnUnits();
+  // Center camera on the hero (2,2)
   const startPos=hexToPixel(2,2);
-  S.cam.x=startPos.x-canvas.width/2;S.cam.y=startPos.y-canvas.height/2;clampCam();
+  S.cam.x=startPos.x-canvas.width/2;
+  S.cam.y=startPos.y-canvas.height/2;
+  clampCam();
   addLog('Realms of War \u2014 v3 Спрайты','system');
   addLog('Клик \u2014 выбрать/переместить/атаковать','system');
   addLog('B \u2014 режим строительства, Esc \u2014 отмена','system');
