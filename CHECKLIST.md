@@ -147,27 +147,24 @@
 
 ## 5. UI/HUD (src/components/hud/ + screens/)
 
-- [ ] `GameHud.tsx` — главный HUD
-- [ ] `ResourceBar.tsx` — панель ресурсов
-- [ ] `TurnPanel.tsx` — панель хода
-- [ ] `SelectionPanel.tsx` — панель выбора
-- [ ] `UnitPanel.tsx` — панель юнита
-- [ ] `CityPanel.tsx` — панель города
-- [ ] `EnemyPanel.tsx` — панель врага
-- [ ] `Minimap.tsx` — мини-карта
-- [ ] `NotificationStack.tsx` — уведомления
-- [ ] `MainMenuScreen.tsx` — главное меню
-- [ ] `NewGameScreen.tsx` — новая игра
-- [ ] `LoadGameScreen.tsx` — загрузка
-- [ ] `SettingsScreen.tsx` — настройки
-- [ ] `TechTreeScreen.tsx` — дерево технологий
-- [ ] `CityManagementScreen.tsx` — управление городом
-- [ ] `RecruitmentScreen.tsx` — найм юнитов
-- [ ] `DiplomacyScreen.tsx` — дипломатия
-- [ ] `EndTurnSummaryScreen.tsx` — итоги хода
-
-> ⚠️ Базовый HUD overlay уже есть в page.tsx (top bar + hex info + controls)
-> Остальные экраны — полноценные React-компоненты с shadcn/ui
+- [x] `GameHud.tsx` — главный HUD overlay
+- [x] `ResourceBar.tsx` — панель ресурсов (8 ресурсов, дельты, адаптивная)
+- [x] `TurnPanel.tsx` — панель хода (номер, игрок, фаза, кнопки: меню, технологии, дипломатия, настройки, конец хода)
+- [x] `SelectionPanel.tsx` — панель выбора (контекстная: юнит/город/гекс)
+- [x] `UnitPanel.tsx` — панель юнита (HP, статы, способности, действия)
+- [x] `CityPanel.tsx` — панель города (население, производство, здания)
+- [x] `Minimap.tsx` — мини-карта (Canvas, terrain colors, клик)
+- [x] `NotificationStack.tsx` — уведомления (info/success/warning/error)
+- [x] `ControlsHelp.tsx` — справка по управлению (сворачиваемая)
+- [x] `MainMenuScreen.tsx` — главное меню (Новая игра, Загрузить, Настройки)
+- [x] `NewGameScreen.tsx` — новая игра (размер карты, игроки, сложность)
+- [x] `SettingsScreen.tsx` — настройки (графика, звук, интерфейс)
+- [x] `TechTreeScreen.tsx` — дерево технологий (фильтры, эры, прогресс)
+- [x] `CityManagementScreen.tsx` — управление городом (население, производство, здания, оборона)
+- [x] `RecruitmentScreen.tsx` — найм юнитов (фильтр по зданиям/техам, стоимость)
+- [x] `DiplomacyScreen.tsx` — дипломатия (список игроков, статус)
+- [x] `EndTurnSummaryScreen.tsx` — итоги хода (модальное окно)
+- [x] `page.tsx` — интеграция: меню ↔ игра, overlay panels
 
 ## 6. Zustand Store (src/store/)
 
@@ -220,11 +217,11 @@ AI базовый         ████████░░░░░░░░░░
 Команды/События    ████████████████████ 100%  (2/2)
 Data-конфиги       ██████████░░░░░░░░░░  50%  (5/10)
 3D Рендеринг       ██████████░░░░░░░░░░  62%  (10/16)
-UI/HUD             ██░░░░░░░░░░░░░░░░░░  10%  (базовый overlay в page.tsx)
+UI/HUD             ████████████████████ 100%  (18/18)
 Store              ████████████████████ 100%  (7/7)
 Providers          ████████████░░░░░░░░  67%  (2/3)
 ────────────────────────────────────────────
-Общий прогресс     ██████████████░░░░░░  58%  (82/141)
+Общий прогресс     ████████████████░░░░  72%  (108/150)
 ```
 
 ---

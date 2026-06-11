@@ -44,7 +44,7 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-11 (Фаза 2 завершена)
+> Последнее обновление: 2026-06-11 (Фаза 3 завершена)
 
 ### Что реализовано
 
@@ -59,6 +59,8 @@
 - ✅ **Zustand Store** (`src/store/`) — 6 слайсов: session, gameView, selection, command, ui, settings
 - ✅ **Providers** (`src/components/providers/`) — GameProvider, I18nProvider
 - ✅ **3D рендеринг** (`src/components/game3d/`) — Canvas, Camera, Lighting, Terrain, Water, Units, Buildings, Fog, Selection, PathPreview
+- ✅ **UI/HUD** (`src/components/hud/`) — GameHud, ResourceBar, TurnPanel, SelectionPanel, UnitPanel, CityPanel, Minimap, NotificationStack, ControlsHelp
+- ✅ **Экраны** (`src/components/screens/`) — MainMenuScreen, NewGameScreen, SettingsScreen, TechTreeScreen, CityManagementScreen, RecruitmentScreen, DiplomacyScreen, EndTurnSummaryScreen
 - ✅ Data-конфиги (`src/data/`) — юниты, здания, технологии, террейн, ресурсы
 - ✅ Прототип 2D (Canvas) — `public/prototype/index.html`
 - ✅ Next.js проект с shadcn/ui компонентами
@@ -66,11 +68,13 @@
 
 ### Что НЕ реализовано (ключевое для v0.1-alpha)
 
-- ❌ ECS-системы — MovementSystem, CombatSystem, EconomySystem и др. (склеивают rules + engine)
-- ❌ UI/HUD экраны (главное меню, дерево технологий, управление городом, найм)
-- ❌ Система сохранений/загрузок
-- ❌ AI-противник (базовый AiSystem есть, но нужен AiDirector)
-- ❌ Звуковое оформление
+- ❌ Линия видимости (`hex/lineOfSight.ts`) и регионы (`hex/regions.ts`)
+- ❌ Система сохранений/загрузок (`engine/save/`)
+- ❌ AI-директор (`engine/ai/`) — базовый AiSystem есть, нужен полный AiDirector
+- ❌ Декорации и пост-процессинг (3D)
+- ❌ Звуковое оформление (AudioProvider)
+- ❌ Web Workers (pathfinding, AI, mapgen)
+- ❌ Локализация (ru.ts / en.ts словари)
 
 ---
 
@@ -87,7 +91,12 @@ realms-of-war/
 │   └── logo.svg
 ├── src/
 │   ├── app/                            # Next.js App Router
-│   ├── components/ui/                  # shadcn/ui компоненты
+│   ├── components/
+│   │   ├── game3d/                     # 3D рендеринг (R3F)
+│   │   ├── hud/                        # HUD overlay (GameHud, ResourceBar, TurnPanel, etc.)
+│   │   ├── screens/                    # Экраны (MainMenu, NewGame, TechTree, City, etc.)
+│   │   ├── providers/                  # React провайдеры
+│   │   └── ui/                         # shadcn/ui компоненты
 │   ├── data/                           # Data-driven конфиги баланса
 │   │   ├── buildings.ts
 │   │   ├── resources.ts
@@ -96,8 +105,12 @@ realms-of-war/
 │   │   └── units.ts
 │   ├── engine/                         # Игровой движок
 │   │   ├── core/                       # Ядро (GameState, EventBus, CommandQueue, RNG)
-│   │   └── hex/                        # Гексагональная математика
+│   │   ├── ecs/                        # ECS (Entity, Components, Systems)
+│   │   ├── hex/                        # Гексагональная математика
+│   │   ├── mapgen/                     # Генератор карты
+│   │   └── rules/                      # Правила игры
 │   ├── hooks/                          # React хуки
+│   ├── store/                          # Zustand store (6 слайсов)
 │   └── lib/                            # Утилиты
 ├── mini-services/                      # Микросервисы (WebSocket и т.д.)
 ├── PROJECT_CONTEXT.md                  # Этот файл
@@ -119,11 +132,12 @@ realms-of-war/
 
 ## Приоритеты разработки (следующие шаги)
 
-1. **UI/HUD экраны** — главное меню, дерево технологий, управление городом, найм юнитов
-2. **AI-директор** — полный AI с InfluenceMap, BehaviorTree
-3. **Сохранения** — Prisma + JSON serialization
-4. **Полировка 3D** — шейдеры, пост-процессинг, instancing
-5. **Звук** — музыка, SFX, ambient
+1. **Сохранения/загрузки** — Prisma + JSON serialization (`engine/save/`)
+2. **AI-директор** — полный AI с InfluenceMap, BehaviorTree (`engine/ai/`)
+3. **Web Workers** — pathfinding, AI, mapgen в отдельных потоках
+4. **Полировка 3D** — DecorationLayer, PostProcessing, instancing
+5. **Звук** — музыка, SFX, ambient (AudioProvider)
+6. **Локализация** — полные словари ru.ts / en.ts
 
 ---
 
@@ -151,3 +165,4 @@ realms-of-war/
 | 2026-06-11 | Настройка GitHub: cleanup репо, добавление PROJECT_CONTEXT.md, приватный режим |
 | 2026-06-11 | **Фаза 1:** GameEngine + ECS ядро + Генератор карты + Правила игры (24 файла, 3 параллельных агента) |
 | 2026-06-11 | **Фаза 2:** ECS-системы + Zustand Store + 3D рендеринг + Browser verification (34 файла, 3 параллельных агента) |
+| 2026-06-11 | **Фаза 3:** UI/HUD + Экраны + Интеграция (19 файлов, 2 параллельных агента + интеграция) |
