@@ -133,6 +133,14 @@ canvas{display:block}
     <button id="btn-recruit" disabled>Нанять (R)</button>
     <button id="btn-end-turn">⏭ Завершить ход</button>
   </div>
+  <div class="section" style="font-size:9px;color:#556;line-height:1.6">
+    <b style="color:#8a9bb5">Клавиши:</b><br>
+    T — Технологии<br>
+    B — Строить<br>
+    R — Нанять<br>
+    Esc — Отмена<br>
+    ↑↓←→ — Камера
+  </div>
   <div id="log"><h3>Журнал</h3></div>
 </div>
 
@@ -199,29 +207,18 @@ const totalSprites = Object.keys(SPRITE_FILES).length;
 
 function loadSprites(callback) {
   const bar = document.getElementById('load-bar');
-  let loaded = 0;
-  const total = Object.keys(SPRITE_FILES).length;
-  function onDone(){
-    loaded++;
-    bar.style.width = (loaded / total * 100) + '%';
-    if (loaded === total) {
+  // Skip actual image loading — drawUnit3D renders units without sprites
+  // Animate loading bar briefly then start
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += 20;
+    bar.style.width = progress + '%';
+    if (progress >= 100) {
+      clearInterval(interval);
       document.getElementById('loading').style.display = 'none';
       callback();
     }
-  }
-  Object.entries(SPRITE_FILES).forEach(([key, src]) => {
-    const img = new Image();
-    img.onload = () => { sprites[key] = img; onDone(); };
-    img.onerror = () => { sprites[key] = null; onDone(); };
-    img.src = src;
-  });
-  // Safety: if sprites take too long (e.g. all 404), start game anyway after 3s
-  setTimeout(() => {
-    if (loaded < total) {
-      document.getElementById('loading').style.display = 'none';
-      callback();
-    }
-  }, 800);
+  }, 30);
 }
 
 // ============================================================
@@ -486,6 +483,13 @@ function renderEffects() {
         ctx.fillStyle = `rgba(83,216,251,${puffAlpha})`;
         ctx.fill();
       }
+    } else if (e.type === 'click') {
+      const alpha = 1 - progress;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 8 + progress * 15, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.6})`;
+      ctx.lineWidth = 2 * (1 - progress);
+      ctx.stroke();
     }
   });
 }
@@ -1343,6 +1347,8 @@ function drawSpriteUnit(u,cx,cy){
   const isAnimating=S.moveAnims.some(a=>a.unit===u);
   if(u.walkAnim>0&&!isAnimating)u.walkAnim--;
   const idleBob=Math.sin(Date.now()*0.003+u.animT)*1.5;
+  const idleBreath=1+Math.sin(Date.now()*0.002+u.animT*1.3)*0.02; // subtle scale pulse
+  const idleHeadTurn=Math.sin(Date.now()*0.001+u.animT*0.7)*0.15; // slight head turn
   // [MOVE ANIM] Stronger walk bounce during animated movement
   const walkBounce=isAnimating?Math.abs(Math.sin(Date.now()*0.012))*3:u.walkAnim>0?Math.abs(Math.sin(u.walkAnim*0.5))*2:0;
   // [MOVE ANIM] Walking leg phase: continuous during animation, discrete otherwise
@@ -1351,6 +1357,14 @@ function drawSpriteUnit(u,cx,cy){
   if(isSelected){
     ctx.save();ctx.beginPath();ctx.ellipse(cx,groundY+2,u.size*0.6,u.size*0.18,0,0,Math.PI*2);ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(Date.now()*0.004)})`;ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);ctx.restore();
     const pulse=0.3+0.2*Math.sin(Date.now()*0.005);const glowGrad=ctx.createRadialGradient(cx,groundY-u.size*0.7,u.size*0.2,cx,groundY-u.size*0.7,u.size*1.2);glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.25})`);glowGrad.addColorStop(1,'rgba(241,196,15,0)');ctx.fillStyle=glowGrad;ctx.beginPath();ctx.arc(cx,groundY-u.size*0.7,u.size*1.2,0,Math.PI*2);ctx.fill();
+  }
+  // Breathing glow for idle units
+  if(!isAnimating && u.walkAnim <= 0){
+    const breathAlpha = 0.08 + Math.sin(Date.now()*0.002+u.animT)*0.04;
+    ctx.beginPath();
+    ctx.ellipse(cx, groundY-u.size*0.6, u.size*0.4, u.size*0.5, 0, 0, Math.PI*2);
+    ctx.fillStyle = u.team==='player' ? `rgba(83,216,251,${breathAlpha})` : `rgba(233,69,96,${breathAlpha})`;
+    ctx.fill();
   }
   ctx.beginPath();ctx.ellipse(cx,groundY+1,u.size*0.35,u.size*0.1,0,0,Math.PI*2);ctx.fillStyle=u.team==='player'?'rgba(83,216,251,0.2)':'rgba(233,69,96,0.2)';ctx.fill();
   drawUnit3D(u.type,cx,groundY,u.size,u.color,u.team,u.facing,walkPhase,idleBob+walkBounce);
@@ -1372,22 +1386,79 @@ function drawSpriteBuilding(b,cx,cy){
   const spriteImg=sprites[b.sprite];
   const drawSize=b.size;
 
-  if(spriteImg){
-    // Здание рисуется чуть ниже верха гекса
-    ctx.save();
-    // Тень
-    ctx.beginPath();ctx.ellipse(cx,cy+6,drawSize*0.6,drawSize*0.3,0,0,Math.PI*2);
-    ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
+  // Shadow
+  ctx.save();
+  ctx.beginPath();ctx.ellipse(cx,cy+6,drawSize*0.6,drawSize*0.3,0,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
 
-    // Спрайт здания
+  if(spriteImg){
+    // Sprite image
     const bx=cx-drawSize,by=cy-h-drawSize*1.2;
     ctx.drawImage(spriteImg,bx,by,drawSize*2,drawSize*2);
-
-    // Подпись
-    ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle='#e0c97f';
-    ctx.fillText(b.name,cx,cy-drawSize*0.6);
-    ctx.restore();
+  }else{
+    // Fallback: draw geometric building
+    const baseY=cy-2;
+    if(b.type==='castle'){
+      // Castle: large stone keep with towers
+      const w=drawSize*1.2,bh=drawSize*1.4;
+      // Main wall
+      ctx.fillStyle='#8a7a60';ctx.fillRect(cx-w/2,baseY-bh,w,bh);
+      // Wall shading
+      ctx.fillStyle='#6a5a40';ctx.fillRect(cx-w/2,baseY-bh*0.6,w,bh*0.6);
+      // Towers
+      const tw=w*0.25,th=bh*0.3;
+      ctx.fillStyle='#9a8a70';
+      ctx.fillRect(cx-w/2-tw*0.3,baseY-bh-th,tw,th);
+      ctx.fillRect(cx+w/2-tw*0.7,baseY-bh-th,tw,th);
+      // Tower tops (crenellations)
+      ctx.fillStyle='#7a6a50';
+      for(let i=0;i<3;i++){ctx.fillRect(cx-w/2-tw*0.3+i*tw/3,baseY-bh-th-3,tw/4,3);}
+      for(let i=0;i<3;i++){ctx.fillRect(cx+w/2-tw*0.7+i*tw/3,baseY-bh-th-3,tw/4,3);}
+      // Gate
+      ctx.fillStyle='#3a2a10';ctx.beginPath();ctx.arc(cx,baseY-4,4,Math.PI,0);ctx.fillRect(cx-4,baseY-4,8,4);ctx.fill();
+      // Flag
+      ctx.strokeStyle='#5a4a30';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx,baseY-bh-th);ctx.lineTo(cx,baseY-bh-th-10);ctx.stroke();
+      ctx.fillStyle='#e94560';ctx.fillRect(cx,baseY-bh-th-10,6,4);
+      // Window lights
+      ctx.fillStyle='rgba(255,220,100,0.6)';
+      ctx.fillRect(cx-w*0.2,baseY-bh*0.8,3,3);ctx.fillRect(cx+w*0.1,baseY-bh*0.8,3,3);
+    }else if(b.type==='barracks'){
+      // Barracks: military building with weapon rack
+      const w=drawSize*0.9,bh=drawSize*1.0;
+      ctx.fillStyle='#6a5030';ctx.fillRect(cx-w/2,baseY-bh,w,bh);
+      ctx.fillStyle='#5a4020';ctx.fillRect(cx-w/2,baseY-bh*0.5,w,bh*0.5);
+      // Roof
+      ctx.fillStyle='#8B4513';ctx.beginPath();ctx.moveTo(cx-w/2-3,baseY-bh);ctx.lineTo(cx,baseY-bh-8);ctx.lineTo(cx+w/2+3,baseY-bh);ctx.closePath();ctx.fill();
+      // Door
+      ctx.fillStyle='#3a2010';ctx.fillRect(cx-3,baseY-8,6,8);
+      // Swords crossed on wall
+      ctx.strokeStyle='#c0c0c0';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(cx-w*0.3,baseY-bh*0.7);ctx.lineTo(cx-w*0.1,baseY-bh*0.5);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx-w*0.1,baseY-bh*0.7);ctx.lineTo(cx-w*0.3,baseY-bh*0.5);ctx.stroke();
+    }else if(b.type==='library'){
+      // Library: tall building with books
+      const w=drawSize*0.8,bh=drawSize*1.2;
+      ctx.fillStyle='#4a3a6a';ctx.fillRect(cx-w/2,baseY-bh,w,bh);
+      ctx.fillStyle='#3a2a5a';ctx.fillRect(cx-w/2,baseY-bh*0.4,w,bh*0.4);
+      // Pointed roof
+      ctx.fillStyle='#6a5a8a';ctx.beginPath();ctx.moveTo(cx-w/2-2,baseY-bh);ctx.lineTo(cx,baseY-bh-10);ctx.lineTo(cx+w/2+2,baseY-bh);ctx.closePath();ctx.fill();
+      // Door
+      ctx.fillStyle='#2a1a4a';ctx.fillRect(cx-2.5,baseY-6,5,6);
+      // Book shelves (windows with colored books)
+      ctx.fillStyle='rgba(200,180,100,0.4)';ctx.fillRect(cx-w*0.3,baseY-bh*0.85,w*0.2,4);
+      ctx.fillStyle='rgba(100,180,200,0.4)';ctx.fillRect(cx+w*0.1,baseY-bh*0.85,w*0.2,4);
+      ctx.fillStyle='rgba(200,100,100,0.4)';ctx.fillRect(cx-w*0.15,baseY-bh*0.65,w*0.3,4);
+      // Magical sparkles
+      const t=Date.now()*0.003;
+      const sp=Math.max(0,Math.sin(t))*0.5;
+      if(sp>0.1){ctx.beginPath();ctx.arc(cx,baseY-bh-12,2,0,Math.PI*2);ctx.fillStyle=`rgba(150,120,255,${sp})`;ctx.fill();}
+    }
   }
+
+  // Label
+  ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle='#e0c97f';
+  ctx.fillText(b.name,cx,cy-drawSize*0.6);
+  ctx.restore();
 }
 
 function render(){
@@ -1427,7 +1498,7 @@ function render(){
     const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
     if(sx>-150&&sx<canvas.width+150&&sy>-200&&sy<canvas.height+150){
       const t=S.map[hexKey(b.q,b.r)]?.terrain||0;
-      drawables.push({type:'building',obj:b,pos,y:pos.y+TERRAIN_HEIGHT[t]-20});
+      drawables.push({type:'building',obj:b,pos,y:pos.y+TERRAIN_HEIGHT[t]+0.5});
     }
   });
 
@@ -1969,6 +2040,7 @@ function endTurn(){
   if(!isInputAllowed())return;
   S.phase='enemy-turn-pending';
   S.selectedUnit=null;clearHL();updatePhaseIndicator();
+  S.moveAnims=[];S.animLock=false;
   S.units.filter(u=>u.team==='enemy').forEach(u=>{u.moved=false;u.attacked=false;u.move=u.maxMove;});
   // [PATCH 1] Отменить предыдущий таймер если вдруг остался
   if(_enemyTurnTimer!==null){clearTimeout(_enemyTurnTimer);_enemyTurnTimer=null;}
@@ -1986,7 +2058,7 @@ function canBuild(type,q,r){
   const cell=S.map[hexKey(q,r)];if(!cell)return false;
   if(cell.terrain===TERRAIN.MOUNTAIN||cell.terrain===TERRAIN.WATER)return false;
   if(S.buildings.find(b=>b.q===q&&b.r===r))return false;
-  if(S.units.find(u=>u.q===q&&u.r===r))return false;  // [PATCH 3] любой юнит, не только вражеский
+  if(S.units.find(u=>u.q===q&&u.r===r&&u.team==='enemy'))return false;  // Only block building under enemy units
   // Радиус от замка
   const castle=S.buildings.find(b=>b.type==='castle');
   if(!castle)return false;
@@ -2111,7 +2183,7 @@ canvas.addEventListener('mousemove',e=>{
   if(_clickStartPos&&!_clickIsDrag){
     const dx=e.clientX-_clickStartPos.x;
     const dy=e.clientY-_clickStartPos.y;
-    if(Math.abs(dx)+Math.abs(dy)>5){
+    if(Math.abs(dx)+Math.abs(dy)>8){
       _clickIsDrag=true;
       S.dragging=true;
     }
@@ -2218,6 +2290,27 @@ document.getElementById('tech-canvas').addEventListener('click',function(e){
   });
 });
 
+document.getElementById('tech-canvas').addEventListener('mousemove',function(e){
+  const rect=this.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  const nodes=window._techNodePositions||{};
+  let found=null;
+  Object.values(nodes).forEach(node=>{
+    if(mx>=node.x&&mx<=node.x+node.w&&my>=node.y&&my<=node.y+node.h){
+      found=node.tech;
+    }
+  });
+  const tt=document.getElementById('tooltip');
+  if(found){
+    const status=getTechStatus(found.id);
+    tt.innerHTML=`<b>${found.name}</b><br>${found.effect}<br><i>${status.reason}</i>`;
+    tt.style.display='block';
+    tt.style.left=(e.clientX+12)+'px';tt.style.top=(e.clientY+12)+'px';
+  }else{
+    tt.style.display='none';
+  }
+});
+
 // [TECH TREE] Close button
 document.getElementById('tech-close').addEventListener('click',()=>{
   document.getElementById('tech-overlay').style.display='none';
@@ -2248,13 +2341,19 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='r'||e.key==='R'){
     if(S.phase==='recruiting'){hideRecruitMenu();}
     else if(isInputAllowed()){
-      // Try to open recruit menu for building under hover/click
-      const hq=S.hoverHex;
+      // Try hover hex first, then selected unit's position
+      let recruitBuilding = null;
+      const hq = S.hoverHex;
       if(hq){
-        const b=S.buildings.find(b=>b.q===hq.q&&b.r===hq.r);
-        if(b&&BT[b.type].canRecruit&&BT[b.type].recruits&&BT[b.type].recruits.length){
-          showRecruitMenu(b.q,b.r);
-        }
+        recruitBuilding = S.buildings.find(b=>b.q===hq.q&&b.r===hq.r&&BT[b.type].canRecruit);
+      }
+      if(!recruitBuilding && S.selectedUnit){
+        recruitBuilding = S.buildings.find(b=>b.q===S.selectedUnit.q&&b.r===S.selectedUnit.r&&BT[b.type].canRecruit);
+      }
+      if(recruitBuilding){
+        showRecruitMenu(recruitBuilding.q, recruitBuilding.r);
+      } else {
+        addLog('Наведите курсор на здание или выберите юнит на здании, затем нажмите R','system');
       }
     }
   }
@@ -2320,6 +2419,7 @@ function tryBuildAtSelected(){
 // [PATCH 2+4] handleClick: guard isInputAllowed, расход u.move по стоимости пути
 function handleClick(q,r){
   if(!isInputAllowed())return;
+  addEffect({type:'click',q,r,t:0,maxT:10});
   const clickedUnit=S.units.find(u=>u.q===q&&u.r===r);
   const clickedBuilding=S.buildings.find(b=>b.q===q&&b.r===r);
   const k=hexKey(q,r);
@@ -2425,6 +2525,18 @@ function selectUnit(u){
     S.maxReachHighlights=computeMaxReach(u,costMap);
   }
   else if(!u.attacked){const t=findAttackTargets(u);S.attackHighlights=new Set(t.map(x=>hexKey(x.q,x.r)));}
+  // Highlight buildings that can recruit
+  S.recruitHighlights = new Set();
+  const bldOnUnit = S.buildings.find(b=>b.q===u.q&&b.r===u.r);
+  if(bldOnUnit && BT[bldOnUnit.type].canRecruit){
+    S.recruitHighlights.add(hexKey(u.q, u.r));
+  }
+  // Also highlight nearby recruit buildings
+  S.buildings.forEach(b=>{
+    if(BT[b.type].canRecruit && hexDist(u.q, u.r, b.q, b.r) <= 1){
+      S.recruitHighlights.add(hexKey(b.q, b.r));
+    }
+  });
   updateUI();
 }
 
@@ -2718,7 +2830,7 @@ function renderTechTree(){
 
     // Effect
     tctx.font='8px Segoe UI,Arial';tctx.fillStyle='#667';
-    tctx.fillText(tech.effect.substring(0,25),x+w/2,y+h/2+20);
+    tctx.fillText(tech.effect.length > 30 ? tech.effect.substring(0,28)+'...' : tech.effect,x+w/2,y+h/2+20);
   });
 }
 
