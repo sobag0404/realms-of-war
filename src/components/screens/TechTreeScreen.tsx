@@ -14,8 +14,8 @@ import {
   getTechsByEra,
   getAvailableTechs,
 } from '@/data/technologies';
-import type { TechBranch, TechId } from '@/engine/core/types';
-import type { Technology } from '@/data/technologies';
+import type { TechBranch } from '@/engine/core/types';
+import type { TechId, Technology } from '@/data/technologies';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -100,13 +100,13 @@ export function TechTreeScreen() {
 
   // ── Derived data ───────────────────────────────────────────────────────
   const player = gameState?.players[activePlayerId];
-  const playerTechs = useMemo(() => new Set<TechId>(player?.techs ?? []), [player?.techs]);
+  const playerTechs = useMemo(() => new Set(player?.techs ?? []) as Set<TechId>, [player?.techs]);
   const currentResearch = player?.currentResearch ?? null;
   const researchProgress = player?.researchProgress ?? 0;
   const sciencePerTurn = player?.sciencePerTurn ?? 0;
 
   const availableTechs = useMemo(
-    () => getAvailableTechs(playerTechs),
+    () => getAvailableTechs(playerTechs as Set<TechId>),
     [playerTechs],
   );
 

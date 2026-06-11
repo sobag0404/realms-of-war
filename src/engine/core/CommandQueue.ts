@@ -156,7 +156,7 @@ export class CommandQueue {
   removeByPlayer(playerId: PlayerId): number {
     const before = this.queue.length;
     this.queue = this.queue.filter((cmd) => {
-      const p = cmd as Record<string, unknown>;
+      const p = cmd as unknown as Record<string, unknown>;
       return p['playerId'] !== playerId && p['fromPlayerId'] !== playerId;
     });
     return before - this.queue.length;

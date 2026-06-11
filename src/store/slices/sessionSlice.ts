@@ -181,7 +181,7 @@ export const createSessionSlice: StateCreator<
       );
     } catch (error) {
       let message = 'Command failed';
-      let code = ERROR_CODES.ENGINE_ERROR;
+      let code: string = ERROR_CODES.ENGINE_ERROR;
 
       if (error instanceof EngineError) {
         message = error.message;

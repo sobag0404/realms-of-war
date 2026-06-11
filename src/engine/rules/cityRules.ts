@@ -191,7 +191,7 @@ export function foundCity(
     buildings: ['city_center'],
     growthProgress: 0,
     growthTarget,
-    workedHexes: territory.slice(0, 2), // Start working first 2 hexes
+    workedHexes: territory.slice(0, 2).map((h) => hexKey(h)), // Start working first 2 hexes
     productionQueue: [],
     productionPerTurn: 1,
     foodPerTurn: 2,

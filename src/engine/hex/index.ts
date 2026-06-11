@@ -65,3 +65,22 @@ export {
   setUnitAt,
   isInBounds,
 } from "./mapStorage";
+
+// ─── Line of Sight ──────────────────────────────────────────────────────────
+export type { LosResult } from "./lineOfSight";
+export {
+  checkLineOfSight,
+  hexLine,
+  isTerrainBlocking,
+  isElevatedTerrain,
+} from "./lineOfSight";
+
+// ─── Regions ────────────────────────────────────────────────────────────────
+export type { HexRegion, RegionAnalysis } from "./regions";
+export {
+  identifyLandRegions,
+  getRegionForHex,
+  getContiguousHexes,
+  areInSameRegion,
+  calculateRegionCenter,
+} from "./regions";

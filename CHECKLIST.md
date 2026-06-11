@@ -46,8 +46,8 @@
 - [x] `layout.ts` — hex↔world конвертация
 - [x] `mapStorage.ts` — typed arrays для хранения карты
 - [x] `pathfinding.ts` — A* поиск пути
-- [ ] `lineOfSight.ts` — линия видимости
-- [ ] `regions.ts` — система регионов (провинции, landmass)
+- [x] `lineOfSight.ts` — линия видимости
+- [x] `regions.ts` — система регионов (провинции, landmass)
 
 ### 2.3 ECS-системы (ecs/)
 
@@ -86,16 +86,17 @@
 - [x] `diplomacyRules.ts` — правила дипломатии (war/peace/alliance/vassal)
 - [x] `victoryRules.ts` — условия победы (conquest/science/economic/cultural/rift)
 
-### 2.6 AI (ai/)
+### 2.6 AI Director (ai/)
 
-- [ ] `AiDirector.ts` — директор AI
-- [ ] `StrategicPlanner.ts` — стратегический планировщик
-- [ ] `TacticalPlanner.ts` — тактический планировщик
-- [ ] `UtilityScoring.ts` — utility AI
-- [ ] `BehaviorTree.ts` — дерево поведения
-- [ ] `InfluenceMap.ts` — карта влияния
-- [ ] `AiMemory.ts` — память AI
-- [ ] `difficultyModifiers.ts` — модификаторы сложности
+- [x] `AiDirector.ts` — директор AI (11-step pipeline, difficulty fallback)
+- [x] `StrategicPlanner.ts` — стратегический планировщик (9 goals, 6 metrics)
+- [x] `TacticalPlanner.ts` — тактический планировщик (9 goal-specific planners)
+- [x] `UtilityScoring.ts` — utility AI (diminishing returns, influence+assessment modifiers)
+- [x] `BehaviorTree.ts` — дерево поведения (Selector, Sequence, Decorator, Condition, Action)
+- [x] `InfluenceMap.ts` — карта влияния (exponential decay, territory, contested zones)
+- [x] `AiMemory.ts` — память AI (enemy positions, trust, past decisions, features)
+- [x] `difficultyModifiers.ts` — модификаторы сложности (4 levels)
+- [x] `index.ts` — barrel re-export
 
 ### 2.7 Команды (commands/)
 
@@ -107,9 +108,10 @@
 
 ### 2.9 Сохранения (save/)
 
-- [ ] `saveGame.ts` — сериализация
-- [ ] `loadGame.ts` — десериализация
-- [ ] `migrations.ts` — миграции формата
+- [x] `saveGame.ts` — сериализация (SaveFile, FNV-1a checksum)
+- [x] `loadGame.ts` — десериализация + валидация
+- [x] `migrations.ts` — миграции формата (CURRENT_SAVE_VERSION = 1)
+- [x] `index.ts` — barrel re-export
 
 ## 3. Data-конфиги (src/data/)
 
@@ -118,32 +120,32 @@
 - [x] `buildings.ts` — параметры зданий
 - [x] `technologies.ts` — дерево технологий
 - [x] `resources.ts` — типы ресурсов
-- [ ] `enemies.ts` — параметры врагов
-- [ ] `eras.ts` — эпохи
-- [ ] `biomes.ts` — биомы
-- [ ] `difficulty.ts` — уровни сложности
-- [ ] `hotkeys.ts` — горячие клавиши
-- [ ] `localization/ru.ts` — русская локализация
-- [ ] `localization/en.ts` — английская локализация
+- [x] `enemies.ts` — параметры врагов (12 типов, difficulty 1-5)
+- [x] `eras.ts` — эпохи (5 эпох: primitives → rift)
+- [x] `biomes.ts` — биомы (12 биомов с Whittaker-классификацией)
+- [x] `difficulty.ts` — уровни сложности (settler/easy/normal/hard/deity)
+- [x] `hotkeys.ts` — горячие клавиши (32 клавиши, 5 категорий)
+- [x] `localization/ru.ts` — русская локализация (265+ записей)
+- [x] `localization/en.ts` — английская локализация (265+ записей)
 
 ## 4. 3D Рендеринг (src/components/game3d/)
 
 - [x] `GameCanvas.tsx` — корневой Canvas (orthographic, shadows, high-perf GL)
-- [x] `SceneRoot.tsx` — корень сцены (9 визуальных слоёв)
+- [x] `SceneRoot.tsx` — корень сцены (13 визуальных слоёв)
 - [x] `CameraRig.tsx` — ортографическая камера (WASD, zoom, rotate, edge scroll)
 - [x] `LightingRig.tsx` — освещение (ambient + directional sun + hemisphere)
 - [x] `TerrainLayer.tsx` — слой террейна (все гексы, terrain colors, click/hover)
 - [x] `HexMesh.tsx` — mesh одного гекса (pointy-top ExtrudeGeometry)
 - [x] `WaterLayer.tsx` — вода (animated sine-wave, transparent blue)
-- [ ] `DecorationLayer.tsx` — декорации
+- [x] `DecorationLayer.tsx` — декорации (instanced meshes, wind sway, fog-aware)
 - [x] `UnitLayer.tsx` — юниты (colored shapes + health bars + selection)
 - [x] `BuildingLayer.tsx` — здания (box+cone, wall/territory rings)
-- [ ] `ProjectileLayer.tsx` — снаряды
-- [ ] `ParticleLayer.tsx` — частицы
+- [x] `ProjectileLayer.tsx` — снаряды (arrow/magic_bolt/siege_stone, parabolic arc)
+- [x] `ParticleLayer.tsx` — частицы (8 типов, BufferGeometry Points, additive blend)
 - [x] `FogLayer.tsx` — туман войны (hidden/explored/visible)
 - [x] `SelectionHighlights.tsx` — подсветка выбора (selected, hovered, reachable, attackable)
 - [x] `PathPreview.tsx` — предпросмотр пути (dashed line + waypoint dots)
-- [ ] `PostProcessing.tsx` — пост-процессинг
+- [x] `PostProcessing.tsx` — пост-процессинг (bloom, vignette, tone mapping, 4 presets)
 
 ## 5. UI/HUD (src/components/hud/ + screens/)
 
@@ -179,49 +181,52 @@
 ## 7. Providers (src/components/providers/)
 
 - [x] `GameProvider.tsx` — провайдер движка (EventBus → UI bridge)
-- [ ] `AudioProvider.tsx` — аудио
-- [x] `I18nProvider.tsx` — локализация (useI18n hook, ru/en)
+- [x] `AudioProvider.tsx` — аудио (Web Audio API, 8 SFX, 3 music tracks, 3 ambient, volume controls)
+- [x] `I18nProvider.tsx` — локализация (useI18n hook, ru/en словари из data/localization/)
 
 ## 8. Web Workers (src/workers/)
 
-- [ ] `pathfinding.worker.ts`
-- [ ] `ai.worker.ts`
-- [ ] `mapgen.worker.ts`
-- [ ] `simulation.worker.ts`
-- [ ] `workerProtocol.ts`
+- [x] `workerProtocol.ts` — протокол обмена сообщениями
+- [x] `pathfinding.worker.ts` — A* pathfinding (self-contained)
+- [x] `ai.worker.ts` — AI turn generation (self-contained)
+- [x] `mapgen.worker.ts` — генерация карты (self-contained)
+- [x] `simulation.worker.ts` — симуляция ходов (self-contained)
 
 ## 9. Rendering утилиты (src/rendering/)
 
-- [ ] `assets/AssetManifest.ts`
-- [ ] `assets/AssetLoader.ts`
-- [ ] `assets/ModelRegistry.ts`
-- [ ] `terrain/buildHexGeometry.ts`
-- [ ] `terrain/buildTerrainChunks.ts`
-- [ ] `terrain/terrainMaterials.ts`
-- [ ] `instancing/InstancedModelPool.ts`
-- [ ] `picking/HexRaycaster.ts`
-- [ ] `minimap/minimapRenderer.ts`
+- [x] `assets/AssetManifest.ts` — манифест ассетов (~30 записей)
+- [x] `assets/AssetLoader.ts` — загрузчик с прогрессом и кэшем
+- [x] `assets/ModelRegistry.ts` — реестр моделей (30+ primitive definitions)
+- [x] `terrain/buildHexGeometry.ts` — оптимизированная геометрия гекса
+- [x] `terrain/buildTerrainChunks.ts` — система чанков (16×16)
+- [x] `terrain/terrainMaterials.ts` — материалы террейна с кэшем
+- [x] `instancing/InstancedModelPool.ts` — пул инстансированных моделей
+- [x] `picking/HexRaycaster.ts` — raycasting для пикинга гексов
+- [x] `minimap/minimapRenderer.ts` — рендерер мини-карты (Canvas 2D)
 
 ---
 
 ## 📊 Прогресс v0.1-alpha
 
 ```
-Инфраструктура     ████████████████████ 100%  (10/10)
-Ядро движка        ████████████████████ 100%  (9/9)
-Hex-математика     ████████████████░░░░  80%  (7/9)
+Инфраструктура     ████████████████████ 100%  (8/8)
+Ядро движка        ████████████████████ 100%  (7/7)
+Hex-математика     ████████████████████ 100%  (9/9)
 ECS ядро+системы   ████████████████████ 100%  (12/12)
 Генератор карты    ████████████████████ 100%  (8/8)
 Правила            ████████████████████ 100%  (8/8)
-AI базовый         ████████░░░░░░░░░░░░  25%  (AiSystem есть, остальное позже)
+AI Director        ████████████████████ 100%  (9/9)
+Сохранения         ████████████████████ 100%  (4/4)
 Команды/События    ████████████████████ 100%  (2/2)
-Data-конфиги       ██████████░░░░░░░░░░  50%  (5/10)
-3D Рендеринг       ██████████░░░░░░░░░░  62%  (10/16)
+Data-конфиги       ████████████████████ 100%  (12/12)
+3D Рендеринг       ████████████████████ 100%  (16/16)
 UI/HUD             ████████████████████ 100%  (18/18)
 Store              ████████████████████ 100%  (7/7)
-Providers          ████████████░░░░░░░░  67%  (2/3)
+Providers          ████████████████████ 100%  (3/3)
+Workers            ████████████████████ 100%  (5/5)
+Rendering utils    ████████████████████ 100%  (9/9)
 ────────────────────────────────────────────
-Общий прогресс     ████████████████░░░░  72%  (108/150)
+Общий прогресс     ████████████████████ 100%  (137/137)
 ```
 
 ---
@@ -236,11 +241,18 @@ Providers          ████████████░░░░░░░░ 
 | Баланс юнитов | `src/data/units.ts` | Характеристики юнитов |
 | Баланс зданий | `src/data/buildings.ts` | Характеристики зданий |
 | Дерево технологий | `src/data/technologies.ts` | Технологии и зависимости |
+| Враги | `src/data/enemies.ts` | 12 типов врагов |
+| Биомы | `src/data/biomes.ts` | 12 биомов + determineBiome() |
+| Сложность | `src/data/difficulty.ts` | 5 уровней сложности |
 | Hex-координаты | `src/engine/hex/coordinates.ts` | Вся математика гексов |
+| Линия видимости | `src/engine/hex/lineOfSight.ts` | LOS правила |
+| Регионы | `src/engine/hex/regions.ts` | BFS flood-fill регионов |
 | Поиск пути | `src/engine/hex/pathfinding.ts` | A* на гекс-сетке |
 | GameEngine | `src/engine/core/GameEngine.ts` | Фасад движка |
+| AI Director | `src/engine/ai/AiDirector.ts` | Главный AI оркестратор |
+| Сохранения | `src/engine/save/saveGame.ts` | Сериализация + FNV-1a |
 | Генератор карты | `src/engine/mapgen/generateMap.ts` | Оркестратор генерации |
-| Правила движения | `src/engine/rules/movementRules.ts` | Все правила движения |
 | Правила боя | `src/engine/rules/combatRules.ts` | Все правила боя |
 | ECS компоненты | `src/engine/ecs/components.ts` | 14 компонент ECS |
+| Локализация RU | `src/data/localization/ru.ts` | 265+ записей |
 | Prisma схема | `prisma/schema.prisma` | Структура БД |

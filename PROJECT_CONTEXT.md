@@ -44,37 +44,39 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-11 (Фаза 3 завершена)
+> Последнее обновление: 2026-06-11 (Фаза 5 завершена)
 
 ### Что реализовано
 
 - ✅ GDD (полная спецификация 5531 строк)
-- ✅ Hex-математика (`src/engine/hex/`) — координаты, дистанции, пути, округление, хранение карты
+- ✅ Hex-математика (`src/engine/hex/`) — координаты, дистанции, пути, округление, хранение карты, **линия видимости, регионы**
 - ✅ Ядро движка (`src/engine/core/`) — GameState, GameConfig, GameRng, CommandQueue, EventBus, типы
 - ✅ **GameEngine.ts** — главный фасад движка (диспетчеризация команд, валидация, иммутабельные обновления)
 - ✅ ECS ядро (`src/engine/ecs/`) — Entity, 14 компонентов, ComponentStorage
 - ✅ **ECS-системы** (`src/engine/ecs/systems/`) — Movement, Combat, Vision, Economy, Research, City, AI, StatusEffect, Turn
 - ✅ Генератор карты (`src/engine/mapgen/`) — шум, биомы, реки, ресурсы, руины, стартовые позиции, валидация
 - ✅ Правила игры (`src/engine/rules/`) — движение, бой, экономика, исследование, города, найм, дипломатия, победа
+- ✅ **AI Director** (`src/engine/ai/`) — StrategicPlanner, TacticalPlanner, UtilityScoring, BehaviorTree, InfluenceMap, AiMemory, DifficultyModifiers
+- ✅ **Сохранения/загрузки** (`src/engine/save/`) — сериализация, десериализация, валидация, миграции
 - ✅ **Zustand Store** (`src/store/`) — 6 слайсов: session, gameView, selection, command, ui, settings
-- ✅ **Providers** (`src/components/providers/`) — GameProvider, I18nProvider
-- ✅ **3D рендеринг** (`src/components/game3d/`) — Canvas, Camera, Lighting, Terrain, Water, Units, Buildings, Fog, Selection, PathPreview
+- ✅ **Providers** (`src/components/providers/`) — GameProvider, I18nProvider, **AudioProvider**
+- ✅ **3D рендеринг** (`src/components/game3d/`) — Canvas, Camera, Lighting, Terrain, Water, Units, Buildings, Fog, Selection, PathPreview, **Decorations, Projectiles, Particles, PostProcessing**
 - ✅ **UI/HUD** (`src/components/hud/`) — GameHud, ResourceBar, TurnPanel, SelectionPanel, UnitPanel, CityPanel, Minimap, NotificationStack, ControlsHelp
 - ✅ **Экраны** (`src/components/screens/`) — MainMenuScreen, NewGameScreen, SettingsScreen, TechTreeScreen, CityManagementScreen, RecruitmentScreen, DiplomacyScreen, EndTurnSummaryScreen
-- ✅ Data-конфиги (`src/data/`) — юниты, здания, технологии, террейн, ресурсы
+- ✅ **Data-конфиги** (`src/data/`) — юниты, здания, технологии, террейн, ресурсы, **враги, эры, биомы, сложность, горячие клавиши**
+- ✅ **Локализация** (`src/data/localization/`) — ru.ts (265+ записей), en.ts (265+ записей)
+- ✅ **Web Workers** (`src/workers/`) — pathfinding, AI, mapgen, simulation + workerProtocol
+- ✅ **Rendering утилиты** (`src/rendering/`) — AssetManifest, AssetLoader, ModelRegistry, buildHexGeometry, buildTerrainChunks, terrainMaterials, InstancedModelPool, HexRaycaster, minimapRenderer
 - ✅ Прототип 2D (Canvas) — `public/prototype/index.html`
 - ✅ Next.js проект с shadcn/ui компонентами
 - ✅ Prisma schema + SQLite
 
 ### Что НЕ реализовано (ключевое для v0.1-alpha)
 
-- ❌ Линия видимости (`hex/lineOfSight.ts`) и регионы (`hex/regions.ts`)
-- ❌ Система сохранений/загрузок (`engine/save/`)
-- ❌ AI-директор (`engine/ai/`) — базовый AiSystem есть, нужен полный AiDirector
-- ❌ Декорации и пост-процессинг (3D)
-- ❌ Звуковое оформление (AudioProvider)
-- ❌ Web Workers (pathfinding, AI, mapgen)
-- ❌ Локализация (ru.ts / en.ts словари)
+- ❌ Декорации и пост-процессинг — нужны 3D модели/ассеты
+- ❌ Звуковое оформление — AudioProvider есть, но нужны реальные звуки
+- ❌ Web Workers интеграция — workers созданы, но не подключены к основному потоку
+- ❌ Полная интеграция рендеринг утилит — rendering/ создан, но не подключён к game3d/
 
 ---
 
@@ -92,25 +94,40 @@ realms-of-war/
 ├── src/
 │   ├── app/                            # Next.js App Router
 │   ├── components/
-│   │   ├── game3d/                     # 3D рендеринг (R3F)
-│   │   ├── hud/                        # HUD overlay (GameHud, ResourceBar, TurnPanel, etc.)
-│   │   ├── screens/                    # Экраны (MainMenu, NewGame, TechTree, City, etc.)
-│   │   ├── providers/                  # React провайдеры
+│   │   ├── game3d/                     # 3D рендеринг (R3F) — 16 компонентов
+│   │   ├── hud/                        # HUD overlay (9 компонентов)
+│   │   ├── screens/                    # Экраны (8 экранов)
+│   │   ├── providers/                  # React провайдеры (3)
 │   │   └── ui/                         # shadcn/ui компоненты
 │   ├── data/                           # Data-driven конфиги баланса
 │   │   ├── buildings.ts
 │   │   ├── resources.ts
 │   │   ├── technologies.ts
 │   │   ├── terrain.ts
-│   │   └── units.ts
+│   │   ├── units.ts
+│   │   ├── enemies.ts
+│   │   ├── eras.ts
+│   │   ├── biomes.ts
+│   │   ├── difficulty.ts
+│   │   ├── hotkeys.ts
+│   │   └── localization/              # ru.ts, en.ts
 │   ├── engine/                         # Игровой движок
+│   │   ├── ai/                        # AI Director (9 файлов)
 │   │   ├── core/                       # Ядро (GameState, EventBus, CommandQueue, RNG)
 │   │   ├── ecs/                        # ECS (Entity, Components, Systems)
-│   │   ├── hex/                        # Гексагональная математика
+│   │   ├── hex/                        # Гексагональная математика + LOS + регионы
 │   │   ├── mapgen/                     # Генератор карты
-│   │   └── rules/                      # Правила игры
+│   │   ├── rules/                      # Правила игры
+│   │   └── save/                       # Сохранения/загрузки
 │   ├── hooks/                          # React хуки
+│   ├── rendering/                      # Rendering утилиты (9 файлов)
+│   │   ├── assets/                     # AssetManifest, AssetLoader, ModelRegistry
+│   │   ├── terrain/                    # buildHexGeometry, buildTerrainChunks, terrainMaterials
+│   │   ├── instancing/                 # InstancedModelPool
+│   │   ├── picking/                    # HexRaycaster
+│   │   └── minimimap/                  # minimapRenderer
 │   ├── store/                          # Zustand store (6 слайсов)
+│   ├── workers/                        # Web Workers (5 файлов)
 │   └── lib/                            # Утилиты
 ├── mini-services/                      # Микросервисы (WebSocket и т.д.)
 ├── PROJECT_CONTEXT.md                  # Этот файл
@@ -127,17 +144,17 @@ realms-of-war/
 4. **Туман войны** — три слоя: explored, visible, lastSeen
 5. **Zustand для UI, не для правил** — движок работает без React (тесты, Worker, replay)
 6. **Нет сервера в MVP** — Hotseat локально, онлайн добавляется позже
+7. **TechBranch = 'military' | 'economic' | 'science' | 'mystical'** — синхронизировано между engine/types.ts и data/technologies.ts
 
 ---
 
 ## Приоритеты разработки (следующие шаги)
 
-1. **Сохранения/загрузки** — Prisma + JSON serialization (`engine/save/`)
-2. **AI-директор** — полный AI с InfluenceMap, BehaviorTree (`engine/ai/`)
-3. **Web Workers** — pathfinding, AI, mapgen в отдельных потоках
-4. **Полировка 3D** — DecorationLayer, PostProcessing, instancing
-5. **Звук** — музыка, SFX, ambient (AudioProvider)
-6. **Локализация** — полные словари ru.ts / en.ts
+1. **Интеграция Workers** — подключить pathfinding/ai/mapgen workers к основному потоку
+2. **Интеграция Rendering Utils** — подключить rendering/ к game3d/ компонентам
+3. **Полировка 3D** — замена примитивов на ModelRegistry, AssetLoader
+4. **Звук** — реальные звуки вместо синтезированных (или оставить синтез для MVP)
+5. **Тестирование и баланс** — playtest, настройка баланса
 
 ---
 
@@ -166,3 +183,5 @@ realms-of-war/
 | 2026-06-11 | **Фаза 1:** GameEngine + ECS ядро + Генератор карты + Правила игры (24 файла, 3 параллельных агента) |
 | 2026-06-11 | **Фаза 2:** ECS-системы + Zustand Store + 3D рендеринг + Browser verification (34 файла, 3 параллельных агента) |
 | 2026-06-11 | **Фаза 3:** UI/HUD + Экраны + Интеграция (19 файлов, 2 параллельных агента + интеграция) |
+| 2026-06-11 | **Фаза 4:** LineOfSight + Regions + Save/Load + AI Director + Data configs + Localization (30 файлов, 3 параллельных агента) |
+| 2026-06-11 | **Фаза 5:** 3D Polish + Audio + Workers + Rendering utils (19 файлов, 3 параллельных агента + TS fixes) |

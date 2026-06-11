@@ -13,10 +13,10 @@
  */
 
 import type { PlayerId, HexCoord, ResourceId, ResourceYield } from '../../core/types';
-import type { GameState } from '../../core/GameState';
+import type { GameState, EntityData } from '../../core/GameState';
 import type { GameCommand, MoveUnitCommand, AttackCommand, FoundCityCommand, BuildBuildingCommand, RecruitUnitCommand, ResearchTechnologyCommand, EndTurnCommand } from '../../core/CommandQueue';
 import type { EventBus } from '../../core/EventBus';
-import { hexKey, hexDistance, HEX_DIRECTIONS } from '../../core/types';
+import { hexKey, hexDistance, hexRing, HEX_DIRECTIONS } from '../../core/types';
 import { getReachableHexes } from '../../rules/movementRules';
 import { canAttack } from '../../rules/combatRules';
 import { canFoundCity } from '../../rules/cityRules';
@@ -124,7 +124,7 @@ export class AiSystem {
               (e) => e.ownerId !== playerId && e.hp > 0,
             );
 
-            let closestEnemy = null;
+            let closestEnemy: EntityData | null = null;
             let closestDist = Infinity;
             for (const enemy of enemyUnits) {
               const dist = hexDistance(unit.hex, enemy.hex);

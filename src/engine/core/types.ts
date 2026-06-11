@@ -64,7 +64,7 @@ export type GameMode = 'menu' | 'single' | 'hotseat' | 'online' | 'replay';
 
 // ─── Technology ───────────────────────────────────────────────────────────────
 
-export type TechBranch = 'military' | 'economy' | 'science' | 'magic';
+export type TechBranch = 'military' | 'economic' | 'science' | 'mystical';
 
 export type EraId =
   | 'primitives'

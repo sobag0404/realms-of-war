@@ -10,7 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { useGameStore } from '@/store/useGameStore';
 import { BUILDINGS, getBuildingById } from '@/data/buildings';
 import { RESOURCES } from '@/data/resources';
-import type { CityState, ResourceId } from '@/engine/core/types';
+import type { ResourceId } from '@/engine/core/types';
+import type { CityState } from '@/engine/core/GameState';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

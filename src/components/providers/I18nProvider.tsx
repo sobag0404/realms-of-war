@@ -1,9 +1,8 @@
 /**
- * I18nProvider — simple internationalization context provider.
+ * I18nProvider — internationalization context provider.
  *
  * Provides a `t()` translation function and the current locale.
- * Currently returns the key itself — will be populated with
- * ru.ts / en.ts translation dictionaries in a future task.
+ * Loads comprehensive dictionaries from ru.ts / en.ts.
  *
  * Usage:
  *   const { t, locale } = useI18n();
@@ -15,15 +14,16 @@
 import { createContext, useContext, useMemo } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import type { Language } from '@/store/slices/settingsSlice';
+import { RU } from '@/data/localization/ru';
+import { EN } from '@/data/localization/en';
 
 // ─── Translation Function ─────────────────────────────────────────────────────
 
 /**
  * Translate a key with optional interpolation parameters.
  *
- * Currently returns the key itself. When translation dictionaries
- * are added, this will look up the key in the current locale's
- * dictionary and interpolate {param} placeholders.
+ * Looks up the key in the current locale's dictionary and
+ * interpolates {param} placeholders with provided values.
  *
  * @param key - Translation key (dot-separated, e.g., "ui.startGame")
  * @param params - Optional interpolation parameters
@@ -52,15 +52,16 @@ export const I18nContext = createContext<I18nContext>({
 /** Access the i18n context from any component inside I18nProvider. */
 export const useI18n = (): I18nContext => useContext(I18nContext);
 
-// ─── Placeholder Dictionaries ─────────────────────────────────────────────────
+// ─── Dictionaries ─────────────────────────────────────────────────────────────
 
 /**
- * Placeholder translation dictionaries.
- * Will be replaced with full dictionaries from ru.ts / en.ts later.
+ * Translation dictionaries for each supported language.
+ * Keys are dot-separated identifiers (e.g., "ui.startGame"),
+ * values are the translated strings with optional {param} placeholders.
  */
 const DICTIONARIES: Record<Language, Record<string, string>> = {
-  ru: {},
-  en: {},
+  ru: RU,
+  en: EN,
 };
 
 // ─── Interpolation Helper ─────────────────────────────────────────────────────
