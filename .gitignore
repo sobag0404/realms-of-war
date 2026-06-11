@@ -52,3 +52,22 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Database files
+*.db
+*.db-journal
+
+# Dev scripts PID
+.zscripts/dev.pid
+
+# Upload temp folder
+/upload/
+
+# Worklog files (local only)
+worklog*.md
+
+# Agent context (local only)
+/agent-ctx/
+
+# Game screenshot (large binary)
+game-screenshot.png
