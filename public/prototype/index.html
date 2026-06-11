@@ -224,12 +224,18 @@ function loadSprites(callback) {
 // ============================================================
 // АКСИАЛЬНЫЕ КООРДИНАТЫ
 // ============================================================
+const _hexPosCache = {};
 function hexToPixel(q, r) {
-  return {
+  const k = q * 1000 + r;
+  if (_hexPosCache[k]) return _hexPosCache[k];
+  const pos = {
     x: HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r),
     y: HEX_SIZE * (3/2 * r)
   };
+  _hexPosCache[k] = pos;
+  return pos;
 }
+function clearHexPosCache() { Object.keys(_hexPosCache).forEach(k => delete _hexPosCache[k]); }
 function pixelToHex(px, py) {
   const q = (Math.sqrt(3)/3 * px - 1/3 * py) / HEX_SIZE;
   const r = (2/3 * py) / HEX_SIZE;
@@ -255,6 +261,20 @@ function hexKey(q,r) { return `${q},${r}`; }
 // ============================================================
 // [PATCH 1] Таймер хода противника — единая точка отмены
 let _enemyTurnTimer = null;
+// [PERF] Cached frame time — avoids repeated Date.now()/performance.now() calls
+let _now = 0;
+// [PERF] Terrain offscreen buffer — pre-rendered hex shapes, blitted each frame
+let _terrainBuffer = null;
+let _terrainDirty = true;
+const TERRAIN_PAD = 100;
+let _skipDecor = false;
+// [PERF] Minimap frame counter for throttling
+let _mmFrame = 0;
+// [PERF] Threats cache — skip recomputation when enemy positions unchanged
+let _threatsDirty = true;
+// [PERF] Pathfinding throttle — limit path recomputation on mousemove
+let _lastPathTime = 0;
+const _pathThrottleMs = 50;
 
 const S = {
   map:{}, units:[], buildings:[], selectedUnit:null,
@@ -660,6 +680,8 @@ function checkEpochTransition(){
 // ============================================================
 function genMap() {
   S.map={};
+  clearHexPosCache();
+  _terrainDirty=true;
   for(let r=0;r<ROWS;r++) for(let q=0;q<COLS;q++){
     const rnd=Math.random();
     let terrain;
@@ -704,7 +726,7 @@ function spawnUnits() {
 // РЕНДЕРИНГ
 // ============================================================
 const canvas=document.getElementById('canvas');
-const ctx=canvas.getContext('2d');
+let ctx=canvas.getContext('2d');
 const mmCanvas=document.getElementById('minimap');
 const mmCtx=mmCanvas.getContext('2d');
 
@@ -770,7 +792,7 @@ function drawDecor(cx,cy,terrain){
     ctx.beginPath();ctx.moveTo(cx+3,cy-1);ctx.lineTo(cx+6,cy-6);ctx.lineTo(cx+8,cy-1);ctx.fill();
   } else if(terrain===TERRAIN.WATER){
     // Волны с анимированным мерцанием
-    const t=Date.now()*0.002;
+    const t=_now*0.002;
     const shimmer=Math.sin(t)*0.15+0.85;
     for(let i=0;i<3;i++){
       const wy=cy-4+i*5;
@@ -828,7 +850,7 @@ function drawDecor(cx,cy,terrain){
       ctx.fillStyle='#6a9058';ctx.fill();
     });
     // Murky bubble
-    const bt=Date.now()*0.003;
+    const bt=_now*0.003;
     const bAlpha=Math.max(0,Math.sin(bt))*0.3;
     if(bAlpha>0.05){
       ctx.beginPath();ctx.arc(cx-2,cy+1+Math.sin(bt)*2,1.5,0,Math.PI*2);
@@ -865,7 +887,7 @@ function drawDecor(cx,cy,terrain){
     ctx.fillStyle='#c080e0';
     ctx.fillRect(cx-2,cy-6,2,4);ctx.fillRect(cx+1,cy-4,2,3);
     // Subtle animated sparkle
-    const rt=Date.now()*0.003;
+    const rt=_now*0.003;
     const rAlpha=Math.max(0,Math.sin(rt))*0.4;
     if(rAlpha>0.05){
       ctx.beginPath();ctx.arc(cx-1,cy-7,2,0,Math.PI*2);
@@ -1064,65 +1086,63 @@ function drawHex3D(cx,cy,terrain,highlight){
     ctx.strokeStyle='rgba(180,80,220,0.35)';ctx.lineWidth=1.5;ctx.stroke();
   }
 
-  // ---- Decorations on hex ----
-  drawDecor(cx,cy-2,terrain);
+  // ---- Decorations on hex (skipped when building terrain buffer) ----
+  if(!_skipDecor) drawDecor(cx,cy-2,terrain);
+}
 
-  // ---- Unified Highlight System (hover/move/attack/selected/threat/recruit/path) ----
-  if(highlight&&highlight.size>0){
-    const drawHexPath=()=>{ctx.beginPath();for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}ctx.closePath();};
+// [PERF] Extracted highlight rendering — drawn on top of pre-rendered terrain
+function drawHexHighlights(cx,cy,terrain,highlight){
+  if(!highlight||highlight.size===0)return;
+  const verts=hexVertices(cx,cy,HEX_SIZE);
+  const drawHexPath=()=>{ctx.beginPath();for(let i=0;i<6;i++){if(i===0)ctx.moveTo(verts[i].x,verts[i].y);else ctx.lineTo(verts[i].x,verts[i].y);}ctx.closePath();};
 
-    // hover: subtle white outline + slight brightness
-    if(highlight.has('hover')){
-      drawHexPath();ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();
-      ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1.5;ctx.stroke();
-    }
-    // recruit: green fill + dashed border
-    if(highlight.has('recruit')){
-      drawHexPath();ctx.fillStyle='rgba(46,204,113,0.2)';ctx.fill();
-      ctx.setLineDash([4,3]);ctx.strokeStyle='rgba(46,204,113,0.6)';ctx.lineWidth=2;ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    // path: yellow fill + dots along edges + center dot
-    if(highlight.has('path')){
-      // Semi-transparent yellow fill for path cells
-      drawHexPath();ctx.fillStyle='rgba(255,220,50,0.12)';ctx.fill();
-      // Dots along edges
-      for(let i=0;i<6;i++){const v1=verts[i],v2=verts[(i+1)%6];
-        const mx=(v1.x+v2.x)/2,my=(v1.y+v2.y)/2;
-        ctx.beginPath();ctx.arc(mx,my,2.5,0,Math.PI*2);ctx.fillStyle='rgba(255,220,50,0.7)';ctx.fill();}
-      // Center dot
-      ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fillStyle='rgba(255,220,50,0.8)';ctx.fill();
-    }
-    // threat: orange pulsing border
-    if(highlight.has('threat')){
-      const pulse=0.5+0.3*Math.sin(Date.now()*0.004);
-      drawHexPath();ctx.strokeStyle=`rgba(230,126,34,${pulse})`;ctx.lineWidth=2.5;ctx.stroke();
-    }
-    // move: cyan fill + border (keep existing style)
-    if(highlight.has('move')){
-      drawHexPath();ctx.fillStyle='rgba(83,216,251,0.25)';ctx.fill();
-      ctx.strokeStyle='rgba(83,216,251,0.6)';ctx.lineWidth=2;ctx.stroke();
-    }
-    // [TASK 6] maxReach: cells at max movement range get a subtle marker
-    if(highlight.has('maxReach')){
-      drawHexPath();ctx.strokeStyle='rgba(83,216,251,0.35)';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
-      // Small corner marker to indicate max reach
-      ctx.beginPath();ctx.arc(verts[0].x,verts[0].y,2.5,0,Math.PI*2);
-      ctx.fillStyle='rgba(83,216,251,0.6)';ctx.fill();
-    }
-    // attack: red fill + border (keep existing style)
-    if(highlight.has('attack')){
-      drawHexPath();ctx.fillStyle='rgba(233,69,96,0.3)';ctx.fill();
-      ctx.strokeStyle='rgba(233,69,96,0.7)';ctx.lineWidth=2;ctx.stroke();
-    }
-    // selected: gold thick border (always on top)
-    if(highlight.has('selected')){
-      drawHexPath();ctx.strokeStyle='#f1c40f';ctx.lineWidth=3;ctx.stroke();
-    }
-    // Stacking glow: if move/attack + hover, add subtle white outline
-    if((highlight.has('move')||highlight.has('attack'))&&highlight.has('hover')){
-      drawHexPath();ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke();
-    }
+  // hover: subtle white outline + slight brightness
+  if(highlight.has('hover')){
+    drawHexPath();ctx.fillStyle='rgba(255,255,255,0.06)';ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1.5;ctx.stroke();
+  }
+  // recruit: green fill + dashed border
+  if(highlight.has('recruit')){
+    drawHexPath();ctx.fillStyle='rgba(46,204,113,0.2)';ctx.fill();
+    ctx.setLineDash([4,3]);ctx.strokeStyle='rgba(46,204,113,0.6)';ctx.lineWidth=2;ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // path: yellow fill + dots along edges + center dot
+  if(highlight.has('path')){
+    drawHexPath();ctx.fillStyle='rgba(255,220,50,0.12)';ctx.fill();
+    for(let i=0;i<6;i++){const v1=verts[i],v2=verts[(i+1)%6];
+      const mx=(v1.x+v2.x)/2,my=(v1.y+v2.y)/2;
+      ctx.beginPath();ctx.arc(mx,my,2.5,0,Math.PI*2);ctx.fillStyle='rgba(255,220,50,0.7)';ctx.fill();}
+    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fillStyle='rgba(255,220,50,0.8)';ctx.fill();
+  }
+  // threat: orange pulsing border
+  if(highlight.has('threat')){
+    const pulse=0.5+0.3*Math.sin(_now*0.004);
+    drawHexPath();ctx.strokeStyle=`rgba(230,126,34,${pulse})`;ctx.lineWidth=2.5;ctx.stroke();
+  }
+  // move: cyan fill + border
+  if(highlight.has('move')){
+    drawHexPath();ctx.fillStyle='rgba(83,216,251,0.25)';ctx.fill();
+    ctx.strokeStyle='rgba(83,216,251,0.6)';ctx.lineWidth=2;ctx.stroke();
+  }
+  // maxReach: cells at max movement range
+  if(highlight.has('maxReach')){
+    drawHexPath();ctx.strokeStyle='rgba(83,216,251,0.35)';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(verts[0].x,verts[0].y,2.5,0,Math.PI*2);
+    ctx.fillStyle='rgba(83,216,251,0.6)';ctx.fill();
+  }
+  // attack: red fill + border
+  if(highlight.has('attack')){
+    drawHexPath();ctx.fillStyle='rgba(233,69,96,0.3)';ctx.fill();
+    ctx.strokeStyle='rgba(233,69,96,0.7)';ctx.lineWidth=2;ctx.stroke();
+  }
+  // selected: gold thick border (always on top)
+  if(highlight.has('selected')){
+    drawHexPath();ctx.strokeStyle='#f1c40f';ctx.lineWidth=3;ctx.stroke();
+  }
+  // Stacking glow: if move/attack + hover
+  if((highlight.has('move')||highlight.has('attack'))&&highlight.has('hover')){
+    drawHexPath();ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.stroke();
   }
 }
 
@@ -1332,8 +1352,8 @@ function drawUnit3D(type,cx,groundY,size,color,team,facing,walkPhase,idleBob){
 
 function drawUnitFallback(u,cx,cy){
   const isAnimating=S.moveAnims.some(a=>a.unit===u);
-  const walkPhase=isAnimating?Date.now()*0.015:u.walkAnim;
-  drawUnit3D(u.type,cx,cy,u.size,u.color,u.team,u.facing,walkPhase,Math.sin(Date.now()*0.003+u.animT)*1.5);
+  const walkPhase=isAnimating?_now*0.015:u.walkAnim;
+  drawUnit3D(u.type,cx,cy,u.size,u.color,u.team,u.facing,walkPhase,Math.sin(_now*0.003+u.animT)*1.5);
 }
 
 // ============================================================
@@ -1346,21 +1366,21 @@ function drawSpriteUnit(u,cx,cy){
   // [MOVE ANIM] Don't decrement walkAnim during active move animation
   const isAnimating=S.moveAnims.some(a=>a.unit===u);
   if(u.walkAnim>0&&!isAnimating)u.walkAnim--;
-  const idleBob=Math.sin(Date.now()*0.003+u.animT)*1.5;
-  const idleBreath=1+Math.sin(Date.now()*0.002+u.animT*1.3)*0.02; // subtle scale pulse
-  const idleHeadTurn=Math.sin(Date.now()*0.001+u.animT*0.7)*0.15; // slight head turn
+  const idleBob=Math.sin(_now*0.003+u.animT)*1.5;
+  const idleBreath=1+Math.sin(_now*0.002+u.animT*1.3)*0.02; // subtle scale pulse
+  const idleHeadTurn=Math.sin(_now*0.001+u.animT*0.7)*0.15; // slight head turn
   // [MOVE ANIM] Stronger walk bounce during animated movement
-  const walkBounce=isAnimating?Math.abs(Math.sin(Date.now()*0.012))*3:u.walkAnim>0?Math.abs(Math.sin(u.walkAnim*0.5))*2:0;
+  const walkBounce=isAnimating?Math.abs(Math.sin(_now*0.012))*3:u.walkAnim>0?Math.abs(Math.sin(u.walkAnim*0.5))*2:0;
   // [MOVE ANIM] Walking leg phase: continuous during animation, discrete otherwise
-  const walkPhase=isAnimating?Date.now()*0.015:u.walkAnim;
+  const walkPhase=isAnimating?_now*0.015:u.walkAnim;
   ctx.beginPath();ctx.ellipse(cx,groundY+3,u.size*0.45,u.size*0.12,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fill();
   if(isSelected){
-    ctx.save();ctx.beginPath();ctx.ellipse(cx,groundY+2,u.size*0.6,u.size*0.18,0,0,Math.PI*2);ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(Date.now()*0.004)})`;ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);ctx.restore();
-    const pulse=0.3+0.2*Math.sin(Date.now()*0.005);const glowGrad=ctx.createRadialGradient(cx,groundY-u.size*0.7,u.size*0.2,cx,groundY-u.size*0.7,u.size*1.2);glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.25})`);glowGrad.addColorStop(1,'rgba(241,196,15,0)');ctx.fillStyle=glowGrad;ctx.beginPath();ctx.arc(cx,groundY-u.size*0.7,u.size*1.2,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.beginPath();ctx.ellipse(cx,groundY+2,u.size*0.6,u.size*0.18,0,0,Math.PI*2);ctx.strokeStyle=`rgba(241,196,15,${0.6+0.2*Math.sin(_now*0.004)})`;ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);ctx.restore();
+    const pulse=0.3+0.2*Math.sin(_now*0.005);const glowGrad=ctx.createRadialGradient(cx,groundY-u.size*0.7,u.size*0.2,cx,groundY-u.size*0.7,u.size*1.2);glowGrad.addColorStop(0,`rgba(241,196,15,${pulse*0.25})`);glowGrad.addColorStop(1,'rgba(241,196,15,0)');ctx.fillStyle=glowGrad;ctx.beginPath();ctx.arc(cx,groundY-u.size*0.7,u.size*1.2,0,Math.PI*2);ctx.fill();
   }
   // Breathing glow for idle units
   if(!isAnimating && u.walkAnim <= 0){
-    const breathAlpha = 0.08 + Math.sin(Date.now()*0.002+u.animT)*0.04;
+    const breathAlpha = 0.08 + Math.sin(_now*0.002+u.animT)*0.04;
     ctx.beginPath();
     ctx.ellipse(cx, groundY-u.size*0.6, u.size*0.4, u.size*0.5, 0, 0, Math.PI*2);
     ctx.fillStyle = u.team==='player' ? `rgba(83,216,251,${breathAlpha})` : `rgba(233,69,96,${breathAlpha})`;
@@ -1449,7 +1469,7 @@ function drawSpriteBuilding(b,cx,cy){
       ctx.fillStyle='rgba(100,180,200,0.4)';ctx.fillRect(cx+w*0.1,baseY-bh*0.85,w*0.2,4);
       ctx.fillStyle='rgba(200,100,100,0.4)';ctx.fillRect(cx-w*0.15,baseY-bh*0.65,w*0.3,4);
       // Magical sparkles
-      const t=Date.now()*0.003;
+      const t=_now*0.003;
       const sp=Math.max(0,Math.sin(t))*0.5;
       if(sp>0.1){ctx.beginPath();ctx.arc(cx,baseY-bh-12,2,0,Math.PI*2);ctx.fillStyle=`rgba(150,120,255,${sp})`;ctx.fill();}
     }
@@ -1461,24 +1481,63 @@ function drawSpriteBuilding(b,cx,cy){
   ctx.restore();
 }
 
+// [PERF] Build terrain offscreen buffer — pre-renders all hex 3D shapes once
+function buildTerrainBuffer(){
+  const mapW=Math.ceil(COLS*HEX_W+TERRAIN_PAD*2);
+  const mapH=Math.ceil(ROWS*HEX_H*0.75+TERRAIN_PAD*2);
+  if(!_terrainBuffer) _terrainBuffer=document.createElement('canvas');
+  _terrainBuffer.width=mapW;
+  _terrainBuffer.height=mapH;
+  const tctx=_terrainBuffer.getContext('2d');
+  // Swap global ctx temporarily so drawHex3D draws to offscreen buffer
+  const savedCtx=ctx;
+  ctx=tctx;
+  _skipDecor=true; // skip animated decorations — they're drawn each frame
+  const cells=Object.values(S.map);
+  cells.sort((a,b)=>a.r-b.r||a.q-b.q);
+  cells.forEach(cell=>{
+    const pos=hexToPixel(cell.q,cell.r);
+    drawHex3D(pos.x+TERRAIN_PAD,pos.y+TERRAIN_PAD,cell.terrain,null);
+  });
+  _skipDecor=false;
+  ctx=savedCtx;
+  _terrainDirty=false;
+}
+
 function render(){
   updateEffects();
+
+  // [PERF] Rebuild terrain offscreen buffer only when terrain changes
+  if(_terrainDirty) buildTerrainBuffer();
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // [PERF] Blit pre-rendered terrain from offscreen buffer
+  if(_terrainBuffer){
+    // The terrain buffer has hexes at (worldPos + TERRAIN_PAD).
+    // To show the portion visible at camera (S.cam.x, S.cam.y),
+    // draw the buffer offset so that buffer pixel (cam+PAD) maps to screen pixel 0.
+    const dx = -(S.cam.x + TERRAIN_PAD);
+    const dy = -(S.cam.y + TERRAIN_PAD);
+    ctx.drawImage(_terrainBuffer, dx, dy);
+  }
+
   ctx.save();
   ctx.translate(-S.cam.x,-S.cam.y);
 
   const cells=Object.values(S.map);
-  cells.sort((a,b)=>a.r-b.r||a.q-b.q);
 
-  // Собираем объекты для сортировки по Y (painter's algorithm)
+  // Draw decorations and collect highlight/building/unit drawables
   const drawables=[];
   cells.forEach(cell=>{
     const pos=hexToPixel(cell.q,cell.r);
     const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
     if(sx>-150&&sx<canvas.width+150&&sy>-200&&sy<canvas.height+150){
+      // Draw decorations on top of pre-rendered terrain (includes animated parts)
+      drawDecor(pos.x,pos.y-2,cell.terrain);
+
       const key=hexKey(cell.q,cell.r);
-      // [TASK 2+3] Unified highlight: compute full Set with all active types
       const hl=new Set();
       if(S.hoverHex&&S.hoverHex.q===cell.q&&S.hoverHex.r===cell.r)hl.add('hover');
       if(S.recruitHighlights.has(key))hl.add('recruit');
@@ -1488,11 +1547,13 @@ function render(){
       if(S.maxReachHighlights.has(key))hl.add('maxReach');
       if(S.attackHighlights.has(key))hl.add('attack');
       if(S.selectedUnit&&S.selectedUnit.q===cell.q&&S.selectedUnit.r===cell.r)hl.add('selected');
-      drawables.push({type:'hex',pos,cell,hl:hl.size?hl:null,y:pos.y+TERRAIN_HEIGHT[cell.terrain]});
+      if(hl.size>0){
+        drawables.push({type:'hex',pos,cell,hl,y:pos.y+TERRAIN_HEIGHT[cell.terrain]});
+      }
     }
   });
 
-  // Здания
+  // Buildings
   S.buildings.forEach(b=>{
     const pos=hexToPixel(b.q,b.r);
     const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
@@ -1502,7 +1563,7 @@ function render(){
     }
   });
 
-  // Юниты — use animated visual positions
+  // Units — use animated visual positions
   S.units.forEach(u=>{
     const pos=getUnitVisualPos(u);
     const sx=pos.x-S.cam.x,sy=pos.y-S.cam.y;
@@ -1512,22 +1573,20 @@ function render(){
     }
   });
 
-  // Сортируем по Y для правильного порядка отрисовки
+  // Sort by Y for correct draw order
   drawables.sort((a,b)=>a.y-b.y);
 
-  // Рисуем всё
+  // Draw highlights, buildings, units
   drawables.forEach(d=>{
     if(d.type==='hex'){
-      drawHex3D(d.pos.x,d.pos.y,d.cell.terrain,d.hl);
-      // [TASK 6] Draw path cost numbers on path-highlighted cells
-      if(d.hl&&d.hl.has('path')){
+      drawHexHighlights(d.pos.x,d.pos.y,d.cell.terrain,d.hl);
+      // Draw path cost numbers on path-highlighted cells
+      if(d.hl.has('path')){
         const key=hexKey(d.cell.q,d.cell.r);
         const cost=S.pathCostMap[key];
         if(cost!==undefined){
           ctx.save();
-          const h=TERRAIN_HEIGHT[d.cell.terrain];
-          // Small cost badge: dark circle with number
-          const bx=d.pos.x+10,by=d.pos.y-h*0.1-10;
+          const bx=d.pos.x+10,by=d.pos.y-TERRAIN_HEIGHT[d.cell.terrain]*0.1-10;
           ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);
           ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fill();
           ctx.strokeStyle='rgba(255,220,50,0.8)';ctx.lineWidth=1;ctx.stroke();
@@ -1545,7 +1604,8 @@ function render(){
   renderEffects();
 
   ctx.restore();
-  renderMinimap();
+  // [PERF] Throttle minimap rendering — only every 3rd frame
+  if(_mmFrame%3===0) renderMinimap();
 }
 
 function renderMinimap(){
@@ -1660,7 +1720,6 @@ function renderMinimap(){
   });
 
   // --- Draw units ---
-  const now=performance.now();
   S.units.forEach(u=>{
     const {x,y}=mmPos(u.q,u.r);
     const isPlayer=u.team==='player';
@@ -1669,7 +1728,7 @@ function renderMinimap(){
 
     // Pulse effect for selected unit
     if(isSelected){
-      const pulse=0.6+0.4*Math.sin(now/200);
+      const pulse=0.6+0.4*Math.sin(_now/200);
       mmCtx.beginPath();
       mmCtx.arc(x,y,dotR+3,0,Math.PI*2);
       mmCtx.fillStyle=`rgba(255,255,255,${(pulse*0.35).toFixed(2)})`;
@@ -1775,10 +1834,11 @@ function findReachable(unit){
   const visited={};
   const costMap={};
   const queue=[{q:unit.q,r:unit.r,cost:0}];
+  let qi=0; // [PERF] index-based BFS instead of shift()
   visited[hexKey(unit.q,unit.r)]=0;
   costMap[hexKey(unit.q,unit.r)]=0;
-  while(queue.length){
-    const cur=queue.shift();
+  while(qi<queue.length){
+    const cur=queue[qi++];
     for(const n of hexNeighbors(cur.q,cur.r)){
       const cell=S.map[hexKey(n.q,n.r)];if(!cell)continue;
       const mc=T_MOVE[cell.terrain];if(mc>=99)continue;
@@ -1817,8 +1877,9 @@ function findPath(fromQ,fromR,toQ,toR,unit){
   costMap[startKey]=0;
   parent[startKey]=null;
 
-  while(queue.length){
-    const cur=queue.shift();
+  let qi=0; // [PERF] index-based BFS instead of shift()
+  while(qi<queue.length){
+    const cur=queue[qi++];
     for(const n of hexNeighbors(cur.q,cur.r)){
       const cell=S.map[hexKey(n.q,n.r)];
       if(!cell)continue;
@@ -1898,6 +1959,7 @@ combat = function(atk, def) {
   const defColor = def.color;
   const atkColor = atk.color;
   _originalCombat(atk, def);
+  _threatsDirty=true; // combat may kill units, invalidate threat cache
   // Hit effect on defender
   const dmgDealt = defHpBefore - def.hp;
   if (dmgDealt > 0) addEffect({type:'hit', q:defQ, r:defR, t:0, maxT:20, damage:dmgDealt});
@@ -1926,6 +1988,7 @@ function checkLvl(u){
 function enemyTurn(){
   if(S.phase==='gameover')return;
   S.phase='enemy';addLog('--- Ход противника ---','enemy');updatePhaseIndicator();
+  _threatsDirty=true; // enemies will move, invalidate threat cache
   const enemies=[...S.units.filter(u=>u.team==='enemy')];
   for(let i=0;i<enemies.length;i++){
     const e=enemies[i];
@@ -2205,21 +2268,26 @@ canvas.addEventListener('mousemove',e=>{
   }
 
   // [TASK 6] Compute path preview on hover when unit is selected
+  // [PERF] Throttle pathfinding — only recompute every 50ms
   if(S.selectedUnit&&S.hoverHex&&S.moveHighlights.has(hexKey(S.hoverHex.q,S.hoverHex.r))){
-    const path=findPath(S.selectedUnit.q,S.selectedUnit.r,S.hoverHex.q,S.hoverHex.r,S.selectedUnit);
-    if(path&&path.length>1){
-      const newPathHL=new Set();
-      const newPathCost={};
-      path.forEach(p=>{
-        const k=hexKey(p.q,p.r);
-        newPathHL.add(k);
-        newPathCost[k]=p.cost;
-      });
-      S.pathHighlights=newPathHL;
-      S.pathCostMap=newPathCost;
-    }else{
-      S.pathHighlights=new Set();
-      S.pathCostMap={};
+    const pn=performance.now();
+    if(pn-_lastPathTime>=_pathThrottleMs){
+      _lastPathTime=pn;
+      const path=findPath(S.selectedUnit.q,S.selectedUnit.r,S.hoverHex.q,S.hoverHex.r,S.selectedUnit);
+      if(path&&path.length>1){
+        const newPathHL=new Set();
+        const newPathCost={};
+        path.forEach(p=>{
+          const k=hexKey(p.q,p.r);
+          newPathHL.add(k);
+          newPathCost[k]=p.cost;
+        });
+        S.pathHighlights=newPathHL;
+        S.pathCostMap=newPathCost;
+      }else{
+        S.pathHighlights=new Set();
+        S.pathCostMap={};
+      }
     }
   }else if(S.selectedUnit&&S.hoverHex&&!S.moveHighlights.has(hexKey(S.hoverHex.q,S.hoverHex.r))){
     // Hovering over non-reachable cell — clear path
@@ -2448,9 +2516,8 @@ function handleClick(q,r){
           const cell=S.map[hexKey(destQ,destR)];
           if(cell&&cell.terrain===TERRAIN.RUINS){
             const g=10+Math.floor(Math.random()*15);S.res.gold+=g;S.pp+=5;
-            addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;
+            addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;_terrainDirty=true;
           }
-          // If still has movement, recalculate reachable cells
           if(su.move>0&&!su.attacked){
             const{moveCells,attackCells,costMap}=findReachable(su);
             S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
@@ -2473,9 +2540,8 @@ function handleClick(q,r){
         const cell=S.map[k];
         if(cell&&cell.terrain===TERRAIN.RUINS){
           const g=10+Math.floor(Math.random()*15);S.res.gold+=g;S.pp+=5;
-          addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;
+          addLog(`Руины! +${g} золота, +5 ОП`,'system');cell.terrain=TERRAIN.PLAINS;_terrainDirty=true;
         }
-        clearHL();
         if(su.move>0&&!su.attacked){
           const{moveCells,attackCells,costMap}=findReachable(su);
           S.moveHighlights=moveCells;S.attackHighlights=attackCells;S.lastCostMap=costMap;
@@ -2542,7 +2608,9 @@ function selectUnit(u){
 
 
 // [TASK 2+3] Compute threat zones: all hexes attackable by enemy units
+// [PERF] Cache threats — only recompute when enemy positions change
 function computeThreats(){
+  if(!_threatsDirty) return; // skip if nothing changed
   S.threatHighlights=new Set();
   S.units.filter(u=>u.team==='enemy'&&u.hp>0).forEach(e=>{
     // Melee/ranged: all hexes within range
@@ -2555,6 +2623,7 @@ function computeThreats(){
       }
     }
   });
+  _threatsDirty=false;
 }
 
 // [TASK 1] Show enemy unit info in the sidebar unit-info panel
@@ -2958,9 +3027,17 @@ function showTurnToast(text){
 // ============================================================
 let _lastFrameTime=0;
 function loop(ts){
+  if(!ts) ts=performance.now(); // [PERF FIX] ensure _now is always a valid number
   const dt=_lastFrameTime?(ts-_lastFrameTime)/1000:0.016;
+  _now=ts; // [PERF] cache frame timestamp once
   _lastFrameTime=ts;
   updateMoveAnims(dt);
+  // [PERF] Frame skip: during enemy turn with no animations, render at ~20fps
+  _mmFrame++;
+  const hasAnims=S.moveAnims.length>0||S.effects.length>0;
+  if((S.phase==='enemy'||S.phase==='enemy-turn-pending')&&!hasAnims&&_mmFrame%3!==0){
+    requestAnimationFrame(loop);return;
+  }
   render();
   requestAnimationFrame(loop);
 }

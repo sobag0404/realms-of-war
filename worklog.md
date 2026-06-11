@@ -1,25 +1,64 @@
 ---
 Task ID: 1
 Agent: Main
-Task: Comprehensive overhaul of Realms of War hex strategy game
+Task: Performance optimization of hex strategy game
 
 Work Log:
-- Analyzed the 2954-line game HTML file to identify all bugs and missing features
-- Verified unit clicking works in browser (was not broken, just needed precise clicks)
-- Fixed sprite loading: replaced 404-prone image loading with instant loading bar animation
-- Fixed building rendering: added geometric fallback renderers for castle, barracks, library (since sprites don't exist)
-- Fixed building Y-sort order: changed from `pos.y+TERRAIN_HEIGHT[t]-20` to `pos.y+TERRAIN_HEIGHT[t]+0.5` so buildings render on top of hexes
-- Fixed click handling: increased drag threshold from 5 to 8 pixels, added click flash effect
-- Fixed build system: changed canBuild to only block enemy units (not friendly) on a cell
-- Improved recruit UX: R key now works with both hover hex and selected unit position, added recruit building highlights
-- Improved tech tree: added mousemove tooltip handler with full effect text and status
-- Improved idle animations: added breathing glow effect for idle units (team-colored)
-- Fixed end turn: added S.moveAnims=[] and S.animLock=false to clear leftover animations
-- Added keyboard shortcut hints section in sidebar
+- Read full 3067-line index.html file and worklog.md
+- Implemented 8 performance optimizations systematically
+- Fixed critical bug: `const ctx` → `let ctx` (needed for ctx-swapping in buildTerrainBuffer)
+- Fixed critical bug: `loop()` called without timestamp from init(), causing _now=undefined → NaN in color strings → render crash → game loop stops
+- Added `if(!ts) ts=performance.now()` guard in loop()
+- Verified all optimizations working in browser: terrain buffer builds (300 cached positions), game loop runs at ~60fps, unit selection/movement/combat works
+
+OPTIMIZATIONS APPLIED:
+
+1. **Cache hexToPixel positions** (HIGH impact)
+   - Added `_hexPosCache = {}` with numeric key `q*1000+r`
+   - `clearHexPosCache()` called in `genMap()`
+   - Saves ~300 `Math.sqrt(3)` recalculations per frame
+
+2. **Cache Date.now() per frame** (MODERATE impact)
+   - `let _now = 0;` set from rAF timestamp at start of `loop()`
+   - Replaced 15+ `Date.now()` calls in rendering code with `_now`
+   - Kept `Date.now()` in non-rendering code
+
+3. **Offscreen canvas for terrain** (BIGGEST WIN)
+   - `buildTerrainBuffer()` pre-renders all 300 hexes to offscreen canvas
+   - Uses ctx-swapping technique (save/restore global `ctx`)
+   - `_skipDecor` flag skips animated decorations during buffer build
+   - `drawHexHighlights()` extracted for separate highlight rendering
+   - `render()` blits terrain buffer, draws decorations/highlights/units on top
+   - `_terrainDirty=true` set in `genMap()` and when ruins are cleared
+   - **Expected: 60-80% reduction in hex drawing cost per frame**
+
+4. **Throttle minimap rendering** (MODERATE impact)
+   - `renderMinimap()` only called every 3rd frame
+   - 66% reduction in minimap computation
+
+5. **Throttle pathfinding on hover** (MODERATE impact)
+   - `findPath()` throttled to max once per 50ms during mousemove
+   - Reduces BFS from ~60/sec to ~20/sec during hover
+
+6. **Optimize BFS** (MODERATE impact)
+   - Index-based `qi++` instead of `queue.shift()` (O(n))
+   - Applied to both `findReachable()` and `findPath()`
+
+7. **Cache computeThreats** (MODERATE impact)
+   - `_threatsDirty` flag skips recomputation when enemies haven't moved
+   - Invalidated only on enemy turn and combat
+
+8. **Frame skip for static scenes** (LOW-MODERATE impact)
+   - During enemy turn with no animations, renders at ~20fps instead of 60fps
+
+BUGS FIXED:
+- `const ctx` → `let ctx` (required for ctx-swapping in terrain buffer)
+- `loop(ts)` without timestamp caused `_now=undefined` → NaN in colors → crash
+  - Added `if(!ts) ts=performance.now()` guard
 
 Stage Summary:
-- All critical bugs fixed (sprite loading, building rendering, click handling)
-- All major features verified working (unit selection, movement, attack, build, recruit, tech tree, end turn)
-- Game loads instantly without 404 errors
-- Buildings (castle, barracks, library) now render with geometric fallback graphics
-- File grew from 2954 to ~3060 lines with all improvements
+- All 8 performance optimizations working correctly
+- Game loop verified running at 60fps (2900+ frames in ~48 seconds)
+- Unit selection, movement, combat, enemy turn all verified working
+- No console errors or render crashes
+- File: ~3143 lines with all optimizations + bug fixes
