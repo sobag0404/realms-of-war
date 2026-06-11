@@ -29,6 +29,9 @@ canvas{display:block}
 #btn-build{background:#2ecc71;color:#fff}
 #btn-build:hover{background:#27ae60}
 #btn-build:disabled{background:#333;color:#666;cursor:not-allowed}
+#btn-recruit{background:#9b59b6;color:#fff}
+#btn-recruit:hover{background:#8e44ad}
+#btn-recruit:disabled{background:#333;color:#666;cursor:not-allowed}
 #log{padding:8px 12px;flex:1;overflow-y:auto}
 #log h3{color:#e94560;font-size:12px;margin-bottom:4px}
 #log .entry{font-size:10px;padding:2px 0;border-bottom:1px solid #0d1b2a;color:#667}
@@ -68,7 +71,7 @@ canvas{display:block}
 
 <div id="loading">
   <h1>REALMS OF WAR</h1>
-  <p>Загрузка спрайтов...</p>
+  <p>Загрузка карты...</p>
   <div class="bar"><div class="bar-fill" id="load-bar"></div></div>
 </div>
 
@@ -109,15 +112,26 @@ canvas{display:block}
   <div style="position:absolute;top:10px;right:20px;color:#8a9bb5;font-size:12px;cursor:pointer" id="tech-close">Закрыть (T / Esc)</div>
 </div>
 
+<div id="recruit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:50;align-items:center;justify-content:center">
+  <div style="background:#0d1b2a;border:2px solid #e0c97f;border-radius:8px;padding:16px;width:320px;max-height:80vh;overflow-y:auto">
+    <h3 style="color:#e0c97f;text-align:center;margin-bottom:12px">НАЁМ ЮНИТОВ</h3>
+    <div id="recruit-list"></div>
+    <div style="text-align:center;margin-top:10px">
+      <button id="btn-close-recruit" style="background:#e94560;color:#fff;border:none;border-radius:3px;padding:6px 16px;cursor:pointer;font-size:12px">Закрыть (Esc)</button>
+    </div>
+  </div>
+</div>
+
 <div id="sidebar">
   <h2>REALMS OF WAR</h2>
   <div id="minimap-container"><canvas id="minimap" width="240" height="200"></canvas></div>
   <div class="section" id="cell-info"><h3>Клетка</h3><p>Нажмите на клетку</p></div>
   <div class="section" id="unit-info"><h3>Юнит</h3><p>Выберите юнит</p></div>
   <div id="actions">
-    <button id="btn-attack" disabled>Атаковать</button>
-    <button id="btn-build" disabled>Строить</button>
-    <button id="btn-end-turn">Завершить ход</button>
+    <button id="btn-attack" disabled>⚔ Атаковать</button>
+    <button id="btn-build" disabled>🏗 Строить (B)</button>
+    <button id="btn-recruit" disabled>Нанять (R)</button>
+    <button id="btn-end-turn">⏭ Завершить ход</button>
   </div>
   <div id="log"><h3>Журнал</h3></div>
 </div>
@@ -207,7 +221,7 @@ function loadSprites(callback) {
       document.getElementById('loading').style.display = 'none';
       callback();
     }
-  }, 3000);
+  }, 800);
 }
 
 // ============================================================
@@ -2074,19 +2088,34 @@ function recruitUnit(unitType,buildingQ,buildingR){
 // ВВОД
 // ============================================================
 // [PATCH 2] mousedown: guard gameover + isInputAllowed
+// Left-click drag/pan support: click vs drag detection
+let _clickStartPos = null;
+let _clickIsDrag = false;
+
 canvas.addEventListener('mousedown',e=>{
   if(S.phase==='gameover')return;
   if(e.button===1||e.button===2){S.dragging=true;S.dragStart={x:e.clientX,y:e.clientY};
     S.camStart={x:S.cam.x,y:S.cam.y};e.preventDefault();return;}
-  if(!isInputAllowed())return;
-  const rect=canvas.getBoundingClientRect();
-  const mx=e.clientX-rect.left+S.cam.x;
-  const my=e.clientY-rect.top+S.cam.y;
-  const hex=pixelToHex(mx,my);
-  if(S.map[hexKey(hex.q,hex.r)])handleClick(hex.q,hex.r);
+  // Left click: start potential drag
+  if(e.button===0){
+    S.dragging=false;
+    _clickStartPos={x:e.clientX,y:e.clientY,time:Date.now()};
+    _clickIsDrag=false;
+    S.dragStart={x:e.clientX,y:e.clientY};
+    S.camStart={x:S.cam.x,y:S.cam.y};
+  }
 });
 
 canvas.addEventListener('mousemove',e=>{
+  // Check if left-click should become a drag
+  if(_clickStartPos&&!_clickIsDrag){
+    const dx=e.clientX-_clickStartPos.x;
+    const dy=e.clientY-_clickStartPos.y;
+    if(Math.abs(dx)+Math.abs(dy)>5){
+      _clickIsDrag=true;
+      S.dragging=true;
+    }
+  }
   if(S.dragging){S.cam.x=S.camStart.x-(e.clientX-S.dragStart.x);
     S.cam.y=S.camStart.y-(e.clientY-S.dragStart.y);clampCam();return;}
   const rect=canvas.getBoundingClientRect();
@@ -2158,8 +2187,21 @@ canvas.addEventListener('mousemove',e=>{
   }else document.getElementById('tooltip').style.display='none';
 });
 
-canvas.addEventListener('mouseup',()=>S.dragging=false);
-canvas.addEventListener('mouseleave',()=>{S.dragging=false;S.hoverHex=null;S.pathHighlights=new Set();S.pathCostMap={};document.getElementById('tooltip').style.display='none';});
+canvas.addEventListener('mouseup',e=>{
+  if(e.button===0&&_clickStartPos&&!_clickIsDrag){
+    // This was a click, not a drag
+    if(!isInputAllowed()){_clickStartPos=null;S.dragging=false;return;}
+    const rect=canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left+S.cam.x;
+    const my=e.clientY-rect.top+S.cam.y;
+    const hex=pixelToHex(mx,my);
+    if(S.map[hexKey(hex.q,hex.r)])handleClick(hex.q,hex.r);
+  }
+  _clickStartPos=null;
+  _clickIsDrag=false;
+  S.dragging=false;
+});
+canvas.addEventListener('mouseleave',()=>{S.dragging=false;_clickStartPos=null;_clickIsDrag=false;S.hoverHex=null;S.pathHighlights=new Set();S.pathCostMap={};document.getElementById('tooltip').style.display='none';});
 
 // [TECH TREE] Click handler for tech tree canvas
 document.getElementById('tech-canvas').addEventListener('click',function(e){
@@ -2237,6 +2279,23 @@ document.getElementById('btn-build').addEventListener('click',()=>{
     addLog('Режим строительства: выберите клетку для Казарм (B \u2014 сменить тип, Esc \u2014 отмена)','system');
   }
   tryBuildAtSelected();
+});
+
+document.getElementById('btn-recruit').addEventListener('click',()=>{
+  if(!isInputAllowed())return;
+  const buildings=S.buildings.filter(b=>BT[b.type].canRecruit);
+  if(buildings.length===0){addLog('Нет зданий для найма','enemy');return;}
+  let b=null;
+  if(S.selectedUnit){
+    b=buildings.find(b=>b.q===S.selectedUnit.q&&b.r===S.selectedUnit.r);
+  }
+  if(!b){
+    if(S.hoverHex){
+      b=buildings.find(b=>b.q===S.hoverHex.q&&b.r===S.hoverHex.r);
+    }
+  }
+  if(!b)b=buildings[0];
+  showRecruitMenu(b.q,b.r);
 });
 
 function tryBuildMode(){
@@ -2493,8 +2552,8 @@ function updateUI(){
   const ab=document.getElementById('btn-attack');
   if(S.selectedUnit&&!S.selectedUnit.attacked){
     const t=findAttackTargets(S.selectedUnit);
-    ab.disabled=!t.length;ab.textContent=t.length?`Атаковать (${t.length})`:'Атаковать';
-  }else{ab.disabled=true;ab.textContent='Атаковать';}
+    ab.disabled=!t.length;ab.textContent=t.length?`⚔ Атаковать (${t.length})`:'⚔ Атаковать';
+  }else{ab.disabled=true;ab.textContent='⚔ Атаковать';}
 
   const bb=document.getElementById('btn-build');
   if(S.selectedUnit){
@@ -2502,8 +2561,12 @@ function updateUI(){
     const canBarracks=canBuild('barracks',u.q,u.r);
     const canLibrary=canBuild('library',u.q,u.r);
     bb.disabled=!canBarracks&&!canLibrary;
-    bb.textContent=canBarracks?'Строить (Казармы)':canLibrary?'Строить (Библиотека)':'Строить';
-  }else{bb.disabled=true;bb.textContent='Строить';}
+    bb.textContent=canBarracks?'🏗 Строить (Казармы)':canLibrary?'🏗 Строить (Библиотека)':'🏗 Строить (B)';
+  }else{bb.disabled=true;bb.textContent='🏗 Строить (B)';}
+
+  const rb=document.getElementById('btn-recruit');
+  const playerBuildings=S.buildings.filter(b=>BT[b.type].canRecruit);
+  rb.disabled=playerBuildings.length===0;
 }
 
 // [PATCH 7] cell-info: textContent/createElement вместо innerHTML
@@ -2887,14 +2950,5 @@ function hideRecruitMenu(){
 document.getElementById('btn-close-recruit').addEventListener('click',hideRecruitMenu);
 </script>
 
-<div id="recruit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:50;align-items:center;justify-content:center">
-  <div style="background:#0d1b2a;border:2px solid #e0c97f;border-radius:8px;padding:16px;width:320px;max-height:80vh;overflow-y:auto">
-    <h3 style="color:#e0c97f;text-align:center;margin-bottom:12px">НАЁМ ЮНИТОВ</h3>
-    <div id="recruit-list"></div>
-    <div style="text-align:center;margin-top:10px">
-      <button id="btn-close-recruit" style="background:#e94560;color:#fff;border:none;border-radius:3px;padding:6px 16px;cursor:pointer;font-size:12px">Закрыть (Esc)</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
