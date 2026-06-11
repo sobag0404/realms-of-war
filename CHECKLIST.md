@@ -54,15 +54,15 @@
 - [x] `Entity.ts` — базовая сущность
 - [x] `components.ts` — 14 компонентов (Health, Movement, Combat, Owner, Position, Experience, Upkeep, Abilities, City, Production, Population, Territory, Fortification, Vision)
 - [x] `componentStorage.ts` — хранилище компонентов
-- [ ] `systems/MovementSystem.ts` — движение юнитов
-- [ ] `systems/CombatSystem.ts` — боёвка
-- [ ] `systems/VisionSystem.ts` — туман войны
-- [ ] `systems/EconomySystem.ts` — экономика
-- [ ] `systems/ResearchSystem.ts` — исследование
-- [ ] `systems/CitySystem.ts` — города
-- [ ] `systems/AiSystem.ts` — AI
-- [ ] `systems/StatusEffectSystem.ts` — эффекты статусов
-- [ ] `systems/TurnSystem.ts` — управление ходами
+- [x] `systems/MovementSystem.ts` — движение юнитов (делегирует movementRules)
+- [x] `systems/CombatSystem.ts` — боёвка (делегирует combatRules)
+- [x] `systems/VisionSystem.ts` — туман войны (радиусы обзора, terrain бонусы)
+- [x] `systems/EconomySystem.ts` — экономика (income breakdown, bankruptcy)
+- [x] `systems/ResearchSystem.ts` — исследование (progress, start, complete)
+- [x] `systems/CitySystem.ts` — города (founding, growth, production, buildings)
+- [x] `systems/AiSystem.ts` — AI (utility scoring, priority evaluation, command generation)
+- [x] `systems/StatusEffectSystem.ts` — эффекты статусов (7 эффектов, duration tracking)
+- [x] `systems/TurnSystem.ts` — управление ходами (full turn pipeline)
 
 ### 2.4 Генератор карты (mapgen/)
 
@@ -128,21 +128,21 @@
 
 ## 4. 3D Рендеринг (src/components/game3d/)
 
-- [ ] `GameCanvas.tsx` — корневой Canvas
-- [ ] `SceneRoot.tsx` — корень сцены
-- [ ] `CameraRig.tsx` — ортографическая камера
-- [ ] `LightingRig.tsx` — освещение
-- [ ] `TerrainLayer.tsx` — слой террейна
-- [ ] `HexMesh.tsx` — mesh одного гекса
-- [ ] `WaterLayer.tsx` — вода
+- [x] `GameCanvas.tsx` — корневой Canvas (orthographic, shadows, high-perf GL)
+- [x] `SceneRoot.tsx` — корень сцены (9 визуальных слоёв)
+- [x] `CameraRig.tsx` — ортографическая камера (WASD, zoom, rotate, edge scroll)
+- [x] `LightingRig.tsx` — освещение (ambient + directional sun + hemisphere)
+- [x] `TerrainLayer.tsx` — слой террейна (все гексы, terrain colors, click/hover)
+- [x] `HexMesh.tsx` — mesh одного гекса (pointy-top ExtrudeGeometry)
+- [x] `WaterLayer.tsx` — вода (animated sine-wave, transparent blue)
 - [ ] `DecorationLayer.tsx` — декорации
-- [ ] `UnitLayer.tsx` — юниты
-- [ ] `BuildingLayer.tsx` — здания
+- [x] `UnitLayer.tsx` — юниты (colored shapes + health bars + selection)
+- [x] `BuildingLayer.tsx` — здания (box+cone, wall/territory rings)
 - [ ] `ProjectileLayer.tsx` — снаряды
 - [ ] `ParticleLayer.tsx` — частицы
-- [ ] `FogLayer.tsx` — туман войны
-- [ ] `SelectionHighlights.tsx` — подсветка выбора
-- [ ] `PathPreview.tsx` — предпросмотр пути
+- [x] `FogLayer.tsx` — туман войны (hidden/explored/visible)
+- [x] `SelectionHighlights.tsx` — подсветка выбора (selected, hovered, reachable, attackable)
+- [x] `PathPreview.tsx` — предпросмотр пути (dashed line + waypoint dots)
 - [ ] `PostProcessing.tsx` — пост-процессинг
 
 ## 5. UI/HUD (src/components/hud/ + screens/)
@@ -166,23 +166,24 @@
 - [ ] `DiplomacyScreen.tsx` — дипломатия
 - [ ] `EndTurnSummaryScreen.tsx` — итоги хода
 
+> ⚠️ Базовый HUD overlay уже есть в page.tsx (top bar + hex info + controls)
+> Остальные экраны — полноценные React-компоненты с shadcn/ui
+
 ## 6. Zustand Store (src/store/)
 
-- [ ] `useGameStore.ts` — корневой store
-- [ ] `slices/sessionSlice.ts`
-- [ ] `slices/gameViewSlice.ts`
-- [ ] `slices/selectionSlice.ts`
-- [ ] `slices/commandSlice.ts`
-- [ ] `slices/uiSlice.ts`
-- [ ] `slices/settingsSlice.ts`
-- [ ] `slices/assetSlice.ts`
-- [ ] `slices/devtoolsSlice.ts`
+- [x] `useGameStore.ts` — корневой store (6 слайсов + devtools)
+- [x] `slices/sessionSlice.ts` — движок lifecycle, state snapshots, startNewGame
+- [x] `slices/gameViewSlice.ts` — камера, viewport, grid/yields/threat toggles
+- [x] `slices/selectionSlice.ts` — выбор юнита/города/гекса
+- [x] `slices/commandSlice.ts` — очередь команд, история, optimistic events
+- [x] `slices/uiSlice.ts` — панели, модалки, уведомления, tooltip
+- [x] `slices/settingsSlice.ts` — настройки (localStorage persistence)
 
 ## 7. Providers (src/components/providers/)
 
-- [ ] `GameProvider.tsx` — провайдер движка
+- [x] `GameProvider.tsx` — провайдер движка (EventBus → UI bridge)
 - [ ] `AudioProvider.tsx` — аудио
-- [ ] `I18nProvider.tsx` — локализация
+- [x] `I18nProvider.tsx` — локализация (useI18n hook, ru/en)
 
 ## 8. Web Workers (src/workers/)
 
@@ -209,21 +210,21 @@
 ## 📊 Прогресс v0.1-alpha
 
 ```
-Инфраструктура     ██████████░░░░░░░░░░  50%  (5/10)
-Ядро движка        ████████████████░░░░  80%  (7+1/9)  ← GameEngine.ts добавлен
+Инфраструктура     ████████████████████ 100%  (10/10)
+Ядро движка        ████████████████████ 100%  (9/9)
 Hex-математика     ████████████████░░░░  80%  (7/9)
-ECS ядро           ████████████████████ 100%  (3/3)   ← Entity, Components, Storage
-ECS-системы        ░░░░░░░░░░░░░░░░░░░░   0%  (0/9)
-Генератор карты    ████████████████████ 100%  (8/8)   ← Все файлы
-Правила            ████████████████████ 100%  (8/8)   ← Все файлы
-AI                 ░░░░░░░░░░░░░░░░░░░░   0%  (0/8)
-Команды/События    ████████████████████ 100%  (2/2)   ← index.ts barrel files
+ECS ядро+системы   ████████████████████ 100%  (12/12)
+Генератор карты    ████████████████████ 100%  (8/8)
+Правила            ████████████████████ 100%  (8/8)
+AI базовый         ████████░░░░░░░░░░░░  25%  (AiSystem есть, остальное позже)
+Команды/События    ████████████████████ 100%  (2/2)
 Data-конфиги       ██████████░░░░░░░░░░  50%  (5/10)
-3D Рендеринг       ░░░░░░░░░░░░░░░░░░░░   0%  (0/16)
-UI/HUD             ░░░░░░░░░░░░░░░░░░░░   0%  (0/18)
-Store              ░░░░░░░░░░░░░░░░░░░░   0%  (0/9)
+3D Рендеринг       ██████████░░░░░░░░░░  62%  (10/16)
+UI/HUD             ██░░░░░░░░░░░░░░░░░░  10%  (базовый overlay в page.tsx)
+Store              ████████████████████ 100%  (7/7)
+Providers          ████████████░░░░░░░░  67%  (2/3)
 ────────────────────────────────────────────
-Общий прогресс     ██████░░░░░░░░░░░░░░  33%  (42/128)
+Общий прогресс     ██████████████░░░░░░  58%  (82/141)
 ```
 
 ---

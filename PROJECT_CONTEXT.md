@@ -44,7 +44,7 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-11 (Фаза 1 завершена)
+> Последнее обновление: 2026-06-11 (Фаза 2 завершена)
 
 ### Что реализовано
 
@@ -53,8 +53,12 @@
 - ✅ Ядро движка (`src/engine/core/`) — GameState, GameConfig, GameRng, CommandQueue, EventBus, типы
 - ✅ **GameEngine.ts** — главный фасад движка (диспетчеризация команд, валидация, иммутабельные обновления)
 - ✅ ECS ядро (`src/engine/ecs/`) — Entity, 14 компонентов, ComponentStorage
+- ✅ **ECS-системы** (`src/engine/ecs/systems/`) — Movement, Combat, Vision, Economy, Research, City, AI, StatusEffect, Turn
 - ✅ Генератор карты (`src/engine/mapgen/`) — шум, биомы, реки, ресурсы, руины, стартовые позиции, валидация
 - ✅ Правила игры (`src/engine/rules/`) — движение, бой, экономика, исследование, города, найм, дипломатия, победа
+- ✅ **Zustand Store** (`src/store/`) — 6 слайсов: session, gameView, selection, command, ui, settings
+- ✅ **Providers** (`src/components/providers/`) — GameProvider, I18nProvider
+- ✅ **3D рендеринг** (`src/components/game3d/`) — Canvas, Camera, Lighting, Terrain, Water, Units, Buildings, Fog, Selection, PathPreview
 - ✅ Data-конфиги (`src/data/`) — юниты, здания, технологии, террейн, ресурсы
 - ✅ Прототип 2D (Canvas) — `public/prototype/index.html`
 - ✅ Next.js проект с shadcn/ui компонентами
@@ -63,12 +67,9 @@
 ### Что НЕ реализовано (ключевое для v0.1-alpha)
 
 - ❌ ECS-системы — MovementSystem, CombatSystem, EconomySystem и др. (склеивают rules + engine)
-- ❌ 3D-рендеринг (React Three Fiber сцена)
-- ❌ UI/HUD экраны (главное меню, настройки, дерево технологий, управление городом)
-- ❌ Zustand Store + Providers
+- ❌ UI/HUD экраны (главное меню, дерево технологий, управление городом, найм)
 - ❌ Система сохранений/загрузок
-- ❌ Hotseat-режим
-- ❌ AI-противник
+- ❌ AI-противник (базовый AiSystem есть, но нужен AiDirector)
 - ❌ Звуковое оформление
 
 ---
@@ -118,12 +119,11 @@ realms-of-war/
 
 ## Приоритеты разработки (следующие шаги)
 
-1. **ECS-системы** — склеить rules + engine (MovementSystem, CombatSystem, EconomySystem, TurnSystem)
-2. **Zustand Store + GameProvider** — клиентское состояние, связь UI ↔ Engine
-3. **3D-рендеринг** — TerrainLayer + CameraRig + SelectionHighlights
-4. **UI/HUD** — GameHud, ResourceBar, TurnPanel, CityPanel
-5. **AI** — базовый стратегический ИИ (Utility AI)
-6. **Сохранения** — Prisma + JSON serialization
+1. **UI/HUD экраны** — главное меню, дерево технологий, управление городом, найм юнитов
+2. **AI-директор** — полный AI с InfluenceMap, BehaviorTree
+3. **Сохранения** — Prisma + JSON serialization
+4. **Полировка 3D** — шейдеры, пост-процессинг, instancing
+5. **Звук** — музыка, SFX, ambient
 
 ---
 
@@ -150,3 +150,4 @@ realms-of-war/
 | 2026-06-11 | Начальная настройка: GDD, hex-математика, ядро движка, data-конфиги, 2D-прототип |
 | 2026-06-11 | Настройка GitHub: cleanup репо, добавление PROJECT_CONTEXT.md, приватный режим |
 | 2026-06-11 | **Фаза 1:** GameEngine + ECS ядро + Генератор карты + Правила игры (24 файла, 3 параллельных агента) |
+| 2026-06-11 | **Фаза 2:** ECS-системы + Zustand Store + 3D рендеринг + Browser verification (34 файла, 3 параллельных агента) |

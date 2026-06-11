@@ -165,3 +165,17 @@ export function getTerrainById(id: TerrainTypeId): TerrainType {
 export const TERRAIN_IDS: TerrainTypeId[] = Object.keys(
   TERRAIN_TYPES
 ) as TerrainTypeId[];
+
+// ---------------------------------------------------------------------------
+// Derived lookup maps (used by 3-D rendering components)
+// ---------------------------------------------------------------------------
+
+/** Hex color string per terrain type, for 3-D mesh materials. */
+export const TERRAIN_COLORS: Record<TerrainTypeId, string> = Object.fromEntries(
+  TERRAIN_IDS.map((id) => [id, TERRAIN_TYPES[id].color]),
+) as Record<TerrainTypeId, string>;
+
+/** Elevation offset per terrain type, for 3-D mesh Y positioning. */
+export const TERRAIN_ELEVATION: Record<TerrainTypeId, number> = Object.fromEntries(
+  TERRAIN_IDS.map((id) => [id, TERRAIN_TYPES[id].visualY]),
+) as Record<TerrainTypeId, number>;
