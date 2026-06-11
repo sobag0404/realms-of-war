@@ -3865,3 +3865,1667 @@ export type GameState = {
 5. OpenGameArt: [каталог](https://opengameart.org/) и [FAQ по лицензиям](https://opengameart.org/content/faq).
 6. Freesound: [FAQ](https://freesound.org/help/faq/) о Creative Commons-звуках.
 7. Incompetech: [страница лицензий](https://incompetech.com/music/royalty-free/licenses/) для музыки Kevin MacLeod.
+
+# Приложение C. Дополнения к спецификации
+
+Этот блок добавляет недостающие системы без переписывания существующих разделов. Если дополнение уточняет уже указанное значение, это явно отмечено строкой `Изменение/уточнение`.
+
+## 1. [ДОПОЛНЕНИЕ] Условия победы и поражения
+
+### 1.1. Настройки побед при создании игры
+
+Каждый тип победы включается отдельным флагом в `NewGameScreen`. По умолчанию для `v0.1-alpha` включены все победы, кроме Score Victory.
+
+```ts
+type VictoryRulesConfig = {
+  domination: boolean;   // default true
+  science: boolean;      // default true
+  riftSeal: boolean;     // default true
+  wonders: boolean;      // default true
+  score: boolean;        // default false, auto-enabled if turnLimit > 0
+  turnLimit: number;     // 0 means no limit, default 300
+  allowContinueAfterWin: boolean; // default true
+};
+```
+
+| Настройка | Значение по умолчанию | Диапазон |
+|---|---:|---:|
+| Domination Victory | on | on/off |
+| Science Victory | on | on/off |
+| Rift Seal Victory | on | on/off |
+| Wonders Victory | on | on/off |
+| Score Victory | off | on/off |
+| Turn Limit | 300 | 0, 150, 200, 300, 500 |
+| Continue After Win | on | on/off |
+
+Если игрок отключил все типы побед и `turnLimit = 0`, кнопка `Start Game` блокируется с ошибкой: `Нужно включить хотя бы одно условие победы или лимит ходов`.
+
+### 1.2. Domination Victory
+
+Domination Victory означает военное подчинение всех major players.
+
+```ts
+dominationWin =
+  enabled &&
+  activeMajorPlayers
+    .filter(p => p.id !== candidatePlayerId)
+    .every(enemy =>
+      candidate.controlsCapitalOf(enemy.id) ||
+      enemy.isEliminated
+    ) &&
+  candidate.ownCapitalControlledBySelf &&
+  holdCounter >= requiredHoldTurns;
+```
+
+| Размер карты | Игроки | Требование | Hold turns |
+|---|---:|---|---:|
+| 20x15 | 2 | захватить столицу противника | 3 |
+| 28x18 | 2 | захватить столицу противника | 3 |
+| 36x24 | 3-4 | контролировать столицы всех противников | 4 |
+| 52x36 | 5-6 | контролировать столицы всех противников | 5 |
+
+Дополнительное правило на случай уничтожения столицы:
+
+```ts
+if originalCapitalDestroyed:
+  substituteCapital = largestRemainingCityByPopulation;
+```
+
+Если у противника нет городов и нет поселенцев, он считается eliminated.
+
+### 1.3. Science Victory
+
+Science Victory отражает восстановление знаний древнего мира без использования нестабильной силы Разлома.
+
+Требования:
+
+1. Исследовать технологию `rationalism`.
+2. Исследовать минимум 30 технологий из 37.
+3. Построить `university` минимум в 2 городах.
+4. Построить `astral_observatory` минимум в 1 городе.
+5. Выполнить проект `great_codex`.
+
+Проект `great_codex`:
+
+| Параметр | Значение |
+|---|---:|
+| Требование | `rationalism`, `astral_observatory` |
+| Стоимость | 650 science progress |
+| Производится | глобально, накапливает 100% science/turn |
+| Минимальное время | 6 ходов |
+| Максимальный вклад overflow | 150 science/turn |
+| Прерывается войной? | нет |
+| Победа | в начале следующего хода после завершения |
+
+Формула прогресса:
+
+```ts
+greatCodexProgress += clamp(player.sciencePerTurn, 0, 150);
+scienceVictoryReady = greatCodexProgress >= 650;
+```
+
+Пример:
+
+```text
+Игрок имеет 72 science/turn.
+650 / 72 = 9.03.
+Проект завершится за 10 ходов.
+Если через 4 хода science выросла до 96, остаток пересчитывается автоматически.
+```
+
+### 1.4. Rift Seal Victory
+
+Rift Seal Victory означает закрытие Разлома через магию, контроль маны и защиту ритуалов.
+
+Требования:
+
+1. Исследовать `riftStudies`.
+2. Исследовать `manaConduits`.
+3. Исследовать `riftContainment`.
+4. Контролировать минимум 3 источника маны.
+5. Иметь доход маны минимум `+12/turn`.
+6. Построить `wonder_astral_gate`.
+7. Провести 4 этапа ритуала `seal_the_rift`.
+
+Этапы ритуала:
+
+| Этап | Название | Стоимость | Длительность | Риск |
+|---|---|---:|---:|---|
+| 1 | Стабилизация контура | 80 маны | 3 хода | spawn 1 cultist camp |
+| 2 | Связывание проводников | 120 маны | 4 хода | -10% science на время |
+| 3 | Запечатывание створок | 160 маны | 5 ходов | атака культистов на ближайший город |
+| 4 | Последняя печать | 220 маны | 6 ходов | все враги видят город с Вратами |
+
+Ритуал прерывается, если город с `wonder_astral_gate` захвачен. Прогресс текущего этапа теряется, завершенные этапы сохраняются.
+
+### 1.5. Wonders Victory
+
+Wonders Victory означает культурно-историческое превосходство.
+
+```ts
+requiredWonders = clamp(Math.ceil(totalEnabledWorldWonders * 0.45), 3, 5);
+requiredPrestige = 80 + playerCount * 15;
+```
+
+Для `v0.1-alpha`, где 4 чуда света, требуется:
+
+| Параметр | Значение |
+|---|---:|
+| Построить чудес света | 3 |
+| Накопить prestige | 110 для 2 игроков |
+| Удерживать чудеса после объявления | 5 ходов |
+
+Prestige:
+
+```ts
+prestige =
+  builtWorldWonders * 30 +
+  completedEras * 8 +
+  capitalPopulation * 2 +
+  controlledRuins * 3 +
+  activeTradeRoutes * 2;
+```
+
+Пример:
+
+```text
+Игрок построил 3 чуда: 90 prestige.
+Столица население 8: +16.
+Контролирует 2 руины: +6.
+Итого 112. Для 2 игроков порог 110, условие выполнено.
+Победа наступит, если игрок удержит 3 чуда 5 ходов.
+```
+
+### 1.6. Score Victory и лимит ходов
+
+Изменение/уточнение: лимит ходов существует, но по умолчанию не завершает игру, если `Score Victory = off`. При `Score Victory = on` стандартный лимит равен 300 ходам.
+
+Score считается в конце последнего хода:
+
+```ts
+score =
+  cityScore +
+  populationScore +
+  techScore +
+  militaryScore +
+  wonderScore +
+  economyScore +
+  explorationScore;
+
+cityScore = cityCount * 40;
+populationScore = totalPopulation * 8;
+techScore = completedTechs * 12;
+militaryScore = floor(totalArmyPower * 0.6);
+wonderScore = worldWonders * 70;
+economyScore = floor((goldIncome + scienceIncome + manaIncome * 3) * 2);
+explorationScore = floor(exploredHexes / totalHexes * 100);
+```
+
+При равенстве score побеждает игрок с большим числом столиц под контролем. Если и это равно, побеждает игрок с большим science/turn.
+
+### 1.7. Условия поражения
+
+| Поражение | Условие | Применяется |
+|---|---|---|
+| Elimination | нет городов, нет поселенцев, нет героя | всегда |
+| Capital Collapse | столица потеряна и не возвращена за 12 ходов | если включено в настройках |
+| Hero Death | герой погиб | только режим `Iron Crown` |
+| Surrender | игрок нажал surrender и подтвердил | всегда |
+| Desync Forfeit | игрок в ranked online не смог восстановить состояние 3 раза | online ranked |
+| Timeout | игрок пропустил 3 таймера подряд | online timed |
+
+Для Hotseat пораженный игрок больше не получает ходов, но его города остаются на карте как occupied/ruins в зависимости от способа поражения.
+
+### 1.8. UI прогресса победы
+
+`VictoryPanel` доступна из HUD кнопкой с иконкой лаврового венка.
+
+| Элемент UI | Содержимое |
+|---|---|
+| Victory tabs | Domination, Science, Rift Seal, Wonders, Score |
+| Progress bar | процент выполнения текущего условия |
+| Checklist | конкретные незавершенные требования |
+| Rival progress | виден только по исследованной информации или дипломатическим данным |
+| Warning banner | появляется, если соперник в 10 ходах от победы |
+
+Пример строки:
+
+```text
+Rift Seal: 5/7 требований
+[x] Rift Studies
+[x] Mana Conduits
+[ ] Rift Containment
+[x] 3 mana sources
+[x] +12 mana/turn
+[x] Astral Gate
+[ ] Ritual stage 2/4
+```
+
+### 1.9. Победа в Hotseat
+
+Последовательность:
+
+```text
+1. Победная команда/условие применяется в конце команды или начале хода.
+2. Экран карты скрывается затемнением.
+3. Показывается VictoryScreen только с именем победителя и типом победы.
+4. Игроки подтверждают общий просмотр итогов.
+5. Открывается MatchSummaryScreen со статистикой всех игроков.
+6. Можно выбрать:
+   - Continue as sandbox
+   - Save replay
+   - Return to menu
+```
+
+В Hotseat нельзя показывать скрытую информацию до общего подтверждения итогов.
+
+## 2. [ДОПОЛНЕНИЕ] Система маны как ресурса
+
+### 2.1. Появление маны по эпохам
+
+Мана физически присутствует на карте с начала игры, но не полностью доступна игроку.
+
+| Эпоха | Видимость маны | Добыча | Использование |
+|---|---|---|---|
+| Примитивы | скрыта, кроме наград руин | одноразовые награды руин | нельзя тратить, cap 10 после `rituals` |
+| Ранняя цивилизация | видна как `strange crystal` после `rituals` | храм +1, руины | храмовые эффекты |
+| Средние века | полностью видна после `arcaneTheory` | мана-фокус, башня магов | маги, Rune Burst |
+| Возрождение | видна и оценивается AI | conduits, лаборатория | паладины, чудеса |
+| Раскол | стратегический ключевой ресурс | high-yield nodes | Rift Seal |
+
+Изменение/уточнение: мана не должна быть полностью мертвым ресурсом до Средних веков. После `rituals` игрок получает малый cap и может копить награды, но стабильная добыча появляется позже.
+
+### 2.2. Максимальный запас маны
+
+```ts
+manaCap =
+  baseCapByEra +
+  templeCount * 4 +
+  mageTowerCount * 10 +
+  alchemistLabCount * 12 +
+  controlledManaSources * 8 +
+  technologyManaCapBonus;
+```
+
+| Условие | Base cap |
+|---|---:|
+| Нет `rituals` | 0 |
+| `rituals` изучены | 10 |
+| `arcaneTheory` изучена | 40 |
+| Возрождение достигнуто | 70 |
+| Раскол достигнут | 110 |
+
+Technology cap bonuses:
+
+| Технология | Бонус |
+|---|---:|
+| `arcaneTheory` | +20 |
+| `alchemy` | +20 |
+| `manaConduits` | +40 |
+| `riftContainment` | +30 |
+
+### 2.3. Формула дохода маны
+
+```ts
+manaIncome =
+  baseManaIncome +
+  terrainManaIncome +
+  buildingManaIncome +
+  improvementManaIncome +
+  technologyManaIncome +
+  wonderManaIncome -
+  ritualMaintenance;
+```
+
+| Источник | Условие | Мана/ход |
+|---|---|---:|
+| Base | нет | 0 |
+| Храм | `rituals` | +1 |
+| Башня магов | `arcaneTheory` | +1 |
+| Лаборатория алхимика | `alchemy` | +2 |
+| Мана-фокус | кристалл маны улучшен | +2 |
+| Руины под контролем | после `rituals` | +1 за 2 руины, округление вниз |
+| Древо Мира | чудо | +2 |
+| Астральные Врата | чудо | +4 |
+| `manaConduits` | технология | +25% к gross mana |
+| Этап Rift Seal | активный ритуал | -2, -3, -4, -5 по этапам |
+
+Пример:
+
+```text
+Игрок имеет:
+2 храма = +2
+1 башню магов = +1
+1 лабораторию = +2
+2 мана-фокуса = +4
+3 контролируемые руины = floor(3 / 2) = +1
+Астральные Врата = +4
+Gross = 14
+manaConduits = +25% => floor(14 * 1.25) = 17
+Активен этап 3 ритуала: -4
+Net mana = +13/ход
+```
+
+### 2.4. Добыча маны до Башни Магов
+
+До `mage_tower` доступны только малые источники:
+
+| Способ | Требование | Количество |
+|---|---|---:|
+| Награда малых руин | разведчик/герой исследует POI | +2..+5 one-time |
+| Обелиск | POI | +1/ход на 10 ходов |
+| Храм | `rituals` | +1/ход |
+| Контроль 2 руин | `rituals` | +1/ход |
+| Wonder `sun_obelisk` | `rituals` | +1/ход |
+
+Магические боевые способности до `arcaneTheory` недоступны, поэтому ранняя мана является подготовительным ресурсом.
+
+### 2.5. Стоимость способностей в мане
+
+| Способность | Юнит/источник | Стоимость | Cooldown |
+|---|---|---:|---:|
+| `Arcane Bolt` | маг | 0 | нет |
+| `Rune Burst` | маг | 1 | 3 хода |
+| `Arcane Shield` | маг, после `alchemy` | 2 | 4 хода |
+| `Cleanse` | паладин | 1 | 4 хода |
+| `Guarding Light Overcharge` | паладин | 2 | 5 ходов |
+| `Rally` | герой | 0 | 5 ходов |
+| `Rift Pulse` | Астральные Врата | 4 | 6 ходов |
+| `Seal Ritual Stage 1` | проект | 80 total | 3 хода |
+| `Seal Ritual Stage 2` | проект | 120 total | 4 хода |
+| `Seal Ritual Stage 3` | проект | 160 total | 5 ходов |
+| `Seal Ritual Stage 4` | проект | 220 total | 6 ходов |
+
+### 2.6. Мана и Rift Seal Victory
+
+Rift Seal требует не только накопить ману, но и выдерживать положительный доход.
+
+```ts
+canStartRiftStage =
+  player.manaStockpile >= stage.startCost &&
+  player.manaPerTurn >= stage.requiredManaPerTurn &&
+  player.controlsManaSources >= 3;
+```
+
+| Этап | Start cost | Требуемый доход |
+|---|---:|---:|
+| 1 | 80 | +8/ход |
+| 2 | 120 | +10/ход |
+| 3 | 160 | +12/ход |
+| 4 | 220 | +15/ход |
+
+Если доход маны падает ниже требования во время этапа, этап не отменяется, но прогресс замедляется:
+
+```ts
+ritualProgressPerTurn =
+  player.manaPerTurn >= required
+    ? 1.0
+    : clamp(player.manaPerTurn / required, 0.25, 0.9);
+```
+
+## 3. [ДОПОЛНЕНИЕ] Naval units и морская система
+
+### 3.1. Статус системы
+
+Naval gameplay не входит в обязательный scope `v0.1-alpha`, но архитектура должна поддерживать:
+
+1. `domain: 'land' | 'naval' | 'air' | 'embarked'`.
+2. Разные movement cost для воды и суши.
+3. Порты как точки строительства и посадки.
+4. Морской бой и транспортировку сухопутных юнитов.
+
+### 3.2. Морские технологии
+
+Изменение/уточнение: существующие технологии `sailing` и `navigation` уже есть. Для полноценной морской ветки после alpha нужно добавить 3 технологии в data configs, не меняя текущий alpha-граф.
+
+| ID | Название | Эпоха | Пререквизиты | Эффекты |
+|---|---|---|---|---|
+| `sailing` | Мореплавание | Ранняя цивилизация | `mapping` | гавань, embark на coast, лодка |
+| `shipbuilding` | Кораблестроение | Средние века | `sailing`, `engineering` | галера, транспорт, ремонт в порту |
+| `cartography` | Морские карты | Возрождение | `navigation`, `shipbuilding` | каравелла, ocean movement |
+| `navalArtillery` | Морская артиллерия | Раскол | `machinery`, `cartography` | линейный корабль, bombard coast |
+
+### 3.3. Типы водных гексов
+
+| Тип | Условие генерации | Move |
+|---|---|---:|
+| Coast | вода рядом с сушей | доступно с `sailing` |
+| Lake | waterbody не соединен с краем карты | доступно с `sailing` |
+| Sea | waterbody соединен с краем, distance to land <= 4 | доступно с `shipbuilding` |
+| Ocean | distance to land > 4 | доступно с `cartography` |
+
+Для карты 20x15 Ocean не генерируется, только Coast/Lake/Sea.
+
+### 3.4. Морские юниты
+
+| ID | Название | Domain | HP | ATK | DEF | MOV | Range | Cost | Upkeep | Tech |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| `boat` | Лодка | naval | 55 | 8 | 5 | 3 | 1 | 40 дерево, 20 золото | 1 золото | `sailing` |
+| `galley` | Галера | naval | 85 | 15 | 10 | 4 | 1 | 80 дерево, 50 золото | 2 золота | `shipbuilding` |
+| `transport` | Транспорт | naval | 90 | 4 | 8 | 4 | 1 | 100 дерево, 40 золото | 2 золота | `shipbuilding` |
+| `caravel` | Каравелла | naval | 105 | 18 | 12 | 5 | 2 | 120 дерево, 90 золото | 3 золота | `cartography` |
+| `warship` | Линейный корабль | naval | 145 | 28 | 16 | 4 | 3 | 160 дерево, 80 железо, 140 золото | 5 золота | `navalArtillery` |
+
+### 3.5. Embark и транспортировка
+
+Есть два режима:
+
+1. **Embarked unit**: сухопутный юнит временно превращается в слабую лодку.
+2. **Transport ship**: отдельный naval unit перевозит 2-4 сухопутных юнита.
+
+Embark:
+
+| Параметр | Значение |
+|---|---:|
+| Требование | `sailing`, гекс coast рядом с land |
+| Стоимость посадки | весь остаток movement |
+| MOV на воде | 2 до `shipbuilding`, 3 после |
+| ATK | 0 |
+| DEF multiplier | 0.45 от базового DEF |
+| Получаемый ranged damage | x1.35 |
+| Высадка | весь остаток movement |
+
+Transport capacity:
+
+| Юнит | Capacity |
+|---|---:|
+| `transport` | 3 land units |
+| `caravel` | 1 land unit |
+| `warship` | 1 land unit |
+
+### 3.6. Морской бой
+
+Морская формула использует общую combat formula, но добавляет wave и boarding modifiers.
+
+```ts
+navalOffense =
+  baseOffense *
+  windModifier *
+  rangeBandModifier *
+  coastalSupportModifier *
+  veteranCrewModifier;
+
+navalDefense =
+  baseDefense *
+  waterTypeModifier *
+  portDefenseModifier *
+  weatherDefenseModifier;
+```
+
+| Модификатор | Условие | Значение |
+|---|---|---:|
+| Coast support | союзный порт в радиусе 3 | +10% DEF |
+| Shallow waters | coast/lake | лодка/галера +10% ATK |
+| Open sea | sea/ocean | лодка -15% DEF |
+| Boarding | melee naval против transport | +35% ATK |
+| Storm | weather enabled | ranged naval -20% accuracy |
+| Port repair | юнит в порту | +15 HP/ход |
+
+### 3.7. Порт и гавань
+
+Существующее здание `harbor` получает будущую naval-функцию.
+
+| Механика | Значение |
+|---|---|
+| Постройка кораблей | только город с `harbor` на coast |
+| Repair | naval units в городе/порту лечатся +15 HP/ход |
+| Embark discount | посадка рядом с harbor не тратит attack action |
+| Trade route | coast route +3 золота, +1 еда |
+| Naval supply | каждый harbor дает free naval upkeep для 2 кораблей |
+| Blockade | вражеский naval unit рядом с harbor снижает trade на 50% |
+
+### 3.8. Архитектурные поля для будущего
+
+```ts
+type UnitDomain = 'land' | 'naval' | 'embarked' | 'air';
+
+type MovementProfile = {
+  domain: UnitDomain;
+  canEnterTerrain: TerrainTypeId[];
+  waterAccess: 'none' | 'coast' | 'sea' | 'ocean';
+  embarkState?: {
+    originalUnitId: EntityId;
+    turnsAtSea: number;
+  };
+};
+```
+
+## 4. [ДОПОЛНЕНИЕ] Дипломатия, нейтральные лагеря и фракции
+
+### 4.1. Типы neutral factions
+
+| Фракция | Тип | Отношение к игроку | Отношение к другим |
+|---|---|---|---|
+| `goblin_clans` | organized hostile | Hostile by default | воюют с free cities, нейтральны к волкам |
+| `wild_beasts` | wildlife | Aggressive if approached | атакуют всех humanoid |
+| `bandit_league` | raiders | Suspicious | торгуют с гоблинами, грабят города |
+| `rift_cult` | late hostile | Hidden -> Hostile | союзны между собой, враждебны всем |
+| `free_cities` | neutral settlements | Neutral | обороняются, торгуют, боятся культистов |
+| `ancient_wardens` | ruins guardians | Dormant | не двигаются далеко от POI |
+
+### 4.2. Репутация
+
+Репутация хранится отдельно по каждой neutral faction.
+
+```ts
+reputation: Record<NeutralFactionId, number>; // -100..+100
+```
+
+| Диапазон | Состояние | Эффект |
+|---|---|---|
+| -100..-61 | Blood Feud | атакуют при виде, trade запрещен |
+| -60..-21 | Hostile | лагеря спавнят рейды |
+| -20..+19 | Neutral | не атакуют вне радиуса угрозы |
+| +20..+59 | Respect | доступен trade/parley |
+| +60..+100 | Alliance | лагеря дают quests, могут прислать помощь |
+
+Изменения репутации:
+
+| Действие | Репутация |
+|---|---:|
+| Уничтожить лагерь фракции | -25 |
+| Захватить neutral city | -35 к free cities |
+| Выполнить quest | +20 |
+| Заплатить tribute | +10, cooldown 10 ходов |
+| Торговать 5 ходов подряд | +5 |
+| Убить культистов рядом с free city | +15 к free cities |
+| Подкупить бандитов для рейда | -10 к free cities, +15 к bandits |
+
+### 4.3. Нейтральные лагеря
+
+```ts
+type NeutralCamp = {
+  id: string;
+  factionId: NeutralFactionId;
+  hex: HexCoord;
+  level: 1 | 2 | 3;
+  aggression: number; // 0..100
+  tributeCooldownUntilTurn: number;
+  spawnProgress: number;
+};
+```
+
+| Уровень лагеря | HP | Spawn interval | Защита | Награда за уничтожение |
+|---|---:|---:|---|---|
+| 1 | 80 | 8 ходов | 1 юнит | 35 золота, 10 XP |
+| 2 | 130 | 6 ходов | 2 юнита | 60 золота, 20 XP |
+| 3 | 190 | 5 ходов | 3 юнита, лидер | 100 золота, relic chance 30% |
+
+### 4.4. Действия с лагерем
+
+| Действие | Требование | Стоимость | Результат |
+|---|---|---:|---|
+| Attack | лагерь видим | нет | бой |
+| Parley | репутация > -40, герой/разведчик рядом | 1 action | открывает варианты |
+| Tribute | золото >= цена | 25/50/90 золота | aggression -30, reputation +10 |
+| Bribe Raid | bandit only, reputation >= 20 | 80 золота | рейд на выбранного врага через 3 хода |
+| Trade | reputation >= 20 | trade goods | разовый обмен |
+| Pact | reputation >= 60 | 120 золота | лагерь не атакует 25 ходов |
+| Recruit Mercenary | bandit/free city | 100 золота | 1 временный юнит на 15 ходов |
+
+Tribute price:
+
+```ts
+tributeCost = 20 + camp.level * 25 + currentEraIndex * 15;
+```
+
+### 4.5. Нейтральные города
+
+Free city - это малый город без полноценного дерева технологий.
+
+| Действие | Условие | Результат |
+|---|---|---|
+| Trade | репутация >= 0 | ресурсный обмен, trade route |
+| Quest | раз в 15 ходов | награда reputation/resources |
+| Vassalize | репутация >= 70, militaryPower >= cityPower * 1.3 | город платит 25% дохода |
+| Annex peacefully | репутация >= 90, 200 золота | город становится вашим, unrest 3 хода |
+| Conquer | победить гарнизон | город ваш, unrest 8 ходов, reputation -35 |
+| Raze | после захвата | получить 50% storage, reputation -60 |
+
+Free city не строит чудеса и не участвует в победе, пока не annexed.
+
+### 4.6. Торговля с нейтралами
+
+| Фракция | Покупает | Продает |
+|---|---|---|
+| Goblin clans | еда, железо | золото, разведданные |
+| Bandit league | золото | наемники, слухи, украденные ресурсы |
+| Free cities | любые ресурсы | еда, stone, trade goods |
+| Ancient wardens | relics | science boost, map reveal |
+
+Формула цены:
+
+```ts
+neutralTradePrice =
+  baseMarketPrice *
+  reputationModifier *
+  scarcityModifier *
+  eraInflation;
+
+reputationModifier = 1.2 - clamp((reputation + 100) / 200, 0, 1) * 0.4;
+```
+
+При reputation +100 цена покупки у нейтрала на 20% ниже базовой, при -100 на 20% выше.
+
+## 5. [ДОПОЛНЕНИЕ] Tutorial и onboarding
+
+### 5.1. Первый запуск
+
+При первом запуске игрок видит `FirstRunChoiceScreen`, а не длинный tutorial text.
+
+| Кнопка | Действие |
+|---|---|
+| Быстрое обучение | запускает фиксированную карту `tutorial-001`, 1 игрок vs нейтралы |
+| Новая игра | обычная генерация, подсказки включены |
+| Я уже играл | подсказки отключены, можно включить в настройках |
+
+Флаг:
+
+```ts
+onboardingState = {
+  firstRunCompleted: boolean;
+  tutorialHintsEnabled: boolean;
+  completedObjectiveIds: string[];
+  seenHintIds: string[];
+};
+```
+
+### 5.2. Обучение через objective chain
+
+Вместо текстовой инструкции используется цепочка коротких целей, подсветка UI и ghost previews.
+
+| Objective ID | Условие завершения | Награда | Что подсвечивается |
+|---|---|---:|---|
+| `select_hero` | выбрать героя | нет | ring вокруг героя |
+| `move_scout` | переместить разведчика на неизвестный гекс | +5 золота | путь и fog boundary |
+| `inspect_city` | открыть панель столицы | нет | city center |
+| `choose_research` | выбрать технологию | +5 science | кнопка технологий |
+| `start_production` | поставить здание/юнита в очередь | +10 дерево | production slot |
+| `attack_camp` | атаковать гоблина | +10 XP герою | enemy camp |
+| `finish_turn` | завершить ход | нет | End Turn |
+| `build_improvement` | начать ферму/лесопилку | +10 еда | worker action |
+| `recruit_unit` | нанять первого юнита | -10% cost one-time | recruitment tab |
+| `found_second_city` | основать второй город | +1 population столицы | recommended city site |
+
+### 5.3. Первые 5 ходов
+
+| Ход | Цель | Скрытая помощь |
+|---|---|---|
+| 1 | выбрать героя, разведать, выбрать исследование | первый path preview бесплатный, враги не атакуют |
+| 2 | открыть город, начать производство | recommended production помечен звездой |
+| 3 | исследовать руины разведчиком | руины в радиусе 4 гарантированы |
+| 4 | первый бой с гоблином | гоблин имеет -20% HP на tutorial карте |
+| 5 | улучшить гекс строителем | worker начинает рядом с рекомендуемой фермой |
+
+### 5.4. Интерактивные подсказки
+
+```ts
+type TutorialHint = {
+  id: string;
+  trigger: TutorialTrigger;
+  anchor: UiAnchor | HexCoord | EntityId;
+  displayMode: 'pulse' | 'ghostPath' | 'combatPreview' | 'panelHighlight';
+  maxShows: number;
+  dismissMode: 'completeAction' | 'manual' | 'timeout';
+};
+```
+
+| Первое действие | Подсказка |
+|---|---|
+| Наведение на гекс | показывает yield icons и movement cost |
+| Выбор юнита | подсвечивает доступные гексы |
+| Наведение атаки | показывает прогноз урона и риск контратаки |
+| Открытие города | подсвечивает очередь производства |
+| Открытие технологий | подсвечивает доступные технологии |
+| Недостаток ресурса | показывает конкретный источник ресурса |
+
+### 5.5. Отключение подсказок
+
+Подсказки отключаются автоматически, если выполнены условия:
+
+```ts
+autoDisableTutorial =
+  completedCoreObjectives >= 8 ||
+  currentTurn >= 25 ||
+  playerDisabledHints;
+```
+
+Core objectives: первые 8 из таблицы objective chain. После отключения остаются только tooltips и combat forecast.
+
+### 5.6. Обучение без длинных текстовых инструкций
+
+| Система | Метод обучения |
+|---|---|
+| Движение | ghost path + подсветка затрат движения на каждом гексе |
+| Бой | combat forecast, подсветка выгодного фланга |
+| Строительство | recommended badge на 1-2 вариантах, остальные доступны |
+| Технологии | glowing edge к технологии с полезным unlock |
+| Экономика | resource delta fly-up в начале хода |
+| Fog | затемнение неизвестного и bright reveal animation |
+| Города | worked hex icons появляются при наведении на население |
+
+Текст допускается только в tooltip и objective label до 90 символов.
+
+## 6. [ДОПОЛНЕНИЕ] Стартовый состав игрока
+
+### 6.1. Стартовый preset `standard_alpha`
+
+Изменение/уточнение: для `v0.1-alpha` стандартный старт начинается с уже основанной столицы. Поселенец не выдается по умолчанию, чтобы второй город появлялся через экономическое решение, а не в первый ход.
+
+| Элемент | Количество | Позиция |
+|---|---:|---|
+| Столица уровня 1 | 1 | стартовый гекс `S` |
+| Герой | 1 | сосед `dir 0` от столицы |
+| Копейщик | 2 | соседи `dir 2` и `dir 4` |
+| Разведчик | 1 | сосед `dir 1` |
+| Строитель | 1 | сосед `dir 3` |
+| Поселенец | 0 | нанимается после старта |
+
+Если выбран гекс занят/заблокирован, юнит ставится на ближайший валидный гекс по BFS радиусом до 3.
+
+```text
+        Scout
+    Spear   Hero
+       Capital
+    Worker  Spear
+```
+
+### 6.2. Стартовый preset `expansion_test`
+
+Для внутренних playtest-карт можно включить ускоренный старт.
+
+| Элемент | Количество |
+|---|---:|
+| Столица | 1 |
+| Герой | 1 |
+| Копейщик | 2 |
+| Разведчик | 1 |
+| Строитель | 1 |
+| Поселенец | 1 |
+
+Поселенец стартует на `dir 5`, а ближайший копейщик считается его охраной. Этот preset нельзя использовать в ranked online.
+
+### 6.3. Стартовые ресурсы
+
+| Ресурс | Standard alpha | Expansion test |
+|---|---:|---:|
+| Золото | 90 | 70 |
+| Еда | 35 | 25 |
+| Дерево | 45 | 35 |
+| Камень | 20 | 15 |
+| Железо | 0 | 0 |
+| Мана | 0 | 0 |
+| Наука stored | 0 | 0 |
+| Очки прогресса stored | 0 | 0 |
+
+### 6.4. Стартовые технологии
+
+| Технология | Статус | Причина |
+|---|---|---|
+| `settlement` | researched | столица уже основана, unlock поселенцев |
+| `toolmaking` | researched | стартовый строитель и improvements |
+| `tracking` | researched | стартовый разведчик |
+| `bronzeWorking` | not researched | новые копейщики требуют исследования |
+| `agriculture` | not researched | первый экономический выбор |
+| `rituals` | not researched | ранний путь к мане |
+
+Стартовые копейщики являются legacy militia: они существуют на карте, но новых копейщиков нельзя нанимать до `bronzeWorking`.
+
+### 6.5. Стартовые здания
+
+Изменение/уточнение: замок не является стартовым полноценным зданием. Визуальный деревянный keep входит в модель `city_center`, но gameplay-эффекты `castle` не активны.
+
+| Здание | Статус на старте |
+|---|---|
+| `city_center` | построено |
+| `castle` | не построено |
+| `barracks` | не построено |
+| `library` | не построено |
+| `granary` | не построено |
+
+Стартовый `city_center` получает уточненный alpha-доход:
+
+| Доход | Значение |
+|---|---:|
+| Золото | +2 |
+| Еда | +2 |
+| Наука | +3 |
+| Прогресс | +1 |
+
+Причина изменения: без базовой науки игрок не может начать исследование до библиотеки, что ломает первые 10 ходов.
+
+## 7. [ДОПОЛНЕНИЕ] Система статусов и эффектов
+
+### 7.1. Общий формат статуса
+
+```ts
+type StatusEffect = {
+  id: StatusEffectId;
+  sourceEntityId?: EntityId;
+  sourcePlayerId?: PlayerId;
+  durationTurns: number;
+  stacks: number;
+  appliedTurn: number;
+  tags: StatusTag[];
+};
+```
+
+| Правило | Значение |
+|---|---|
+| Максимум одинаковых stack | 3, если статус stackable |
+| Refresh | повторное наложение обновляет duration |
+| Tick timing | начало хода владельца цели |
+| Cleanse timing | до poison/burn tick |
+| UI | максимум 6 иконок, остальные в tooltip |
+
+### 7.2. Полный список статусов
+
+| ID | Тип | Длительность | Stacks | Эффект | Источник | Снятие |
+|---|---|---:|---:|---|---|---|
+| `fortified` | buff | пока не двинется | нет | +20% DEF | действие Fortify | движение/атака |
+| `brace` | buff | 1 ход | нет | +35% DEF против charge | копейщик | начало следующего хода |
+| `commanded` | buff aura | dynamic | нет | +10% ATK/DEF | герой radius 2 | выйти из радиуса |
+| `guarded_light` | buff aura | dynamic | нет | +15% DEF | паладин рядом | выйти из радиуса |
+| `inspired` | buff | 2 хода | нет | +10% XP gain, +5% crit | герой Rally | duration |
+| `shielded` | buff | 2 хода | нет | -25% входящего ranged/magic | Arcane Shield | duration/dispel |
+| `poisoned` | debuff dot | 3 хода | да | 4 damage/stack/turn, healing -25% | болото, культист, ядовитые руины | Cleanse, temple |
+| `burning` | debuff dot | 2 хода | да | 6 damage/stack/turn, DEF -5% | fire VFX, catapult fire upgrade | вода, дождь, Cleanse |
+| `cursed` | debuff magic | 2 хода | нет | -10% DEF, DoT +20% | культист | Cleanse, temple |
+| `slowed` | debuff | 1 ход | нет | MOV -1, минимум 1 | болото, chilled | duration |
+| `stunned` | debuff | 1 ход | нет | нельзя атаковать, MOV = 0 | siege critical, Rift Pulse | Cleanse не снимает |
+| `bleeding` | debuff dot | 2 хода | да | 3 damage/stack при движении на гекс | wolf, bandit | лечение 10+ HP |
+| `concealed` | stealth | пока не атакует | нет | не виден дальше 2 гексов | разведчик в лесу | атака/adjacent enemy |
+| `wet` | neutral | 2 хода | нет | immune to burning, lightning risk future | дождь, река | duration |
+| `exhausted` | neutral | до начала хода | нет | нельзя counterattack | после counterattack/ability | начало хода |
+| `unrest` | city debuff | 3-8 ходов | нет | -50% yields | захват города | duration, garrison |
+
+### 7.3. Взаимодействия статусов
+
+| Комбинация | Результат |
+|---|---|
+| `wet` + `burning` | burning снимается, появляется smoke VFX |
+| `burning` + `poisoned` | оба работают, но суммарный DoT capped at 18/turn |
+| `cursed` + любой DoT | DoT damage x1.20 |
+| `shielded` + `burning` | shield не снижает DoT, только direct magic/ranged |
+| `fortified` + movement | fortified снимается до движения |
+| `brace` + knight charge | charge bonus рыцаря отменяется, копейщик получает +35% DEF |
+| `stunned` + `fortified` | fortified сохраняется, но юнит не действует |
+| `concealed` + attack | concealed снимается перед расчетом атаки |
+
+### 7.4. Визуальные индикаторы
+
+| Статус | Индикатор на юните | VFX |
+|---|---|---|
+| Fortified | маленький щит над HP bar | короткая стойка/щит |
+| Brace | копье icon | stance animation |
+| Commanded | золотой ring segment | мягкая aura от героя |
+| Poisoned | зеленая капля | faint green particles |
+| Burning | красное пламя | flame/smoke particles |
+| Cursed | фиолетовая руна | dark pulse |
+| Slowed | синяя цепь | low dust trail |
+| Stunned | желтая звезда | brief flash |
+| Concealed | полупрозрачная иконка глаза | shimmer |
+| Unrest | красный флаг на городе | smoke/angry crowd marker |
+
+## 8. [ДОПОЛНЕНИЕ] День, ночь и погода
+
+### 8.1. Статус для alpha
+
+Изменение/уточнение: в `v0.1-alpha` день/ночь и погода являются визуальными системами по умолчанию и не меняют боевые формулы. Gameplay modifiers доступны только при включенной настройке `Advanced Weather Rules`.
+
+Причина: пошаговая стратегия уже имеет много модификаторов. Погода не должна ломать читаемость боя в первой alpha.
+
+### 8.2. Цикл дня и ночи
+
+```ts
+type DayPhase = 'dawn' | 'day' | 'dusk' | 'night';
+dayPhase = phases[Math.floor(turn / 2) % 4];
+```
+
+| Фаза | Ходы | Exposure | Цвет света |
+|---|---|---:|---|
+| Dawn | 1-2 | 0.95 | теплый `#ffd9a0` |
+| Day | 3-4 | 1.05 | нейтральный `#fff1d2` |
+| Dusk | 5-6 | 0.85 | оранжевый `#e6a06a` |
+| Night | 7-8 | 0.65 | холодный `#8aa7d6` |
+
+Цикл повторяется каждые 8 ходов. В Hotseat все игроки видят одну и ту же фазу, потому что turn глобальный.
+
+### 8.3. Погода
+
+```ts
+type WeatherType = 'clear' | 'mist' | 'rain' | 'storm' | 'snow' | 'heat';
+```
+
+Вероятности на начало глобального раунда:
+
+| Биом | Clear | Mist | Rain | Storm | Snow | Heat |
+|---|---:|---:|---:|---:|---:|---:|
+| Temperate | 55% | 15% | 20% | 8% | 2% | 0% |
+| Boreal | 45% | 15% | 10% | 5% | 25% | 0% |
+| Arid | 70% | 0% | 2% | 3% | 0% | 25% |
+| Wetlands | 35% | 25% | 25% | 15% | 0% | 0% |
+| Highlands | 50% | 15% | 10% | 10% | 15% | 0% |
+
+Для alpha выбирается weather per map, не per region, чтобы не усложнять UI.
+
+### 8.4. Advanced Weather Rules
+
+Если включено:
+
+| Погода | Движение | Бой | Видимость |
+|---|---|---|---|
+| Clear | нет | нет | нет |
+| Mist | нет | ranged accuracy -10% | vision -1, минимум 1 |
+| Rain | болото/лес +1 move cost | fire/burning не накладывается | нет |
+| Storm | coast/naval +1 move cost | ranged/siege accuracy -15% | vision -1 |
+| Snow | холмы/горы +1 move cost | cavalry charge -15% | нет |
+| Heat | пустыня +1 move cost | units in desert lose 2 HP/turn if not adjacent water | нет |
+
+Погода длится 3-6 ходов:
+
+```ts
+weatherDuration = rng.int(3, 6);
+```
+
+## 9. [ДОПОЛНЕНИЕ] Баланс экономики ранней игры
+
+### 9.1. Базовый сценарий расчета
+
+Расчеты ниже используют `standard_alpha`, карту 20x15 и стартовую столицу:
+
+| Параметр | Значение |
+|---|---|
+| Население столицы | 2 |
+| Worked hexes | 3 |
+| Рабочие гексы | floodplain, forest, hills |
+| Стартовые технологии | `settlement`, `toolmaking`, `tracking` |
+| Исследование | `agriculture` или `bronzeWorking` |
+| Производство | `granary` или `barracks` |
+
+Доход хода 1:
+
+| Источник | Еда | Дерево | Камень | Золото | Наука | Прогресс |
+|---|---:|---:|---:|---:|---:|---:|
+| City center | 2 | 0 | 0 | 2 | 3 | 1 |
+| Floodplain | 3 | 0 | 0 | 1 | 0 | 0 |
+| Forest | 1 | 2 | 0 | 0 | 0 | 0 |
+| Hills | 0 | 0 | 1 | 1 | 0 | 0 |
+| Gross | 6 | 2 | 1 | 4 | 3 | 1 |
+| Upkeep | -1 worker food | 0 | 0 | -3 units | 0 | 0 |
+| Net | +5 | +2 | +1 | +1 | +3 | +1 |
+
+### 9.2. Ход 1
+
+| Действие | Доступно? | Комментарий |
+|---|---|---|
+| Разведчик идет к руинам | да | MOV 4, цель в радиусе 4-6 |
+| Герой занимает холм/центр | да | открывает обзор и безопасный бой |
+| Копейщики прикрывают столицу | да | один рядом с городом, один с разведчиком |
+| Строитель начинает ферму/лесопилку | да | 2 хода ферма, 2 хода лесопилка |
+| Выбор исследования | да | `agriculture` 35 science или `bronzeWorking` 35 |
+| Найм лучника | нет | нужен `archery` |
+| Постройка второго города | нет в standard | нужен нанятый поселенец |
+
+После конца хода 1 при net:
+
+```text
+Gold: 90 + 1 = 91
+Food: 35 + 5 = 40
+Wood: 45 + 2 = 47
+Stone: 20 + 1 = 21
+Science progress: 3/35
+```
+
+### 9.3. Ход 5
+
+Типичное состояние при выборе `agriculture` и фермы:
+
+| Показатель | Значение |
+|---|---:|
+| Gold | 94-100 |
+| Food | 58-66 |
+| Wood | 52-58 |
+| Stone | 24-28 |
+| Science progress | 15/35 |
+| Столица growth | 20-28 / required 42 |
+| Постройка | granary 60-80% |
+| Разведка | 20-35 гексов открыто |
+| Руины | 0-1 исследованы |
+
+Если разведчик нашел руины с science reward +15, `agriculture` завершается на ходе 5-6.
+
+### 9.4. Ход 10
+
+Типичное состояние:
+
+| Показатель | Economy-first | Military-first |
+|---|---:|---:|
+| Gold | 105-125 | 90-110 |
+| Food | 80-105 | 65-85 |
+| Wood | 60-75 | 45-60 |
+| Stone | 30-38 | 28-35 |
+| Изучено | `agriculture` | `bronzeWorking` |
+| Второе исследование | `bronzeWorking` 10-18/35 | `archery` 6-12/70 |
+| Здание | granary завершен | barracks завершены |
+| Юниты | стартовые + worker | стартовые + 1 spearman queued |
+| Поселенец | можно начать, 5-7 ходов | откладывается |
+
+### 9.5. Ход 20
+
+Целевое состояние здоровой ранней экономики:
+
+| Показатель | Целевой диапазон |
+|---|---:|
+| Города | 1-2 |
+| Население столицы | 3-4 |
+| Юниты | 5-8 |
+| Изученные технологии | 3-4 |
+| Gold/turn | +4..+12 |
+| Food surplus empire | +8..+18 |
+| Science/turn | 5..11 |
+| Wood stockpile | 40..90 |
+| Stone stockpile | 25..70 |
+| Первый лучник | ход 16-22 |
+| Первый второй город | ход 14-22 |
+
+### 9.6. Время до ключевых событий
+
+| Событие | Быстро | Норма | Поздно |
+|---|---:|---:|---:|
+| Первая технология | ход 6 | ход 8 | ход 11 |
+| Granary/Barracks | ход 8 | ход 10 | ход 13 |
+| Первый поселенец | ход 12 | ход 16 | ход 22 |
+| Второй город | ход 14 | ход 18 | ход 24 |
+| Archery researched | ход 14 | ход 18 | ход 24 |
+| Первый лучник | ход 16 | ход 20 | ход 26 |
+
+Если второй город появляется до хода 10 без сильной жертвы армии, стоимость поселенца нужно увеличить на 15%. Если первый лучник стабильно позже хода 26, стоимость `archery` нужно снизить с 70 до 60.
+
+## 10. [ДОПОЛНЕНИЕ] Точные параметры карты 20x15
+
+### 10.1. Размер и форма
+
+Карта 20x15 хранится как прямоугольный массив axial-координат:
+
+```ts
+width = 20;
+height = 15;
+q = 0..19;
+r = 0..14;
+totalHexes = width * height = 300;
+```
+
+Визуально pointy-top axial rectangle выглядит как скошенный параллелограмм, но storage и генерация считаются прямоугольником.
+
+World bounds для `HEX_RADIUS = 1`:
+
+```ts
+minX = 0;
+maxX = sqrt(3) * (19 + 14 / 2) = 45.03;
+minZ = 0;
+maxZ = 1.5 * 14 = 21.0;
+```
+
+### 10.2. Стандартные размеры режимов
+
+| Режим | Рекомендуемый размер | Гексы | Игроки | Комментарий |
+|---|---|---:|---:|---|
+| Tutorial | 16x12 | 192 | 1 + нейтралы | короткая карта |
+| 1 игрок vs AI alpha | 20x15 | 300 | 2 | стандарт alpha |
+| Hotseat quick duel | 20x15 | 300 | 2 | допустимо, контакт ранний |
+| Hotseat standard duel | 28x18 | 504 | 2 | рекомендуется |
+| 3-4 игрока | 36x24 | 864 | 3-4 | после оптимизации |
+| 5-6 игроков | 52x36 | 1872 | 5-6 | future |
+
+Ответ на вопрос: для Hotseat 2 игрока карта 20x15 подходит для быстрой партии на 60-90 минут, но стандартной считается 28x18, чтобы дать место для второго города и разведки.
+
+### 10.3. Параметры 20x15 standard
+
+| Параметр | Значение |
+|---|---:|
+| Игроки | 1 human + 1 AI или 2 Hotseat |
+| Major player starts | 2 |
+| Neutral camps | 5-7 |
+| Free cities | 0-1 |
+| Ruins/POI | 8-12 |
+| Mana sources | 3-5 |
+| Rivers | 2-4 |
+| Average start distance | 11-14 hex |
+| Minimum land path distance | 14 |
+| Recommended turn limit | 200 для quick, 300 standard |
+
+## 11. [ДОПОЛНЕНИЕ] Save game миграции и autosave
+
+### 11.1. Версии сохранения
+
+```ts
+type SaveMetadata = {
+  saveSchemaVersion: number;   // increments on save format changes
+  gameRulesVersion: string;    // semver, affects balance/rules
+  contentVersion: string;      // semver, affects data configs/assets
+  createdWithBuild: string;
+  createdAt: string;
+  lastPlayedAt: string;
+};
+```
+
+| Версия | Назначение | Пример |
+|---|---|---|
+| `saveSchemaVersion` | структура JSON/Blob | 1, 2, 3 |
+| `gameRulesVersion` | правила, формулы, баланс | `0.1.0` |
+| `contentVersion` | технологии, юниты, здания | `0.1.0-data.4` |
+
+### 11.2. Совместимость
+
+| Ситуация | Поведение |
+|---|---|
+| saveSchemaVersion ниже текущей | применить миграции по порядку |
+| saveSchemaVersion выше текущей | запретить загрузку, показать версию |
+| gameRulesVersion patch отличается | разрешить, пометить `balance changed` |
+| gameRulesVersion minor отличается | разрешить только как `legacy rules` или sandbox |
+| contentVersion missing ids | попытаться map через migration table |
+| migration failed | создать backup и не трогать исходный save |
+
+### 11.3. Формат миграции
+
+```ts
+type SaveMigration = {
+  from: number;
+  to: number;
+  description: string;
+  migrate: (oldSave: unknown) => unknown;
+};
+```
+
+Правила:
+
+1. Миграция не изменяет исходный файл до успешной записи нового.
+2. Перед миграцией создается backup.
+3. После миграции пересчитывается `stateHash`.
+4. Если hash невалиден, save открывается только в recovery mode.
+
+### 11.4. Autosave
+
+| Тип | Когда | Слоты |
+|---|---|---:|
+| Turn autosave | начало хода human player | 10 rolling |
+| Pre-combat autosave | перед атакой по городу/герою | 3 rolling |
+| Manual quicksave | `Ctrl+S` или кнопка | 5 rolling |
+| Milestone autosave | новая эпоха, победный проект | 5 rolling |
+| Hotseat switch autosave | перед экраном передачи хода | 6 rolling |
+
+Autosave naming:
+
+```text
+autosave_turn_024_player_kingdom_of_dawn
+quicksave_003
+milestone_era_medieval_turn_041
+```
+
+Минимальный интервал autosave: 30 секунд реального времени, кроме Hotseat switch, который всегда сохраняет.
+
+### 11.5. Несовместимость и UI
+
+Если save несовместим:
+
+```text
+Это сохранение создано в версии 0.2.0, текущая версия 0.1.0.
+Загрузка невозможна: формат сохранения новее клиента.
+[Открыть папку сохранений] [Назад]
+```
+
+Если требуется миграция:
+
+```text
+Сохранение будет обновлено с формата 1 до 3.
+Будет создан backup. Старый файл не будет удален.
+[Обновить и загрузить] [Отмена]
+```
+
+## 12. [ДОПОЛНЕНИЕ] Accessibility: клавиатура, screen reader, высокий контраст
+
+### 12.1. Полная навигация клавиатурой
+
+| Клавиша | Контекст | Действие |
+|---|---|---|
+| `ArrowUp` | map cursor | сосед direction 2 |
+| `ArrowDown` | map cursor | сосед direction 5 |
+| `ArrowLeft` | map cursor | сосед direction 3 |
+| `ArrowRight` | map cursor | сосед direction 0 |
+| `Shift+ArrowUp` | map cursor | direction 1 |
+| `Shift+ArrowDown` | map cursor | direction 4 |
+| `Enter` | map/UI | выбрать/подтвердить |
+| `Esc` | любой | отменить/закрыть |
+| `Tab` | UI | следующий focusable element |
+| `Shift+Tab` | UI | предыдущий focusable element |
+| `N` | map | следующий юнит с действием |
+| `C` | map | следующий город |
+| `H` | map | центр на столице |
+| `Ctrl+F` | map | найти город/юнит |
+| `Ctrl+S` | любой | quicksave |
+| `Ctrl+L` | меню | quickload prompt |
+| `?` | любой | hotkey overlay |
+
+Hex cursor всегда имеет visible ring и текстовое описание в live region.
+
+### 12.2. Keyboard action modes
+
+```ts
+type KeyboardActionMode =
+  | 'inspect'
+  | 'moveTarget'
+  | 'attackTarget'
+  | 'buildTarget'
+  | 'cityProduction'
+  | 'techSelect';
+```
+
+| Mode | Вход | Выход |
+|---|---|---|
+| inspect | default | `M`, `A`, `B`, `T` |
+| moveTarget | `M` на выбранном юните | Enter подтверждает, Esc отменяет |
+| attackTarget | `A` | Enter атакует, Esc отменяет |
+| buildTarget | worker action | Enter строит, Esc отменяет |
+| cityProduction | `B` на городе | Enter ставит в очередь |
+| techSelect | `T` | Enter выбирает технологию |
+
+### 12.3. Screen reader support
+
+3D canvas:
+
+```tsx
+<canvas
+  role="application"
+  aria-label="Карта Realms of War. Используйте стрелки для перемещения курсора по гексам."
+/>
+<div aria-live="polite" id="map-status" />
+<div aria-live="assertive" id="combat-alerts" />
+```
+
+Live region examples:
+
+| Событие | Текст |
+|---|---|
+| Cursor moved | `Гекс q 5 r 7, лес, защита +20%, еда 1, дерево 2.` |
+| Unit selected | `Выбран Копейщик, здоровье 80 из 80, движение 2, атака доступна.` |
+| Combat forecast | `Ожидаемый урон 10, ответный урон 6, шанс критического удара 5 процентов.` |
+| Enemy visible | `Обнаружен Гоблин-лучник на расстоянии 3.` |
+| Research complete | `Исследование Земледелие завершено. Доступен Амбар.` |
+
+### 12.4. ARIA для UI
+
+| Элемент | Атрибуты |
+|---|---|
+| ResourceBar | `role="status"`, `aria-label` с полными значениями |
+| EndTurn button | `aria-disabled`, `aria-describedby` для blockers |
+| Tech node | `role="treeitem"`, `aria-expanded`, `aria-selected` |
+| Production queue | `role="listbox"` |
+| Modal | `role="dialog"`, focus trap |
+| Tooltip | `role="tooltip"`, связка `aria-describedby` |
+
+### 12.5. Высококонтрастный режим
+
+| Токен | Normal | High contrast |
+|---|---|---|
+| Background | `#151922` | `#000000` |
+| Panel | `#202633` | `#101010` |
+| Text | `#e8edf5` | `#ffffff` |
+| Muted text | `#aab3c2` | `#d8d8d8` |
+| Focus ring | `#d7aa4b` | `#ffff00` |
+| Enemy | `#d65a54` | `#ff4040` |
+| Ally | `#4d8fd6` | `#00b7ff` |
+| Valid move | `#6fbf73` | `#00ff66` |
+| Blocked | `#5d6675` | `#888888` |
+
+High contrast также включает:
+
+1. Толщина selection ring x1.75.
+2. Отключение прозрачности панелей.
+3. Pattern overlay для heatmaps.
+4. Минимальный contrast ratio текста 7:1.
+
+## 13. [ДОПОЛНЕНИЕ] Anti-cheat для будущего мультиплеера
+
+### 13.1. Базовый принцип
+
+Open-source клиент нельзя считать доверенным. Anti-cheat строится не на запрете модификации клиента, а на серверной валидации команд и минимизации скрытой информации на клиенте.
+
+| Режим | Уровень доверия | Anti-cheat |
+|---|---|---|
+| Hotseat | доверенный локальный | нет |
+| Online friendly relay | частично доверенный | command hash, desync detection |
+| Online ranked | недоверенный | authoritative server, visible-state slices |
+
+### 13.2. Валидация команд сервером
+
+Для ranked server прогоняет каждую команду через тот же `GameEngine`.
+
+```ts
+serverAcceptsCommand =
+  isPlayerTurn(command.playerId) &&
+  commandIndex === expectedIndex &&
+  schemaValid(command) &&
+  commandAllowedByVisibleState(command) &&
+  engineValidationPasses(command) &&
+  resultingStateHashMatchesServer;
+```
+
+Проверки:
+
+| Команда | Проверка |
+|---|---|
+| MoveUnit | владелец, movement, terrain, fog, нет enemy zone block |
+| Attack | range, line of sight, attackAvailable, target visible |
+| Recruit | ресурсы, building/tech unlock, city ownership |
+| Research | prerequisites, not already researched |
+| Trade | доступный маршрут, ресурсы, cooldown |
+| EndTurn | no pending forced decisions |
+
+### 13.3. Защита от map hack
+
+Для ranked online клиент не получает полный `GameState`. Сервер отправляет `PlayerVisibleState`.
+
+```ts
+type PlayerVisibleState = {
+  ownEntities: EntitySnapshot[];
+  visibleEnemyEntities: EntitySnapshot[];
+  exploredMap: ExploredHexSnapshot[];
+  visibleMap: VisibleHexSnapshot[];
+  publicScores: PublicScoreSnapshot[];
+};
+```
+
+Скрытые данные:
+
+1. Невидимые юниты противника.
+2. Текущие очереди строительства противника.
+3. Невидимые ресурсы без технологии.
+4. AI/neutral hidden intents.
+5. Ритуальные проекты до разведки нужного города.
+
+### 13.4. Tamper evidence
+
+```ts
+type SignedCommandEnvelope = {
+  command: GameCommand;
+  matchId: string;
+  playerId: string;
+  commandIndex: number;
+  previousStateHash: string;
+  clientBuildHash: string;
+  signature: string;
+};
+```
+
+Client build hash не предотвращает чит, но помогает:
+
+1. помечать modded clients;
+2. запрещать ranked при mismatch;
+3. быстро диагностировать desync.
+
+### 13.5. Обнаружение и санкции
+
+| Нарушение | Действие |
+|---|---|
+| Invalid command schema | reject, warning |
+| 3 invalid commands за матч | auto-forfeit |
+| State hash mismatch | resync attempt |
+| 3 desync за 20 ходов | match cancelled или forfeit виновного |
+| Build hash mismatch in ranked | запрет входа |
+| Rate limit exceeded | temporary disconnect |
+| Replay доказал невозможное действие | match overturned, rating rollback |
+
+Логи ranked матчей хранятся 30 дней:
+
+```ts
+type MatchAuditLog = {
+  matchId: string;
+  commandLog: GameCommand[];
+  stateHashesByTurn: string[];
+  rejectedCommands: RejectedCommand[];
+  clientBuildHashes: Record<PlayerId, string>;
+};
+```
+
+## 14. [ДОПОЛНЕНИЕ] Система достижений
+
+### 14.1. Принципы
+
+1. Достижения не дают gameplay bonuses.
+2. Достижения работают offline.
+3. В ranked online достижения подтверждаются сервером.
+4. Hidden achievements раскрываются после выполнения.
+
+```ts
+type Achievement = {
+  id: string;
+  nameKey: string;
+  descriptionKey: string;
+  category: AchievementCategory;
+  hidden: boolean;
+  progressMax: number;
+};
+```
+
+### 14.2. Список достижений
+
+| ID | Название | Условие | Категория |
+|---|---|---|---|
+| `first_city` | Первый камень | основать первый город | economy |
+| `second_city_turn20` | Быстрая экспансия | основать второй город до хода 20 | economy |
+| `first_blood` | Первая кровь | уничтожить первого врага | combat |
+| `hero_survives` | Живой символ | выиграть партию без смерти героя | combat |
+| `ruin_runner` | Искатель древностей | исследовать 5 руин за матч | exploration |
+| `forest_king` | Лесной король | контролировать 20 лесных гексов | economy |
+| `iron_line` | Железная линия | иметь 5 melee юнитов уровня 3+ | combat |
+| `no_gold_deficit` | Казна полна | 50 ходов без отрицательного gold/turn | economy |
+| `first_wonder` | Чудо эпохи | построить первое чудо | wonders |
+| `three_wonders` | Каменная летопись | построить 3 чуда в одном матче | wonders |
+| `science_victory` | Великий кодекс | выиграть Science Victory | victory |
+| `domination_victory` | Под одной короной | выиграть Domination Victory | victory |
+| `rift_sealed` | Печать Разлома | выиграть Rift Seal Victory | victory |
+| `wonder_victory` | Наследие веков | выиграть Wonders Victory | victory |
+| `underdog` | Против течения | победить AI Veteran после потери столицы | challenge |
+| `clean_war` | Без осадного пепла | выиграть войну, не разрушив города | challenge |
+| `neutral_friend` | Договор с окраиной | довести reputation с free cities до +80 | diplomacy |
+| `camp_tamer` | Укротитель лагерей | заключить pact с 3 лагерями | diplomacy |
+| `mage_order` | Орден арканы | иметь 4 магов и +12 mana/turn | magic |
+| `seal_rush` | Срочная печать | завершить Rift Seal до хода 180 | magic |
+| `cartographer` | Картограф | исследовать 90% карты | exploration |
+| `hotseat_finish` | За одним столом | завершить Hotseat матч | multiplayer |
+| `perfect_defense` | Непробитые стены | выдержать 5 атак города без потери HP города | combat |
+| `market_master` | Мастер рынка | заработать 500 золота торговлей | economy |
+
+### 14.3. Статистика
+
+```ts
+type PlayerStats = {
+  matchesStarted: number;
+  matchesFinished: number;
+  victoriesByType: Record<VictoryType, number>;
+  unitsKilled: number;
+  unitsLost: number;
+  citiesFounded: number;
+  citiesCaptured: number;
+  wondersBuilt: number;
+  techsResearched: number;
+  ruinsExplored: number;
+  totalGoldEarned: number;
+  totalManaSpent: number;
+  highestUnitLevel: number;
+};
+```
+
+### 14.4. Связь с условиями победы
+
+| Victory type | Achievement | Доп. статистика |
+|---|---|---|
+| Domination | `domination_victory` | столицы захвачены, ход победы |
+| Science | `science_victory` | tech count, science/turn |
+| Rift Seal | `rift_sealed` | mana spent, ritual turns |
+| Wonders | `wonder_victory` | wonders count, prestige |
+| Score | `score_king` future | final score breakdown |
+
+## 15. [ДОПОЛНЕНИЕ] Моддинг и data-driven контент
+
+### 15.1. Политика моддинга
+
+Моддинг поддерживается для offline, Hotseat и friendly online. Ranked online использует только signed vanilla data.
+
+| Режим | Mods |
+|---|---|
+| Singleplayer | разрешены |
+| Hotseat | разрешены, если все игроки на одном клиенте |
+| Online friendly | разрешены, если checksum совпадает у всех |
+| Online ranked | запрещены |
+
+### 15.2. Структура мода
+
+```text
+mods/
+  my-mod/
+    manifest.json
+    data/
+      units.json
+      buildings.json
+      technologies.json
+      terrain.json
+      map-presets.json
+    assets/
+      models/
+      textures/
+      icons/
+      audio/
+    localization/
+      ru.json
+      en.json
+    maps/
+      custom-map-001.json
+```
+
+`manifest.json`:
+
+```json
+{
+  "id": "my-mod",
+  "name": "My Mod",
+  "version": "1.0.0",
+  "gameVersion": ">=0.1.0 <0.2.0",
+  "author": "Author",
+  "loadOrder": 100,
+  "dependencies": [],
+  "checksum": "sha256..."
+}
+```
+
+### 15.3. Что можно менять без кода
+
+| Категория | Можно менять | Нельзя без кода |
+|---|---|---|
+| Юниты | stats, cost, abilities refs, model refs | новая hardcoded ability logic |
+| Здания | yields, cost, prereqs, models | новый production algorithm |
+| Технологии | graph, costs, unlocks | новый тип unlock без schema |
+| Террейн | yields, move, defense, colors | новый shader behavior |
+| Карты | fixed maps, presets, seeds | новый generator algorithm |
+| Локализация | все строки | layout logic |
+| Аудио | event bindings | новый audio engine |
+
+### 15.4. Schema для кастомного юнита
+
+```json
+{
+  "id": "mod_elven_ranger",
+  "nameKey": "unit.mod_elven_ranger.name",
+  "descriptionKey": "unit.mod_elven_ranger.description",
+  "domain": "land",
+  "stats": {
+    "hp": 72,
+    "atk": 16,
+    "def": 7,
+    "mov": 3,
+    "range": 2
+  },
+  "cost": {
+    "wood": 50,
+    "gold": 60
+  },
+  "upkeep": {
+    "gold": 2
+  },
+  "era": "medieval",
+  "requiredTech": "archery",
+  "abilities": ["volley", "forest_concealment"],
+  "modelId": "mod_elven_ranger.glb",
+  "iconId": "mod_elven_ranger"
+}
+```
+
+### 15.5. Кастомные карты
+
+```ts
+type CustomMapFile = {
+  schemaVersion: 1;
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  seed?: string;
+  hexes: Array<{
+    q: number;
+    r: number;
+    terrainId: TerrainTypeId;
+    elevation?: number;
+    resourceId?: string;
+    riverMask?: number;
+  }>;
+  starts: Array<{
+    playerSlot: number;
+    q: number;
+    r: number;
+  }>;
+  neutralCamps?: NeutralCampPlacement[];
+  ruins?: PoiPlacement[];
+};
+```
+
+Валидация кастомной карты:
+
+| Проверка | Условие |
+|---|---|
+| Все hexes в bounds | обязательно |
+| Starts на land | обязательно |
+| Starts connected | обязательно для land-only режима |
+| Unknown terrain ids | ошибка |
+| Missing localization | warning |
+| Too many assets | warning при > 500 MB |
+
+### 15.6. Conflict resolution
+
+Моды применяются по `loadOrder`. Если два мода меняют один ID:
+
+```ts
+finalRecord = deepMerge(baseRecord, modARecord, modBRecord);
+```
+
+Правила:
+
+1. Поля scalar заменяются последним модом.
+2. Массивы по умолчанию заменяются, не объединяются.
+3. Для `effects` можно указать `patchMode: 'append'`.
+4. Ошибка schema validation отключает только проблемный мод, не всю игру.
+
+### 15.7. Checksums для мультиплеера
+
+```ts
+contentChecksum = sha256(stableSerialize({
+  baseContentVersion,
+  enabledMods: mods.map(m => ({
+    id: m.id,
+    version: m.version,
+    checksum: m.checksum
+  }))
+}));
+```
+
+Friendly online lobby стартует только если `contentChecksum` совпадает у всех игроков.
