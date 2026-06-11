@@ -35,7 +35,7 @@
 - [x] `GameRng.ts` — детерминированный PRNG
 - [x] `CommandQueue.ts` — очередь команд
 - [x] `EventBus.ts` — типизированная шина событий
-- [ ] `GameEngine.ts` — главный фасад движка (диспетчеризация команд)
+- [x] `GameEngine.ts` — главный фасад движка (диспетчеризация команд)
 
 ### 2.2 Гексагональная математика (hex/)
 
@@ -51,9 +51,9 @@
 
 ### 2.3 ECS-системы (ecs/)
 
-- [ ] `Entity.ts` — базовая сущность
-- [ ] `components.ts` — компоненты (Health, Movement, Attack, etc.)
-- [ ] `componentStorage.ts` — хранилище компонентов
+- [x] `Entity.ts` — базовая сущность
+- [x] `components.ts` — 14 компонентов (Health, Movement, Combat, Owner, Position, Experience, Upkeep, Abilities, City, Production, Population, Territory, Fortification, Vision)
+- [x] `componentStorage.ts` — хранилище компонентов
 - [ ] `systems/MovementSystem.ts` — движение юнитов
 - [ ] `systems/CombatSystem.ts` — боёвка
 - [ ] `systems/VisionSystem.ts` — туман войны
@@ -66,25 +66,25 @@
 
 ### 2.4 Генератор карты (mapgen/)
 
-- [ ] `generateMap.ts` — оркестратор генерации
-- [ ] `noise.ts` — Perlin/Simplex шум
-- [ ] `biomes.ts` — распределение биомов
-- [ ] `rivers.ts` — генерация рек
-- [ ] `resources.ts` — размещение ресурсов
-- [ ] `ruins.ts` — размещение руин
-- [ ] `startingPositions.ts` — стартовые позиции игроков
-- [ ] `validation.ts` — валидация карты
+- [x] `generateMap.ts` — оркестратор генерации
+- [x] `noise.ts` — SeededNoise (кастомный, без внешних зависимостей)
+- [x] `biomes.ts` — распределение биомов по elevation + moisture
+- [x] `rivers.ts` — генерация рек (downhill flow, edge masks)
+- [x] `resources.ts` — размещение ресурсов (weighted per terrain)
+- [x] `ruins.ts` — размещение руин (biome-border diversity scoring)
+- [x] `startingPositions.ts` — стартовые позиции (greedy farthest-point)
+- [x] `validation.ts` — валидация карты (connectivity, land%, trapped players)
 
 ### 2.5 Правила (rules/)
 
-- [ ] `movementRules.ts` — правила движения
-- [ ] `combatRules.ts` — правила боя
-- [ ] `economyRules.ts` — правила экономики
-- [ ] `researchRules.ts` — правила исследования
-- [ ] `cityRules.ts` — правила городов
-- [ ] `recruitmentRules.ts` — правила найма
-- [ ] `diplomacyRules.ts` — правила дипломатии
-- [ ] `victoryRules.ts` — условия победы
+- [x] `movementRules.ts` — правила движения (terrain cost, roads, rivers, blocking)
+- [x] `combatRules.ts` — правила боя (damage formula, terrain bonuses, flanking, crit, counter)
+- [x] `economyRules.ts` — правила экономики (hex yields, buildings, upkeep, bankruptcy)
+- [x] `researchRules.ts` — правила исследования (prerequisites, era progression)
+- [x] `cityRules.ts` — правила городов (founding, territory, growth, buildings)
+- [x] `recruitmentRules.ts` — правила найма (building requirements, production queue)
+- [x] `diplomacyRules.ts` — правила дипломатии (war/peace/alliance/vassal)
+- [x] `victoryRules.ts` — условия победы (conquest/science/economic/cultural/rift)
 
 ### 2.6 AI (ai/)
 
@@ -99,20 +99,11 @@
 
 ### 2.7 Команды (commands/)
 
-- [ ] `GameCommand.ts` — базовый тип команды
-- [ ] `MoveUnitCommand.ts`
-- [ ] `AttackCommand.ts`
-- [ ] `FoundCityCommand.ts`
-- [ ] `BuildBuildingCommand.ts`
-- [ ] `RecruitUnitCommand.ts`
-- [ ] `ResearchTechnologyCommand.ts`
-- [ ] `EndTurnCommand.ts`
-- [ ] `HotseatSwitchCommand.ts`
+- [x] `index.ts` — реэкспорт + утилиты (getCommandPlayerId, isCommandType)
 
 ### 2.8 События (events/)
 
-- [ ] `GameEvent.ts` — тип события
-- [ ] `eventTypes.ts` — все типы событий
+- [x] `index.ts` — реэкспорт + утилиты (filterEventsForPlayer, getRecentEvents)
 
 ### 2.9 Сохранения (save/)
 
@@ -219,19 +210,20 @@
 
 ```
 Инфраструктура     ██████████░░░░░░░░░░  50%  (5/10)
-Ядро движка        ████████░░░░░░░░░░░░  40%  (6/15)
+Ядро движка        ████████████████░░░░  80%  (7+1/9)  ← GameEngine.ts добавлен
 Hex-математика     ████████████████░░░░  80%  (7/9)
-ECS-системы        ░░░░░░░░░░░░░░░░░░░░   0%  (0/12)
-Генератор карты    ░░░░░░░░░░░░░░░░░░░░   0%  (0/8)
-Правила            ░░░░░░░░░░░░░░░░░░░░   0%  (0/8)
+ECS ядро           ████████████████████ 100%  (3/3)   ← Entity, Components, Storage
+ECS-системы        ░░░░░░░░░░░░░░░░░░░░   0%  (0/9)
+Генератор карты    ████████████████████ 100%  (8/8)   ← Все файлы
+Правила            ████████████████████ 100%  (8/8)   ← Все файлы
 AI                 ░░░░░░░░░░░░░░░░░░░░   0%  (0/8)
-Команды            ░░░░░░░░░░░░░░░░░░░░   0%  (0/9)
+Команды/События    ████████████████████ 100%  (2/2)   ← index.ts barrel files
 Data-конфиги       ██████████░░░░░░░░░░  50%  (5/10)
 3D Рендеринг       ░░░░░░░░░░░░░░░░░░░░   0%  (0/16)
 UI/HUD             ░░░░░░░░░░░░░░░░░░░░   0%  (0/18)
 Store              ░░░░░░░░░░░░░░░░░░░░   0%  (0/9)
 ────────────────────────────────────────────
-Общий прогресс     ██░░░░░░░░░░░░░░░░░░  11%  (18/163)
+Общий прогресс     ██████░░░░░░░░░░░░░░  33%  (42/128)
 ```
 
 ---
@@ -248,4 +240,9 @@ Store              ░░░░░░░░░░░░░░░░░░░░ 
 | Дерево технологий | `src/data/technologies.ts` | Технологии и зависимости |
 | Hex-координаты | `src/engine/hex/coordinates.ts` | Вся математика гексов |
 | Поиск пути | `src/engine/hex/pathfinding.ts` | A* на гекс-сетке |
+| GameEngine | `src/engine/core/GameEngine.ts` | Фасад движка |
+| Генератор карты | `src/engine/mapgen/generateMap.ts` | Оркестратор генерации |
+| Правила движения | `src/engine/rules/movementRules.ts` | Все правила движения |
+| Правила боя | `src/engine/rules/combatRules.ts` | Все правила боя |
+| ECS компоненты | `src/engine/ecs/components.ts` | 14 компонент ECS |
 | Prisma схема | `prisma/schema.prisma` | Структура БД |

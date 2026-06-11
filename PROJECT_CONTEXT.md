@@ -44,13 +44,17 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-11
+> Последнее обновление: 2026-06-11 (Фаза 1 завершена)
 
 ### Что реализовано
 
 - ✅ GDD (полная спецификация 5531 строк)
 - ✅ Hex-математика (`src/engine/hex/`) — координаты, дистанции, пути, округление, хранение карты
 - ✅ Ядро движка (`src/engine/core/`) — GameState, GameConfig, GameRng, CommandQueue, EventBus, типы
+- ✅ **GameEngine.ts** — главный фасад движка (диспетчеризация команд, валидация, иммутабельные обновления)
+- ✅ ECS ядро (`src/engine/ecs/`) — Entity, 14 компонентов, ComponentStorage
+- ✅ Генератор карты (`src/engine/mapgen/`) — шум, биомы, реки, ресурсы, руины, стартовые позиции, валидация
+- ✅ Правила игры (`src/engine/rules/`) — движение, бой, экономика, исследование, города, найм, дипломатия, победа
 - ✅ Data-конфиги (`src/data/`) — юниты, здания, технологии, террейн, ресурсы
 - ✅ Прототип 2D (Canvas) — `public/prototype/index.html`
 - ✅ Next.js проект с shadcn/ui компонентами
@@ -58,10 +62,10 @@
 
 ### Что НЕ реализовано (ключевое для v0.1-alpha)
 
-- ❌ ECS-системы (Movement, Combat, Economy, Research, Vision, AI, City, Turn)
-- ❌ Генератор карты (mapgen)
+- ❌ ECS-системы — MovementSystem, CombatSystem, EconomySystem и др. (склеивают rules + engine)
 - ❌ 3D-рендеринг (React Three Fiber сцена)
 - ❌ UI/HUD экраны (главное меню, настройки, дерево технологий, управление городом)
+- ❌ Zustand Store + Providers
 - ❌ Система сохранений/загрузок
 - ❌ Hotseat-режим
 - ❌ AI-противник
@@ -114,8 +118,8 @@ realms-of-war/
 
 ## Приоритеты разработки (следующие шаги)
 
-1. **ECS-системы** — Movement, Combat, Economy (ядро геймплея)
-2. **Генератор карты** — seed-based, биомы, реки, ресурсы, стартовые позиции
+1. **ECS-системы** — склеить rules + engine (MovementSystem, CombatSystem, EconomySystem, TurnSystem)
+2. **Zustand Store + GameProvider** — клиентское состояние, связь UI ↔ Engine
 3. **3D-рендеринг** — TerrainLayer + CameraRig + SelectionHighlights
 4. **UI/HUD** — GameHud, ResourceBar, TurnPanel, CityPanel
 5. **AI** — базовый стратегический ИИ (Utility AI)
@@ -145,3 +149,4 @@ realms-of-war/
 |---|---|
 | 2026-06-11 | Начальная настройка: GDD, hex-математика, ядро движка, data-конфиги, 2D-прототип |
 | 2026-06-11 | Настройка GitHub: cleanup репо, добавление PROJECT_CONTEXT.md, приватный режим |
+| 2026-06-11 | **Фаза 1:** GameEngine + ECS ядро + Генератор карты + Правила игры (24 файла, 3 параллельных агента) |
