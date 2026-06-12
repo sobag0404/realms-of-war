@@ -75,13 +75,14 @@ export function UnitPanel({ entity }: UnitPanelProps) {
   );
 
   const handleFortify = useCallback(() => {
-    // Dispatch a command to fortify the unit
+    // Dispatch FortifyUnit command — adds fortified status, ends unit's turn
     if (!isOwnedByActive) return;
     dispatchCommand({
-      type: 'EndTurn', // placeholder — real fortify command would be different
+      type: 'FortifyUnit',
       playerId: activePlayerId,
+      entityId: entity.id,
     });
-  }, [dispatchCommand, activePlayerId, isOwnedByActive]);
+  }, [dispatchCommand, activePlayerId, isOwnedByActive, entity.id]);
 
   const handleWake = useCallback(() => {
     if (!isOwnedByActive) return;

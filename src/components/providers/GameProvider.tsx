@@ -158,9 +158,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       // Could trigger combat animation here
     });
 
-    // ── Unit Killed ─────────────────────────────────────────────────────────
-    const unsubKilled = eventBus.on('event') as () => void; // placeholder
-
     // ── City Founded ────────────────────────────────────────────────────────
     const unsubCity = eventBus.on('CityFounded', (event) => {
       const mapping = EVENT_NOTIFICATION_MAP.CityFounded;
@@ -243,7 +240,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     unsubscribeRefs.current = [
       unsubMoved,
       unsubAttack,
-      unsubKilled,
       unsubCity,
       unsubBuilding,
       unsubTech,

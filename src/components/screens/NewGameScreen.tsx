@@ -140,6 +140,9 @@ export function NewGameScreen() {
     const config: GameConfig = createDefaultConfig({
       mode: gameMode,
       difficulty,
+      // NOTE: Date.now() for seed is OK in UI code — the seed is set once here
+      // at game creation and then the RNG state is tracked deterministically.
+      // This is NOT game-state logic; it's user-initiated configuration.
       seed: Date.now(),
       players,
       map: {

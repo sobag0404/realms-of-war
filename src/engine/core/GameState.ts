@@ -267,6 +267,12 @@ export interface GameState {
 
   /** Victory condition that ended the game. */
   victoryCondition: string | null;
+
+  /** Monotonic counter for generating deterministic entity IDs. Part of serializable state. */
+  nextEntitySeq: number;
+
+  /** Monotonic counter for generating deterministic city IDs. Part of serializable state. */
+  nextCitySeq: number;
 }
 
 // ─── State Factory ────────────────────────────────────────────────────────────
@@ -325,5 +331,7 @@ export function createInitialGameState(config: GameConfig): GameState {
     gameOver: false,
     winnerId: null,
     victoryCondition: null,
+    nextEntitySeq: 1,
+    nextCitySeq: 1,
   };
 }

@@ -12,6 +12,7 @@ import { hexKey, hexDistance, hexRing, HEX_DIRECTIONS } from '../core/types';
 import { TERRAIN_TYPES } from '../../data/terrain';
 import { BUILDINGS } from '../../data/buildings';
 import { TECHNOLOGIES } from '../../data/technologies';
+import { nextCityId } from '../core/idGenerator';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,10 +51,7 @@ function getHexTile(state: GameState, hex: HexCoord): HexTile | null {
   return state.map.tiles[hexKey(hex)] ?? null;
 }
 
-/** Generate a unique city ID. */
-function generateCityId(): CityId {
-  return `city-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-}
+
 
 /** Check if a player has a specific tech. */
 function hasTech(state: GameState, playerId: PlayerId, techId: TechId): boolean {
@@ -169,7 +167,7 @@ export function foundCity(
   const check = canFoundCity(state, playerId, hex);
   if (!check.canFound) return state;
 
-  const cityId = generateCityId();
+  const { state: stateWithCityId, id: cityId } = nextCityId(state);
 
   // Calculate territory hexes (radius 1 for level 1)
   const territory = getCityTerritoryAtLevel(hex, 1);
@@ -200,14 +198,14 @@ export function foundCity(
     foundedTurn: state.turn,
   };
 
-  // Remove the settler
-  const settlerId = Object.values(state.entities).find(
+  // Remove the settler (use the state with updated city counter)
+  const settlerId = Object.values(stateWithCityId.entities).find(
     (e) => e.ownerId === playerId &&
            e.typeId === 'settler' &&
            hexKey(e.hex) === hexKey(hex),
   )?.id;
 
-  const newEntities = { ...state.entities };
+  const newEntities = { ...stateWithCityId.entities };
   if (settlerId) {
     const { [settlerId]: _, ...rest } = newEntities;
     void _;
@@ -217,7 +215,7 @@ export function foundCity(
   }
 
   // Update hex tiles to assign ownership
-  const newTiles = { ...state.map.tiles };
+  const newTiles = { ...stateWithCityId.map.tiles };
   for (const tHex of territory) {
     const key = hexKey(tHex);
     const existingTile = newTiles[key];
@@ -239,14 +237,14 @@ export function foundCity(
   }
 
   return {
-    ...state,
+    ...stateWithCityId,
     cities: {
-      ...state.cities,
+      ...stateWithCityId.cities,
       [cityId]: newCity,
     },
     entities: newEntities,
     map: {
-      ...state.map,
+      ...stateWithCityId.map,
       tiles: newTiles,
     },
   };

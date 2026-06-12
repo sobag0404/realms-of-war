@@ -7,6 +7,10 @@
  * - Session metadata (mode, active player, errors)
  *
  * Game rules live in src/engine/rules/ — this slice does NOT contain game logic.
+ *
+ * Save/load operations route through the engine save format via saveService
+ * to ensure checksums, gameConfig, commandLog, and rngState are properly
+ * persisted and restored.
  */
 
 import type { StateCreator } from 'zustand';
@@ -20,6 +24,11 @@ import { generateMap } from '@/engine/mapgen/generateMap';
 import { createDefaultConfig } from '@/engine/core/GameConfig';
 import { getWorkerManager } from '@/workers/workerManager';
 import { populateStartingPositions } from '@/engine/core/startPositions';
+import type { SaveFile } from '@/engine/save/saveGame';
+import {
+  createSaveFile,
+  serializeSaveWithChecksum,
+} from '@/lib/saveService';
 
 // ─── Slice Interface ──────────────────────────────────────────────────────────
 
@@ -36,7 +45,10 @@ export interface SessionSlice {
 
   // Actions
   startNewGame: (config: GameConfig) => void;
+  /** Legacy load from a bare GameState (no config/rng/commandLog). Prefer loadSaveFile. */
   loadGame: (state: GameState) => void;
+  /** Load from a validated SaveFile — the proper, full-featured load path. */
+  loadSaveFile: (saveFile: SaveFile) => void;
   saveGame: (name?: string) => Promise<boolean>;
   dispatchCommand: (command: GameCommand) => void;
   endTurn: () => void;
@@ -213,7 +225,9 @@ export const createSessionSlice: StateCreator<
 
   loadGame: (state: GameState) => {
     try {
-      // Reconstruct the engine from the loaded state
+      // Legacy path: reconstruct config from GameState.
+      // Prefer loadSaveFile() which uses the full SaveFile with
+      // gameConfig, rngState, and commandLog from the engine save format.
       const config = createDefaultConfig({
         version: state.version,
         seed: state.seed,
@@ -269,15 +283,79 @@ export const createSessionSlice: StateCreator<
     }
   },
 
+  loadSaveFile: (saveFile: SaveFile) => {
+    try {
+      const { gameState: loadedState, gameConfig, rngState } = saveFile;
+
+      // 1. Create engine with the *original* GameConfig from the save
+      const engine = new GameEngine(gameConfig);
+
+      // 2. Restore the game state
+      engine.setState(loadedState);
+
+      // 3. Restore RNG state for deterministic continuation
+      if (rngState && rngState.position !== 0) {
+        engine.getRng().setState(rngState.position);
+      }
+
+      const localPlayerIds = Object.values(loadedState.players)
+        .filter((p) => !p.isAI)
+        .map((p) => p.id);
+
+      set(
+        {
+          engine,
+          gameState: loadedState,
+          snapshotVersion: get().snapshotVersion + 1,
+          activePlayerId: loadedState.activePlayerId,
+          mode: gameConfig.mode,
+          localPlayerIds,
+          isProcessingCommand: false,
+          lastError: null,
+        },
+        false,
+        'session/loadSaveFile',
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load save file';
+      set(
+        {
+          lastError: { message, code: ERROR_CODES.ENGINE_ERROR },
+        },
+        false,
+        'session/loadSaveFileError',
+      );
+    }
+  },
+
   saveGame: async (name?: string) => {
-    const { gameState } = get();
-    if (!gameState) return false;
+    const { engine, gameState } = get();
+    if (!gameState || !engine) return false;
 
     try {
       const saveName = name ?? `Автосохранение — Ход ${gameState.turn}`;
       const playerNames = Object.values(gameState.players)
         .map((p) => p.name)
         .join(', ');
+
+      // Build a proper SaveFile with version, timestamp, gameConfig,
+      // commandLog, rngState, and a real checksum via the engine save format.
+      const gameConfig = engine.getConfig();
+      const rngPosition = engine.getRng().getState();
+
+      const saveFile = createSaveFile({
+        name: saveName,
+        gameState,
+        gameConfig,
+        commandLog: engine.getCommandQueue().toArray() as GameCommand[],
+        rngState: {
+          seed: gameConfig.seed,
+          position: rngPosition,
+        },
+      });
+
+      const { data, checksum } = serializeSaveWithChecksum(saveFile);
 
       const res = await fetch('/api/save', {
         method: 'POST',
@@ -286,8 +364,8 @@ export const createSessionSlice: StateCreator<
           name: saveName,
           turn: gameState.turn,
           players: playerNames,
-          data: JSON.stringify(gameState),
-          checksum: '',
+          data,
+          checksum,
         }),
       });
 

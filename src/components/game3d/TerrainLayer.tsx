@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { TERRAIN_ELEVATION } from '@/data/terrain';
@@ -9,8 +9,7 @@ import { hexToWorld } from '@/engine/hex/coordinates';
 import type { HexCoord, TerrainTypeId } from '@/engine/core/types';
 import { buildTerrainChunks, disposeChunks } from '@/rendering/terrain/buildTerrainChunks';
 import type { TerrainChunk } from '@/rendering/terrain/buildTerrainChunks';
-import { getDefaultFlatHexGeometry, disposeDefaultGeometries } from '@/rendering/terrain/buildHexGeometry';
-import { createMovementRangeMaterial, createAttackRangeMaterial } from '@/rendering/terrain/terrainMaterials';
+import { createSelectionMaterial, createHoverMaterial } from '@/rendering/terrain/terrainMaterials';
 
 // ─── Chunked Terrain Threshold ──────────────────────────────────────────────
 // Use chunked rendering when tile count exceeds this threshold
@@ -44,8 +43,8 @@ export function TerrainLayer() {
     return buildTerrainChunks(tileData);
   }, [gameState, tiles]);
 
-  // Dispose chunks when they change
-  useMemo(() => {
+  // Dispose chunks when they change — use useEffect for proper cleanup
+  useEffect(() => {
     return () => {
       if (terrainChunks.length > 0) {
         disposeChunks(terrainChunks);
@@ -72,37 +71,135 @@ export function TerrainLayer() {
         <ChunkedTerrain chunks={terrainChunks} />
       )}
 
-      {/* Individual hex meshes for small maps or interaction layer */}
-      {tiles.map((tile) => {
-        const key = `${tile.coord.q},${tile.coord.r}`;
-        const [wx, , wz] = hexToWorld(tile.coord);
-        const elevation = TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
+      {/* Conditional rendering: full hex meshes for small maps, lightweight interaction planes for chunked maps */}
+      {terrainChunks.length === 0 ? (
+        // Full per-hex rendering for small maps
+        tiles.map((tile) => {
+          const key = `${tile.coord.q},${tile.coord.r}`;
+          const [wx, , wz] = hexToWorld(tile.coord);
+          const elevation = TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
 
-        const isSelected = selectedHex !== null &&
-          selectedHex.q === tile.coord.q &&
-          selectedHex.r === tile.coord.r;
-        const isHovered = hoveredHex !== null &&
-          hoveredHex.q === tile.coord.q &&
-          hoveredHex.r === tile.coord.r;
+          const isSelected = selectedHex !== null &&
+            selectedHex.q === tile.coord.q &&
+            selectedHex.r === tile.coord.r;
+          const isHovered = hoveredHex !== null &&
+            hoveredHex.q === tile.coord.q &&
+            hoveredHex.r === tile.coord.r;
 
-        return (
-          <group key={key}>
-            <HexMesh
+          return (
+            <group key={key}>
+              <HexMesh
+                position={[wx, 0, wz]}
+                terrain={tile.terrain as TerrainTypeId}
+                hex={tile.coord}
+                elevation={elevation}
+                isHighlighted={isSelected}
+                isHovered={isHovered}
+                onClick={handleHexClick}
+                onHover={handleHexHover}
+              />
+            </group>
+          );
+        })
+      ) : (
+        // Lightweight interaction overlay for chunked maps — invisible planes for raycasting
+        tiles.map((tile) => {
+          const key = `${tile.coord.q},${tile.coord.r}`;
+          const [wx, , wz] = hexToWorld(tile.coord);
+
+          const isSelected = selectedHex !== null &&
+            selectedHex.q === tile.coord.q &&
+            selectedHex.r === tile.coord.r;
+          const isHovered = hoveredHex !== null &&
+            hoveredHex.q === tile.coord.q &&
+            hoveredHex.r === tile.coord.r;
+
+          return (
+            <HexInteractionPlane
+              key={key}
               position={[wx, 0, wz]}
-              terrain={tile.terrain as TerrainTypeId}
               hex={tile.coord}
-              elevation={elevation}
               isHighlighted={isSelected}
               isHovered={isHovered}
               onClick={handleHexClick}
               onHover={handleHexHover}
             />
-          </group>
-        );
-      })}
+          );
+        })
+      )}
 
       {/* Grid overlay lines */}
       {showGrid && <GridOverlay tiles={tiles} />}
+    </group>
+  );
+}
+
+// ─── Hex Interaction Plane ──────────────────────────────────────────────────
+// Lightweight invisible plane for click/hover interaction on chunked terrain.
+// Renders only a flat transparent mesh for raycasting — no visual geometry.
+
+interface HexInteractionPlaneProps {
+  position: [number, number, number];
+  hex: HexCoord;
+  isHighlighted?: boolean;
+  isHovered?: boolean;
+  onClick?: (hex: HexCoord) => void;
+  onHover?: (hex: HexCoord | null) => void;
+}
+
+function HexInteractionPlane({
+  position,
+  hex,
+  isHighlighted,
+  isHovered,
+  onClick,
+  onHover,
+}: HexInteractionPlaneProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  const handlePointerOver = (e: THREE.Event) => {
+    (e as unknown as { stopPropagation: () => void }).stopPropagation();
+    onHover?.(hex);
+  };
+
+  const handlePointerOut = (e: THREE.Event) => {
+    (e as unknown as { stopPropagation: () => void }).stopPropagation();
+    onHover?.(null);
+  };
+
+  const handleClick = (e: THREE.Event) => {
+    (e as unknown as { stopPropagation: () => void }).stopPropagation();
+    onClick?.(hex);
+  };
+
+  return (
+    <group position={[position[0], position[1], position[2]]}>
+      {/* Invisible flat hex plane for raycasting — depthWrite off so it never occludes */}
+      <mesh
+        ref={meshRef}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.02, 0]}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      >
+        <circleGeometry args={[0.95, 6]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Highlight ring — only shown when selected or hovered */}
+      {(isHighlighted || isHovered) && (
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 0.03, 0]}
+        >
+          <ringGeometry args={[0.85, 0.95, 6]} />
+          <primitive
+            object={isHighlighted ? createSelectionMaterial() : createHoverMaterial()}
+            attach="material"
+          />
+        </mesh>
+      )}
     </group>
   );
 }

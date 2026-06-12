@@ -20,6 +20,7 @@ import type { PlayerId } from '../core/types';
 import type { GameState } from '../core/GameState';
 import type { GameCommand } from '../core/CommandQueue';
 import type { EventBus } from '../core/EventBus';
+import type { GameRng } from '../core/GameRng';
 import { AiSystem } from '../ecs/systems/AiSystem';
 import { StrategicPlanner } from './StrategicPlanner';
 import type { StrategicGoal, StrategicAssessment } from './StrategicPlanner';
@@ -81,8 +82,14 @@ export class AiDirector {
   /**
    * Generate all commands for this AI player's turn.
    * This is the main entry point called by the TurnSystem.
+   *
+   * @param state - Current game state
+   * @param eventBus - Event bus for emitting game events
+   * @param rng - Deterministic RNG (from GameEngine) — must be provided for
+   *   reproducible replays. If omitted, falls back to a counter-based
+   *   deterministic approach (no Math.random()).
    */
-  generateTurnCommands(state: GameState, eventBus: EventBus): GameCommand[] {
+  generateTurnCommands(state: GameState, eventBus: EventBus, rng?: GameRng): GameCommand[] {
     const player = state.players[this.playerId];
     if (!player || !player.isAlive) return [];
 
@@ -142,7 +149,7 @@ export class AiDirector {
     const commands = this.selectCommands(state, prioritizedPlans, assessment);
 
     // Step 9: Apply mistake probability (AI makes suboptimal choices)
-    const finalCommands = this.applyMistakeFilter(commands, state);
+    const finalCommands = this.applyMistakeFilter(commands, rng);
 
     // Step 10: Always end with EndTurn
     finalCommands.push({ type: 'EndTurn', playerId: this.playerId });
@@ -352,24 +359,40 @@ export class AiDirector {
    * Apply mistake filter based on difficulty.
    * On easy mode, the AI may skip some good commands.
    * On deity, the AI always plays optimally.
+   *
+   * Uses the provided deterministic GameRng so replays are reproducible.
+   * If no RNG is provided, uses a counter-based deterministic approach
+   * (skip every Nth non-critical command based on mistake probability)
+   * instead of falling back to Math.random().
    */
   private applyMistakeFilter(
     commands: GameCommand[],
-    _state: GameState,
+    rng?: GameRng,
   ): GameCommand[] {
     if (this.difficultyModifiers.mistakeProbability <= 0) {
       return commands;
     }
 
-    // Randomly skip some commands based on mistake probability
+    // Deterministic mistake filtering: use the provided RNG if available,
+    // otherwise use a counter-based approach that skips every Nth command.
+    let nonCriticalIndex = 0;
+    // For counter-based: skip approximately every 1/mistakeProbability commands
+    const skipInterval = Math.round(1 / this.difficultyModifiers.mistakeProbability);
+
     return commands.filter((cmd) => {
       // Never skip critical commands
       if (cmd.type === 'EndTurn' || cmd.type === 'FoundCity' || cmd.type === 'ResearchTechnology') {
         return true;
       }
 
-      // Roll for mistake
-      return Math.random() > this.difficultyModifiers.mistakeProbability;
+      if (rng) {
+        // Deterministic RNG-based roll
+        return rng.next() > this.difficultyModifiers.mistakeProbability;
+      }
+
+      // Counter-based deterministic fallback (no Math.random)
+      nonCriticalIndex++;
+      return (nonCriticalIndex % skipInterval) !== 0;
     });
   }
 

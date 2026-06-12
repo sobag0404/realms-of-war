@@ -10,8 +10,8 @@
  * bundle. All simulation logic is re-implemented inline with simplified rules.
  *
  * Message protocol:
- *   Input:  { type: 'simulate', state, commands }
- *   Output: { type: 'simulateResult', finalState, events }
+ *   Input:  { type: 'simulate', requestId, state, commands }
+ *   Output: { type: 'simulateResult', requestId, finalState, events }
  */
 
 // ─── Inline Hex Math ──────────────────────────────────────────────────────────
@@ -46,6 +46,25 @@ const TERRAIN_COSTS: Record<string, number> = {
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
+}
+
+// ─── Deterministic ID Generation ─────────────────────────────────────────────
+//
+// The simulation worker is self-contained and cannot import from the main bundle.
+// We use the state's nextEntitySeq / nextCitySeq counters (part of the
+// serializable GameState) to generate deterministic IDs instead of Date.now()
+// or Math.random(). This keeps replays reproducible.
+
+function simNextEntityId(state: SimState): string {
+  const seq = state.nextEntitySeq ?? 1;
+  state.nextEntitySeq = seq + 1;
+  return `entity-${seq}`;
+}
+
+function simNextCityId(state: SimState): string {
+  const seq = state.nextCitySeq ?? 1;
+  state.nextCitySeq = seq + 1;
+  return `city-${seq}`;
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -169,7 +188,7 @@ function applyCommand(state: SimState, command: SimCommand): unknown[] {
           break;
         }
 
-        const cityId = `city-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const cityId = simNextCityId(state);
         const cityName = command.name ?? `City ${Object.keys(state.cities || {}).length + 1}`;
 
         state.cities[cityId] = {
@@ -239,7 +258,7 @@ function applyCommand(state: SimState, command: SimCommand): unknown[] {
           break;
         }
 
-        const entityId = `unit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const entityId = simNextEntityId(state);
 
         // Simple unit stats
         const unitStats: Record<string, { attack: number; defense: number; hp: number; range: number; movement: number }> = {
@@ -378,6 +397,7 @@ function simulateTurns(state: SimState, commands: SimCommand[]): { state: SimSta
 
 self.onmessage = function (e: MessageEvent) {
   const request = e.data;
+  const requestId: string = request.requestId ?? '';
 
   try {
     if (request.type === 'simulate') {
@@ -386,12 +406,14 @@ self.onmessage = function (e: MessageEvent) {
 
       self.postMessage({
         type: 'simulateResult',
+        requestId,
         finalState: result.state,
         events: result.events,
       });
     } else {
       self.postMessage({
         type: 'error',
+        requestId,
         requestType: request.type,
         message: `Unknown request type: ${request.type}`,
       });
@@ -399,6 +421,7 @@ self.onmessage = function (e: MessageEvent) {
   } catch (err) {
     self.postMessage({
       type: 'error',
+      requestId,
       requestType: request.type ?? 'unknown',
       message: err instanceof Error ? err.message : String(err),
     });

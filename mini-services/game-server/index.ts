@@ -1,7 +1,9 @@
 // Lightweight static file server for Realms of War
 // Serves the prototype HTML game directly
+import { resolve } from 'path';
+
 const PORT = 3000;
-const PUBLIC_DIR = '/home/z/my-project/public';
+const PUBLIC_DIR = resolve(import.meta.dir, '../../public');
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -30,7 +32,7 @@ const server = Bun.serve({
       return new Response('Forbidden', { status: 403 });
     }
 
-    const filePath = PUBLIC_DIR + path;
+    const filePath = resolve(PUBLIC_DIR, path.slice(1));
 
     try {
       const file = Bun.file(filePath);
@@ -59,4 +61,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(`🎮 Realms of War game server on http://localhost:${PORT}`);
+console.log(`Realms of War game server on http://localhost:${PORT}`);

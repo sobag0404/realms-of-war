@@ -10,8 +10,8 @@
  * bundle. All AI logic is re-implemented inline with simplified heuristics.
  *
  * Message protocol:
- *   Input:  { type: 'generateTurn', state, playerId, difficulty }
- *   Output: { type: 'generateTurnResult', commands }
+ *   Input:  { type: 'generateTurn', requestId, state, playerId, difficulty }
+ *   Output: { type: 'generateTurnResult', requestId, commands }
  */
 
 // ─── Inline Hex Math ──────────────────────────────────────────────────────────
@@ -399,6 +399,7 @@ function findBestCityLocation(
 
 self.onmessage = function (e: MessageEvent) {
   const request = e.data;
+  const requestId: string = request.requestId ?? '';
 
   try {
     if (request.type === 'generateTurn') {
@@ -407,11 +408,13 @@ self.onmessage = function (e: MessageEvent) {
 
       self.postMessage({
         type: 'generateTurnResult',
+        requestId,
         commands,
       });
     } else {
       self.postMessage({
         type: 'error',
+        requestId,
         requestType: request.type,
         message: `Unknown request type: ${request.type}`,
       });
@@ -419,6 +422,7 @@ self.onmessage = function (e: MessageEvent) {
   } catch (err) {
     self.postMessage({
       type: 'error',
+      requestId,
       requestType: request.type ?? 'unknown',
       message: err instanceof Error ? err.message : String(err),
     });

@@ -200,6 +200,9 @@ export function createDefaultConfig(overrides?: Partial<GameConfig>): GameConfig
   const defaults: GameConfig = {
     version: 1,
     mode: 'single',
+    // NOTE: Date.now() here is fine — the seed is set once at game creation time
+    // and then the RNG state is tracked deterministically within GameState.
+    // Replay determinism depends on the seed value itself, not on how it was chosen.
     seed: Date.now(),
     difficulty: 'chieftain',
     speed: 'normal',

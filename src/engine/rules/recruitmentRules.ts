@@ -10,6 +10,7 @@ import type { GameState, EntityData, CityState, ProductionItem } from '../core/G
 import { hexKey, hexDistance, HEX_DIRECTIONS } from '../core/types';
 import { UNIT_TYPES, PLAYER_UNIT_IDS } from '../../data/units';
 import { BUILDINGS } from '../../data/buildings';
+import { nextEntityId } from '../core/idGenerator';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -40,10 +41,7 @@ function getEntityAtHex(state: GameState, hex: HexCoord): EntityData | null {
   return Object.values(state.entities).find((e) => hexKey(e.hex) === key) ?? null;
 }
 
-/** Generate a unique entity ID. */
-function generateEntityId(): EntityId {
-  return `unit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-}
+
 
 /** Check if a player can afford a cost. */
 function canAfford(state: GameState, playerId: PlayerId, cost: ResourceYield): boolean {
@@ -416,7 +414,7 @@ export function processRecruitment(
       }
     }
 
-    const newUnitId = generateEntityId();
+    const { state: stateWithEntityId, id: newUnitId } = nextEntityId(state);
     const newEntity: EntityData = {
       id: newUnitId,
       typeId: currentItem.id as UnitTypeId,
@@ -444,13 +442,13 @@ export function processRecruitment(
     const newQueue = city.productionQueue.slice(1);
 
     const newState: GameState = {
-      ...state,
+      ...stateWithEntityId,
       entities: {
-        ...state.entities,
+        ...stateWithEntityId.entities,
         [newUnitId]: newEntity,
       },
       cities: {
-        ...state.cities,
+        ...stateWithEntityId.cities,
         [cityId]: {
           ...city,
           productionQueue: newQueue,

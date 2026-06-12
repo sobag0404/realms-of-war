@@ -6,6 +6,9 @@
  * worker fails to initialize or throws an error.
  *
  * Uses the workerProtocol.ts message format for all communication.
+ * Every request includes a unique `requestId` that is echoed back in the
+ * response, allowing correct routing of concurrent requests of the same
+ * type without FIFO/prefix matching.
  */
 
 import type {
@@ -38,6 +41,7 @@ class WorkerManager {
       resolve: (value: unknown) => void;
       reject: (reason: unknown) => void;
       timeout: ReturnType<typeof setTimeout>;
+      workerType: WorkerType;
     }
   > = new Map();
   private requestCounter = 0;
@@ -125,9 +129,8 @@ class WorkerManager {
     }
 
     // Reject any pending requests for this worker type
-    const prefix = `${type}-`;
     for (const [requestId, pending] of this.pendingRequests) {
-      if (requestId.startsWith(prefix)) {
+      if (pending.workerType === type) {
         clearTimeout(pending.timeout);
         pending.reject(new Error(`Worker ${type} terminated`));
         this.pendingRequests.delete(requestId);
@@ -156,50 +159,34 @@ class WorkerManager {
    * Generate a unique request ID.
    */
   private nextRequestId(type: WorkerType): string {
-    return `${type}-${++this.requestCounter}`;
+    return `${type}-${++this.requestCounter}-${Date.now().toString(36)}`;
   }
 
   /**
-   * Handle incoming worker message, routing to the correct pending request.
+   * Handle incoming worker message, routing to the correct pending request
+   * by matching the `requestId` field in the response.
    */
   private handleWorkerMessage(data: PathfindingResponse | AiResponse | MapGenResponse | SimulationResponse | WorkerErrorResponse): void {
-    // We need to find the pending request. Since workers process one message at a time
-    // (first-in-first-out), we can match by worker type prefix and take the oldest.
-    // But we include the requestType in the response for disambiguation.
+    // Match the response to a pending request by requestId
+    const requestId = data.requestId;
 
-    const responseType = data.type;
-
-    // Find the matching pending request by looking at the response type
-    let matchedId: string | null = null;
-
-    for (const [requestId] of this.pendingRequests) {
-      // Match based on response type to request type mapping
-      if (
-        (responseType === 'findPathResult' && requestId.startsWith('pathfinding-')) ||
-        (responseType === 'generateTurnResult' && requestId.startsWith('ai-')) ||
-        (responseType === 'generateMapResult' && requestId.startsWith('mapgen-')) ||
-        (responseType === 'simulateResult' && requestId.startsWith('simulation-')) ||
-        (responseType === 'error')
-      ) {
-        if (matchedId === null) {
-          matchedId = requestId;
-          break; // Take the first (oldest) match
-        }
-      }
-    }
-
-    if (!matchedId) {
-      console.warn('[WorkerManager] Received response with no pending request:', responseType);
+    if (!requestId) {
+      // Defensive fallback: if a worker sends a response without a requestId
+      // (shouldn't happen after this fix), log a warning and skip.
+      console.warn('[WorkerManager] Received response without requestId:', data.type);
       return;
     }
 
-    const pending = this.pendingRequests.get(matchedId);
-    if (!pending) return;
+    const pending = this.pendingRequests.get(requestId);
+    if (!pending) {
+      console.warn('[WorkerManager] Received response with unknown requestId:', requestId);
+      return;
+    }
 
     clearTimeout(pending.timeout);
-    this.pendingRequests.delete(matchedId);
+    this.pendingRequests.delete(requestId);
 
-    if (responseType === 'error') {
+    if (data.type === 'error') {
       const errorData = data as WorkerErrorResponse;
       pending.reject(new Error(`Worker error (${errorData.requestType}): ${errorData.message}`));
     } else {
@@ -211,7 +198,7 @@ class WorkerManager {
    * Send a request to a worker and return a promise for the response.
    * Includes a timeout to prevent indefinite hangs.
    */
-  private sendRequest<T>(type: WorkerType, request: unknown, timeoutMs = 30000): Promise<T> {
+  private sendRequest<T>(type: WorkerType, request: Record<string, unknown>, timeoutMs = 30000): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const worker = this.getWorker(type);
 
@@ -221,6 +208,8 @@ class WorkerManager {
       }
 
       const requestId = this.nextRequestId(type);
+      // Attach requestId to the request message
+      request.requestId = requestId;
 
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(requestId);
@@ -231,6 +220,7 @@ class WorkerManager {
         resolve: resolve as (value: unknown) => void,
         reject,
         timeout,
+        workerType: type,
       });
 
       // Post the message to the worker
@@ -250,7 +240,7 @@ class WorkerManager {
     to: { q: number; r: number },
     movementPoints: number,
   ): Promise<PathfindingResponse> {
-    const request: PathfindingRequest = {
+    const request: Omit<PathfindingRequest, 'requestId'> = {
       type: 'findPath',
       tiles,
       from,
@@ -259,7 +249,7 @@ class WorkerManager {
     };
 
     try {
-      return await this.sendRequest<PathfindingResponse>('pathfinding', request);
+      return await this.sendRequest<PathfindingResponse>('pathfinding', request as Record<string, unknown>);
     } catch (error) {
       console.warn('[WorkerManager] Pathfinding worker failed, using sync fallback:', error);
       return this.syncPathfinding(request);
@@ -275,7 +265,7 @@ class WorkerManager {
     playerId: string,
     difficulty: string,
   ): Promise<AiResponse> {
-    const request: AiRequest = {
+    const request: Omit<AiRequest, 'requestId'> = {
       type: 'generateTurn',
       state,
       playerId,
@@ -283,7 +273,7 @@ class WorkerManager {
     };
 
     try {
-      return await this.sendRequest<AiResponse>('ai', request);
+      return await this.sendRequest<AiResponse>('ai', request as Record<string, unknown>);
     } catch (error) {
       console.warn('[WorkerManager] AI worker failed, using sync fallback:', error);
       return this.syncAiTurn(request);
@@ -300,7 +290,7 @@ class WorkerManager {
     seed: number,
     playerCount: number,
   ): Promise<MapGenResponse> {
-    const request: MapGenRequest = {
+    const request: Omit<MapGenRequest, 'requestId'> = {
       type: 'generateMap',
       width,
       height,
@@ -309,7 +299,7 @@ class WorkerManager {
     };
 
     try {
-      return await this.sendRequest<MapGenResponse>('mapgen', request);
+      return await this.sendRequest<MapGenResponse>('mapgen', request as Record<string, unknown>);
     } catch (error) {
       console.warn('[WorkerManager] Mapgen worker failed, using sync fallback:', error);
       return this.syncMapgen(request);
@@ -324,14 +314,14 @@ class WorkerManager {
     state: unknown,
     commands: unknown[],
   ): Promise<SimulationResponse> {
-    const request: SimulationRequest = {
+    const request: Omit<SimulationRequest, 'requestId'> = {
       type: 'simulate',
       state,
       commands,
     };
 
     try {
-      return await this.sendRequest<SimulationResponse>('simulation', request);
+      return await this.sendRequest<SimulationResponse>('simulation', request as Record<string, unknown>);
     } catch (error) {
       console.warn('[WorkerManager] Simulation worker failed, using sync fallback:', error);
       return this.syncSimulation(request);
@@ -343,8 +333,9 @@ class WorkerManager {
   /**
    * Synchronous fallback for pathfinding.
    * Re-implements simplified A* and reachable-hex computation inline.
+   * Generates a requestId so the caller can correlate if needed.
    */
-  private syncPathfinding(request: PathfindingRequest): PathfindingResponse {
+  private syncPathfinding(request: Omit<PathfindingRequest, 'requestId'>): PathfindingResponse {
     const { tiles, from, to, movementPoints } = request;
 
     // Inline terrain costs
@@ -469,14 +460,14 @@ class WorkerManager {
       }
     }
 
-    return { type: 'findPathResult', path, reachable };
+    return { type: 'findPathResult', requestId: '', path, reachable };
   }
 
   /**
    * Synchronous fallback for AI turn generation.
    * Uses the main-thread AiSystem.generateTurn.
    */
-  private syncAiTurn(request: AiRequest): AiResponse {
+  private syncAiTurn(request: Omit<AiRequest, 'requestId'>): AiResponse {
     try {
       const state = request.state as GameState;
       const playerId = request.playerId;
@@ -491,10 +482,10 @@ class WorkerManager {
       } as unknown as EventBus;
 
       const commands = AiSystem.generateTurn(state, playerId, noopEventBus);
-      return { type: 'generateTurnResult', commands };
+      return { type: 'generateTurnResult', requestId: '', commands };
     } catch (error) {
       console.error('[WorkerManager] Sync AI fallback failed:', error);
-      return { type: 'generateTurnResult', commands: [] };
+      return { type: 'generateTurnResult', requestId: '', commands: [] };
     }
   }
 
@@ -502,7 +493,7 @@ class WorkerManager {
    * Synchronous fallback for map generation.
    * Uses the main-thread generateMap function.
    */
-  private syncMapgen(request: MapGenRequest): MapGenResponse {
+  private syncMapgen(request: Omit<MapGenRequest, 'requestId'>): MapGenResponse {
     try {
       const result = generateMap({
         width: request.width,
@@ -512,6 +503,7 @@ class WorkerManager {
       });
       return {
         type: 'generateMapResult',
+        requestId: '',
         mapData: result.mapData,
         startingPositions: result.startingPositions,
       };
@@ -525,7 +517,7 @@ class WorkerManager {
    * Synchronous fallback for simulation.
    * Deep clones the state and applies commands sequentially.
    */
-  private syncSimulation(request: SimulationRequest): SimulationResponse {
+  private syncSimulation(request: Omit<SimulationRequest, 'requestId'>): SimulationResponse {
     try {
       // Simple synchronous simulation: deep clone + apply
       const state = JSON.parse(JSON.stringify(request.state));
@@ -538,6 +530,7 @@ class WorkerManager {
 
       return {
         type: 'simulateResult',
+        requestId: '',
         finalState: state,
         events,
       };
@@ -545,6 +538,7 @@ class WorkerManager {
       console.error('[WorkerManager] Sync simulation fallback failed:', error);
       return {
         type: 'simulateResult',
+        requestId: '',
         finalState: request.state,
         events: [],
       };

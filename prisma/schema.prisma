@@ -17,6 +17,10 @@ model SaveGame {
   players   String   // JSON stringified player names
   data      String   // JSON stringified GameState
   checksum  String   // FNV-1a checksum
+  ownerId   String   @default("local")
+  version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([ownerId, updatedAt])
 }

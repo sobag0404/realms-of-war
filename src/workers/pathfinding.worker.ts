@@ -7,8 +7,8 @@
  * All hex math and terrain costs are re-implemented inline.
  *
  * Message protocol:
- *   Input:  { type: 'findPath', tiles, from, to, movementPoints }
- *   Output: { type: 'findPathResult', path, reachable }
+ *   Input:  { type: 'findPath', requestId, tiles, from, to, movementPoints }
+ *   Output: { type: 'findPathResult', requestId, path, reachable }
  */
 
 // ─── Inline Hex Math ──────────────────────────────────────────────────────────
@@ -272,6 +272,7 @@ function findReachable(
 
 self.onmessage = function (e: MessageEvent) {
   const request = e.data;
+  const requestId: string = request.requestId ?? '';
 
   try {
     if (request.type === 'findPath') {
@@ -285,6 +286,7 @@ self.onmessage = function (e: MessageEvent) {
 
       const response = {
         type: 'findPathResult' as const,
+        requestId,
         path,
         reachable,
       };
@@ -292,6 +294,7 @@ self.onmessage = function (e: MessageEvent) {
     } else {
       self.postMessage({
         type: 'error',
+        requestId,
         requestType: request.type,
         message: `Unknown request type: ${request.type}`,
       });
@@ -299,6 +302,7 @@ self.onmessage = function (e: MessageEvent) {
   } catch (err) {
     self.postMessage({
       type: 'error',
+      requestId,
       requestType: request.type ?? 'unknown',
       message: err instanceof Error ? err.message : String(err),
     });

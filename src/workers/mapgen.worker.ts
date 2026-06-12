@@ -13,8 +13,8 @@
  * bundle. All noise generation and biome logic is re-implemented inline.
  *
  * Message protocol:
- *   Input:  { type: 'generateMap', width, height, seed, playerCount }
- *   Output: { type: 'generateMapResult', mapData }
+ *   Input:  { type: 'generateMap', requestId, width, height, seed, playerCount }
+ *   Output: { type: 'generateMapResult', requestId, mapData }
  */
 
 // ─── Seeded Noise (Perlin-style) ──────────────────────────────────────────────
@@ -401,6 +401,7 @@ function generateMap(width: number, height: number, seed: number, playerCount: n
 
 self.onmessage = function (e: MessageEvent) {
   const request = e.data;
+  const requestId: string = request.requestId ?? '';
 
   try {
     if (request.type === 'generateMap') {
@@ -414,12 +415,14 @@ self.onmessage = function (e: MessageEvent) {
 
       self.postMessage({
         type: 'generateMapResult',
+        requestId,
         mapData: { radius: mapData.radius, tiles: mapData.tiles },
         startingPositions: mapData.startingPositions,
       });
     } else {
       self.postMessage({
         type: 'error',
+        requestId,
         requestType: request.type,
         message: `Unknown request type: ${request.type}`,
       });
@@ -427,6 +430,7 @@ self.onmessage = function (e: MessageEvent) {
   } catch (err) {
     self.postMessage({
       type: 'error',
+      requestId,
       requestType: request.type ?? 'unknown',
       message: err instanceof Error ? err.message : String(err),
     });
