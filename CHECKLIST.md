@@ -252,7 +252,60 @@
 
 ---
 
+## 15. Техническое ревью (2026-06-12)
+
+> Полный текст: `docs/realms-of-war-ai-dev-review.md` | Секция GDD: §16
+
+### 15.1. P0 — Критичные (БЛОКЕРЫ)
+
+- [ ] Удалить XTransformPort reverse proxy из Caddyfile (SSRF/open proxy)
+- [ ] Убрать `ignoreBuildErrors: true` из next.config.ts
+- [ ] Включить `reactStrictMode: true` в next.config.ts
+- [ ] Save API: добавить auth/ownership (любой может CRUD любые saves)
+- [ ] Save API: добавить body size limit (DoS через большой JSON)
+- [ ] Save API: добавить Zod validation для request body/query params
+- [ ] Обновить Next.js до patched версии (GHSA-q4gf-8mx6-v5v3)
+
+### 15.2. P1 — Серьёзные
+
+- [ ] Добавить Vitest + typecheck script
+- [ ] Написать engine unit tests (hex, movement, combat, city, recruitment, research, save/load)
+- [ ] Ввести SaveService — единый путь save/load через engine SaveFile format
+- [ ] Save: checksum не пустой, load проверяет checksum
+- [ ] Save: сохранять gameConfig, commandLog, rngState
+- [ ] Save: load через deserializeSave/validateSave/applyMigrations
+- [ ] Детерминизм: убрать Math.random() из engine/rules (cityRules, recruitmentRules, AiDirector)
+- [ ] Детерминизм: убрать Date.now() из engine/rules (заменить на GameRng/counters)
+- [ ] Детерминизм: добавить nextEntitySeq/nextCitySeq в GameState
+- [ ] Worker protocol: добавить requestId в request/response
+- [ ] Worker: WorkerManager ищет pending request по requestId, не FIFO
+- [ ] ESLint: включить no-debugger, no-unreachable, no-empty, no-undef
+- [ ] ESLint: включить react-hooks/exhaustive-deps (warn)
+- [ ] ESLint: включить @typescript-eslint/no-unused-vars (warn)
+- [ ] Удалить placeholder `eventBus.on('event')` из GameProvider.tsx
+- [ ] Исправить Fortify: dispatch FortifyUnit вместо EndTurn в UnitPanel.tsx
+
+### 15.3. P2 — Средние
+
+- [ ] TerrainLayer: заменить cleanup useMemo на useEffect
+- [ ] TerrainLayer: не рендерить full HexMesh при активных chunks
+- [ ] TerrainLayer: lightweight interaction overlay для picking
+- [ ] Добавить root README.md (setup, команды, структура, security notes)
+- [ ] Добавить .env.example
+- [ ] Убрать hardcoded /home/z/my-project из scripts/mini-services
+- [ ] Prisma: dev-only query logging (production: error only)
+- [ ] Mini-service: усиленная path traversal защита (path.resolve + startsWith)
+- [ ] Settings: schema validation для localStorage значений
+- [ ] GameEngine: dispatch добавляет command в command log
+- [ ] GameEngine: processQueue не skip invalid commands silently
+- [ ] GameProvider: log/report AI invalid commands в dev mode
+- [ ] GitHub Actions CI (typecheck + lint + test + build)
+
+---
+
 ## 📊 Прогресс v0.1-alpha
+
+### Структурный прогресс (файлы существуют)
 
 ```
 Инфраструктура     ████████████████████ 100%  (8/8)
@@ -277,8 +330,25 @@ Rules→Engine       ███████████████████�
 Старт игры         ████████████████████ 100%  (4/4)
 UI Production      ████████████████████ 100%  (4/4)
 ────────────────────────────────────────────
-Общий прогресс     ████████████████████ 100%  (186/186)
+Структурный        ████████████████████ 100%  (186/186)
 ```
+
+### Инженерная зрелость (по результатам ревью)
+
+```
+Безопасность       ██░░░░░░░░░░░░░░░░░░  10%  (1/7 P0)
+Тесты              ░░░░░░░░░░░░░░░░░░░░   0%  (0/16 P1)
+Save consistency   ░░░░░░░░░░░░░░░░░░░░   0%  (0/6 P1)
+Детерминизм        ░░░░░░░░░░░░░░░░░░░░   0%  (0/4 P1)
+Worker protocol    ░░░░░░░░░░░░░░░░░░░░   0%  (0/3 P1)
+ESLint/TS strict   ░░░░░░░░░░░░░░░░░░░░   0%  (0/5 P1+P2)
+Документация       █░░░░░░░░░░░░░░░░░░░   5%  (0/2 P2)
+────────────────────────────────────────────
+Инженерная         █░░░░░░░░░░░░░░░░░░░   5%  (1/43)
+```
+
+> ⚠️ **Важно:** Структурный прогресс 100% означает что файлы существуют и код написан.
+> Инженерная зрелость отражает качество: безопасность, тесты, детерминизм, документация.
 
 ---
 
@@ -287,6 +357,7 @@ UI Production      ████████████████████ 
 | Что посмотреть | Где | Зачем |
 |---|---|---|
 | Полная спецификация | `docs/realms-of-war-design-spec.md` | Все правила, формулы, архитектура |
+| Техническое ревью | `docs/realms-of-war-ai-dev-review.md` | Результаты ревью 2026-06-12, P0/P1/P2 задачи |
 | Типы движка | `src/engine/core/types.ts` | Базовые типы игры |
 | Конфиг игры | `src/engine/core/GameConfig.ts` | Настройки карты, баланса |
 | Баланс юнитов | `src/data/units.ts` | Характеристики юнитов |

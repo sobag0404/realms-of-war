@@ -5529,3 +5529,115 @@ contentChecksum = sha256(stableSerialize({
 ```
 
 Friendly online lobby стартует только если `contentChecksum` совпадает у всех игроков.
+
+---
+
+## 16. Результаты технического ревью (2026-06-12)
+
+> Полный текст ревью: `docs/realms-of-war-ai-dev-review.md`
+
+### 16.1. Оценка ревьюера
+
+| Категория | Оценка /10 |
+|---|---:|
+| Идея и продуктовая ценность | 7 |
+| Архитектура | 6 |
+| Качество кода | 4 |
+| Безопасность | 2 |
+| Тесты | 0 |
+| Документация | 5 |
+| Производительность | 4 |
+| Поддерживаемость | 5 |
+| Готовность к продакшену | 1 |
+| Общий уровень проекта | 4 |
+
+### 16.2. Сильные стороны (подтверждённые ревьюером)
+
+- Хорошая доменная декомпозиция (engine/data/store/UI/rendering/workers/API)
+- Настоящий игровой engine-слой (GameEngine, Command pattern, EventBus)
+- Command pattern подходит для стратегии (replay, undo, save compatibility, потенциальный multiplayer)
+- Data-driven подход (баланс вынесен в src/data)
+- Worker infrastructure (pathfinding, mapgen, AI, simulation не блокируют main thread)
+- UI не выглядит пустой заглушкой (main menu, HUD, city panel, minimap, diplomacy, tech tree, recruitment)
+- Документация продукта (GDD, PROJECT_CONTEXT, CHECKLIST)
+
+### 16.3. Критичные проблемы P0
+
+| Проблема | Файлы | Суть |
+|---|---|---|
+| SSRF/open proxy через Caddy | `Caddyfile` | User-controlled query-параметр управляет портом reverse proxy |
+| Save API без auth/ownership | `src/app/api/*` | Любой может прочитать/удалить/создать saves |
+| Нет body size limit на `/api/save` | `src/app/api/save/route.ts` | DB/disk/memory DoS через большой JSON |
+| TypeScript errors игнорируются | `next.config.ts` | `ignoreBuildErrors: true` маскирует реальные ошибки |
+
+### 16.4. Серьёзные проблемы P1
+
+| Проблема | Файлы | Суть |
+|---|---|---|
+| Нет тестов engine/rules/save | весь проект | Любая правка может сломать правила незаметно |
+| Engine save-module не используется | `sessionSlice.ts`, API routes | SaveFile/checksum/rngState/commandLog не работают |
+| Детерминизм нарушен | `cityRules.ts`, `recruitmentRules.ts`, `AiDirector.ts`, `simulation.worker.ts` | `Math.random()` и `Date.now()` в game-state logic |
+| Worker responses без requestId | `workerProtocol.ts`, `workerManager.ts` | Конкурентные запросы могут получить чужой ответ |
+| ESLint обезврежен | `eslint.config.mjs` | Критичные правила выключены |
+| GameProvider placeholder | `GameProvider.tsx` | `eventBus.on('event')` — несуществующий event type |
+| Fortify вызывает EndTurn | `UnitPanel.tsx` | Кнопка Fortify фактически завершает ход |
+
+### 16.5. Средние проблемы P2
+
+| Проблема | Файлы | Суть |
+|---|---|---|
+| Terrain chunks + per-hex одновременно | `TerrainLayer.tsx` | Большие карты тормозят |
+| GPU cleanup через useMemo | `TerrainLayer.tsx` | Риск утечек geometries/materials |
+| Нет root README / .env.example | root | Сложный onboarding |
+| Hardcoded deploy paths | scripts, mini-services | Непереносимый деплой |
+| Prisma query logging всегда включён | `src/lib/db.ts` | Sensitive data может попасть в логи |
+| Mini-service path traversal защита слабая | `mini-services/game-server/index.ts` | Небезопасная обработка путей |
+| localStorage settings без validation | `settingsSlice.ts` | Повреждённые значения ломают UI |
+
+### 16.6. План доработки (согласно ревью)
+
+**День 1 — Emergency Hardening:**
+1. Удалить XTransformPort reverse proxy из Caddyfile
+2. Убрать ignoreBuildErrors из next.config.ts
+3. Включить reactStrictMode
+4. Исправить GameProvider placeholder
+5. Исправить UnitPanel Fortify
+6. Отключить Prisma query logging в production
+7. Добавить .env.example
+8. Добавить root README.md
+9. Добавить typecheck script
+10. Обновить Next.js до patched версии
+
+**3–5 дней — Базовая инженерная стабилизация:**
+1. Добавить Vitest
+2. Написать engine tests (hex, movement, combat, city, recruitment, research, save/load)
+3. Добавить Zod validation для API routes
+4. Ввести SaveService (единый путь save/load)
+5. Добавить worker requestId
+6. Исправить TerrainLayer cleanup
+7. Включить базовые ESLint rules
+8. Добавить GitHub Actions CI
+
+**1–2 недели — Production readiness:**
+1. Auth/owner модель или local-only saves
+2. Deterministic counters и RNG
+3. Playwright e2e
+4. Dependency audit
+5. Error boundaries
+
+### 16.7. Вопросы к владельцу проекта (от ревьюера)
+
+1. Saves должны быть локальными или cloud saves?
+2. Будут ли аккаунты пользователей?
+3. Игра single-player only, hotseat, или планируется multiplayer?
+4. Где проект должен деплоиться?
+5. SQLite — временно или production target?
+6. Нужно ли сохранять compatibility с текущими raw saves?
+7. Что важнее для ближайшего demo: gameplay stability, 3D visuals, AI или save/load?
+8. Нужно ли поддерживать RU/EN UI одинаково в alpha?
+9. Можно ли удалить mini-services, если не используются?
+10. Какие размеры карт целевые для performance?
+
+### 16.8. Ключевой вывод ревьюера
+
+> Проект не нужно переписывать с нуля. У него хорошая основа. Но нельзя продолжать наращивать features без стабилизации. Приоритет: security → build/typecheck → save/load → deterministic engine → tests → CI → rendering → UX cleanup → и только потом новые фичи.
