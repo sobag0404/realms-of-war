@@ -1,0 +1,2002 @@
+     1→     1→# Realms of War — техническое ревью и ТЗ для AI-разработчика
+     2→     2→
+     3→     3→**Проект:** `realms-of-war-main`  
+     4→     4→**Архив:** `realms-of-war-main.zip`  
+     5→     5→**Дата ревью:** 2026-06-12  
+     6→     6→**Формат ревью:** статический анализ ZIP-архива  
+     7→     7→**Роль ревьюера:** senior developer / architect / security reviewer / QA  
+     8→     8→
+     9→     9→---
+    10→    10→
+    11→    11→## 0. Важный контекст для AI-разработчика
+    12→    12→
+    13→    13→Этот файл предназначен как рабочее ТЗ для AI-разработчика/Codex. Его цель — не просто описать проблемы, а дать порядок исправлений, файлы, критерии приёмки и ограничения.
+    14→    14→
+    15→    15→Перед началом работы AI-разработчик должен прочитать:
+    16→    16→
+    17→    17→1. `PROJECT_CONTEXT.md`
+    18→    18→2. `CHECKLIST.md`
+    19→    19→3. `docs/realms-of-war-design-spec.md`
+    20→    20→4. `package.json`
+    21→    21→5. `next.config.ts`
+    22→    22→6. `eslint.config.mjs`
+    23→    23→7. `prisma/schema.prisma`
+    24→    24→8. `src/app/api/save/route.ts`
+    25→    25→9. `src/app/api/load/route.ts`
+    26→    26→10. `src/app/api/saves/route.ts`
+    27→    27→11. `src/store/slices/sessionSlice.ts`
+    28→    28→12. `src/engine/core/GameEngine.ts`
+    29→    29→13. `src/engine/save/saveGame.ts`
+    30→    30→14. `src/engine/save/loadGame.ts`
+    31→    31→15. `src/components/providers/GameProvider.tsx`
+    32→    32→16. `src/components/game3d/TerrainLayer.tsx`
+    33→    33→17. `src/workers/workerManager.ts`
+    34→    34→18. `Caddyfile`
+    35→    35→
+    36→    36→**Критически важно:** не начинать с добавления новых игровых фич. Сначала закрыть безопасность, сборку, сохранения, тесты и детерминизм.
+    37→    37→
+    38→    38→---
+    39→    39→
+    40→    40→## 1. Краткий вердикт
+    41→    41→
+    42→    42→`Realms of War` — амбициозный alpha-прототип fantasy 4X/TBS-игры на **Next.js + TypeScript + React Three Fiber + Zustand + Prisma/SQLite**.
+    43→    43→
+    44→    44→Проект выглядит значительно серьёзнее обычного учебного CRUD: есть игровой engine, hex-математика, ECS-подход, command pattern, EventBus, mapgen, AI, workers, 3D-рендеринг, HUD, save/load, GDD и project context.
+    45→    45→
+    46→    46→Но по engineering discipline проект пока не production-ready. Основные блокеры:
+    47→    47→
+    48→    48→- публичные save/load/delete API без авторизации и ownership;
+    49→    49→- опасный Caddy reverse proxy через query-параметр `XTransformPort`;
+    50→    50→- `next.config.ts` игнорирует TypeScript build errors;
+    51→    51→- ESLint фактически обезврежен;
+    52→    52→- реальных тестов нет;
+    53→    53→- save/load в UI/API обходит engine-level save-модуль;
+    54→    54→- детерминизм заявлен в архитектуре, но нарушен через `Math.random()` и `Date.now()` в engine/rules/workers;
+    55→    55→- есть placeholders в пользовательских действиях;
+    56→    56→- нет полноценного root `README.md`, `.env.example`, CI/CD и production-инструкции.
+    57→    57→
+    58→    58→**Текущий уровень:** сильный WIP/alpha-прототип, ближе к `junior+ / middle-` по зрелости реализации. Архитектурная задумка местами тянет на `middle/middle+`, но безопасность, тесты, build discipline и deploy-подход ниже production-уровня.
+    59→    59→
+    60→    60→---
+    61→    61→
+    62→    62→## 2. Объём изученного проекта
+    63→    63→
+    64→    64→Статически изучено:
+    65→    65→
+    66→    66→- **251 файл** в архиве;
+    67→    67→- **199 TypeScript/TSX файлов** в `src`;
+    68→    68→- примерно **40 281 строка TypeScript/TSX**;
+    69→    69→- основные зоны:
+    70→    70→  - `src/engine` — около 16k строк;
+    71→    71→  - `src/components` — около 13.7k строк;
+    72→    72→  - `src/data` — около 3.5k строк;
+    73→    73→  - `src/rendering` — около 2.6k строк;
+    74→    74→  - `src/workers` — около 2.3k строк;
+    75→    75→  - `src/store` — около 1.1k строк;
+    76→    76→  - `src/app` — около 237 строк.
+    77→    77→
+    78→    78→Не было подтверждено фактическим запуском:
+    79→    79→
+    80→    80→- `bun install`;
+    81→    81→- `bun run build`;
+    82→    82→- `bun run lint`;
+    83→    83→- `bunx tsc --noEmit`;
+    84→    84→- browser smoke test;
+    85→    85→- Prisma migration/apply;
+    86→    86→- runtime save/load.
+    87→    87→
+    88→    88→Причина: анализ выполнялся по ZIP без установленного окружения и `node_modules`. Все выводы по сборке — статические, по конфигам и коду.
+    89→    89→
+    90→    90→---
+    91→    91→
+    92→    92→## 3. Итоговая оценка
+    93→    93→
+    94→    94→| Категория | Оценка /10 | Комментарий |
+    95→    95→|---|---:|---|
+    96→    96→| Идея и продуктовая ценность | 7 | Понятная fantasy 4X/TBS-идея. Есть GDD, core loop, data configs. Нужна фокусировка MVP. |
+    97→    97→| Архитектура | 6 | Слои в целом есть: engine/data/store/UI/rendering/workers/API. Но есть несостыковки между engine save и API save, worker protocol и worker manager, UI actions и commands. |
+    98→    98→| Качество кода | 4 | Есть сильные модули, но много masking-подходов: выключены TS/ESLint checks, placeholders, silent catches, hardcoded deploy paths. |
+    99→    99→| Безопасность | 2 | Save API публичные, Caddy SSRF/open-proxy риск, нет auth/rate limit/body limit/schema validation. |
+   100→   100→| Тесты | 0 | Реальных unit/integration/e2e тестов не найдено. |
+   101→   101→| Документация | 5 | Есть GDD и `PROJECT_CONTEXT.md`, но нет нормального root README, env-документации и production runbook. |
+   102→   102→| Производительность | 4 | Есть workers и chunked rendering, но terrain фактически рендерится неэффективно на больших картах, есть риск GPU leaks. |
+   103→   103→| Поддерживаемость | 5 | Структура поддерживаемая, но отсутствие тестов/CI/strict checks быстро приведёт к деградации. |
+   104→   104→| Готовность к продакшену | 1 | Публично запускать нельзя. |
+   105→   105→| Общий уровень проекта | 4 | Сильный alpha-прототип, слабый production-hardening. |
+   106→   106→
+   107→   107→**Готовность к показу клиенту:** только как WIP/alpha demo.  
+   108→   108→**Готовность к инвестору:** можно показывать идею и демо, но честно обозначать technical debt.  
+   109→   109→**Готовность к работодателю:** можно показывать как амбициозный pet project, если рядом есть список известных проблем и план исправлений.  
+   110→   110→**Готовность к production:** нет.  
+   111→   111→**Готовность к коммерческому использованию:** нет.
+   112→   112→
+   113→   113→---
+   114→   114→
+   115→   115→## 4. Сильные стороны проекта
+   116→   116→
+   117→   117→### 4.1. Хорошая доменная декомпозиция
+   118→   118→
+   119→   119→Сильные директории:
+   120→   120→
+   121→   121→```text
+   122→   122→src/engine/
+   123→   123→src/data/
+   124→   124→src/store/
+   125→   125→src/components/game3d/
+   126→   126→src/components/hud/
+   127→   127→src/components/screens/
+   128→   128→src/rendering/
+   129→   129→src/workers/
+   130→   130→prisma/
+   131→   131→docs/
+   132→   132→```
+   133→   133→
+   134→   134→Это уже не хаотичный single-file prototype. Проект пытается отделять правила игры от UI, состояние от рендера, данные баланса от логики.
+   135→   135→
+   136→   136→### 4.2. Есть настоящий игровой engine-слой
+   137→   137→
+   138→   138→`src/engine/core/GameEngine.ts` — правильная идея: внешний код dispatch-ит команды, engine валидирует и применяет их.
+   139→   139→
+   140→   140→Хорошо:
+   141→   141→
+   142→   142→- `dispatch(command)`;
+   143→   143→- `validate(command)`;
+   144→   144→- `setState(state)` для save/load;
+   145→   145→- `EventBus`;
+   146→   146→- `CommandQueue`;
+   147→   147→- delegation в `rules` и `systems`.
+   148→   148→
+   149→   149→### 4.3. Command pattern подходит для стратегии
+   150→   150→
+   151→   151→`src/engine/core/CommandQueue.ts` описывает сериализуемые команды:
+   152→   152→
+   153→   153→- `MoveUnit`;
+   154→   154→- `Attack`;
+   155→   155→- `FoundCity`;
+   156→   156→- `BuildBuilding`;
+   157→   157→- `RecruitUnit`;
+   158→   158→- `ResearchTechnology`;
+   159→   159→- `ChangeDiplomacy`;
+   160→   160→- `EndTurn`;
+   161→   161→- `FortifyUnit`;
+   162→   162→- `BuildImprovement`;
+   163→   163→- `SellResource`;
+   164→   164→- `BuyResource`.
+   165→   165→
+   166→   166→Это правильная база для replay, undo, save compatibility и потенциального multiplayer.
+   167→   167→
+   168→   168→### 4.4. Data-driven подход
+   169→   169→
+   170→   170→Баланс вынесен в `src/data`:
+   171→   171→
+   172→   172→- `units.ts`;
+   173→   173→- `buildings.ts`;
+   174→   174→- `technologies.ts`;
+   175→   175→- `resources.ts`;
+   176→   176→- `terrain.ts`;
+   177→   177→- `biomes.ts`;
+   178→   178→- `difficulty.ts`;
+   179→   179→- `hotkeys.ts`;
+   180→   180→- `localization/ru.ts`;
+   181→   181→- `localization/en.ts`.
+   182→   182→
+   183→   183→Для 4X/TBS это правильнее, чем hardcode в UI.
+   184→   184→
+   185→   185→### 4.5. Есть worker infrastructure
+   186→   186→
+   187→   187→`src/workers` содержит:
+   188→   188→
+   189→   189→- `pathfinding.worker.ts`;
+   190→   190→- `mapgen.worker.ts`;
+   191→   191→- `ai.worker.ts`;
+   192→   192→- `simulation.worker.ts`;
+   193→   193→- `workerManager.ts`;
+   194→   194→- `workerProtocol.ts`.
+   195→   195→
+   196→   196→Идея верная: pathfinding, map generation, AI и simulation не должны блокировать main thread.
+   197→   197→
+   198→   198→### 4.6. UI не выглядит пустой заглушкой
+   199→   199→
+   200→   200→Есть:
+   201→   201→
+   202→   202→- main menu;
+   203→   203→- new game screen;
+   204→   204→- settings;
+   205→   205→- HUD;
+   206→   206→- resource bar;
+   207→   207→- turn panel;
+   208→   208→- city panel;
+   209→   209→- unit panel;
+   210→   210→- minimap;
+   211→   211→- diplomacy screen;
+   212→   212→- tech tree;
+   213→   213→- recruitment screen.
+   214→   214→
+   215→   215→Для alpha-прототипа это хороший объём.
+   216→   216→
+   217→   217→### 4.7. Есть документация продукта
+   218→   218→
+   219→   219→`docs/realms-of-war-design-spec.md`, `PROJECT_CONTEXT.md`, `CHECKLIST.md` дают много контекста. Это помогает AI-разработчику и человеку быстрее понять намерение проекта.
+   220→   220→
+   221→   221→---
+   222→   222→
+   223→   223→## 5. Главные слабые места
+   224→   224→
+   225→   225→### 5.1. TypeScript build errors игнорируются
+   226→   226→
+   227→   227→Файл: `next.config.ts`
+   228→   228→
+   229→   229→```ts
+   230→   230→const nextConfig: NextConfig = {
+   231→   231→  output: "standalone",
+   232→   232→  typescript: {
+   233→   233→    ignoreBuildErrors: true,
+   234→   234→  },
+   235→   235→  reactStrictMode: false,
+   236→   236→  allowedDevOrigins: ["21.0.15.156"],
+   237→   237→};
+   238→   238→```
+   239→   239→
+   240→   240→Проблема:
+   241→   241→
+   242→   242→- production build может проходить со сломанной типизацией;
+   243→   243→- реальные ошибки маскируются;
+   244→   244→- AI-разработчик может добавлять несовместимый код, а проект всё равно “соберётся”.
+   245→   245→
+   246→   246→Найден пример, который likely должен ловиться типизацией:
+   247→   247→
+   248→   248→Файл: `src/components/providers/GameProvider.tsx`
+   249→   249→
+   250→   250→```ts
+   251→   251→const unsubKilled = eventBus.on('event') as () => void; // placeholder
+   252→   252→```
+   253→   253→
+   254→   254→`'event'` не входит в `GameEventType`. Это placeholder, замаскированный отключёнными проверками.
+   255→   255→
+   256→   256→### 5.2. ESLint обезврежен
+   257→   257→
+   258→   258→Файл: `eslint.config.mjs`
+   259→   259→
+   260→   260→Выключены правила:
+   261→   261→
+   262→   262→```js
+   263→   263→"@typescript-eslint/no-explicit-any": "off",
+   264→   264→"@typescript-eslint/no-unused-vars": "off",
+   265→   265→"react-hooks/exhaustive-deps": "off",
+   266→   266→"no-console": "off",
+   267→   267→"no-debugger": "off",
+   268→   268→"no-empty": "off",
+   269→   269→"no-undef": "off",
+   270→   270→"no-unreachable": "off",
+   271→   271→```
+   272→   272→
+   273→   273→Это не просто “ослабленный lint”. Это почти отсутствие safety net.
+   274→   274→
+   275→   275→### 5.3. Реальных тестов нет
+   276→   276→
+   277→   277→Не найдено:
+   278→   278→
+   279→   279→- `*.test.ts`;
+   280→   280→- `*.spec.ts`;
+   281→   281→- `__tests__`;
+   282→   282→- Vitest/Jest config;
+   283→   283→- Playwright config;
+   284→   284→- test script в `package.json`.
+   285→   285→
+   286→   286→Для game engine это критично: правила движения, боя, экономики, исследований и save/load легко сломать незаметно.
+   287→   287→
+   288→   288→### 5.4. Save/load архитектура раздвоена
+   289→   289→
+   290→   290→Есть хороший engine-level модуль:
+   291→   291→
+   292→   292→- `src/engine/save/saveGame.ts`;
+   293→   293→- `src/engine/save/loadGame.ts`;
+   294→   294→- `src/engine/save/migrations.ts`.
+   295→   295→
+   296→   296→Он поддерживает:
+   297→   297→
+   298→   298→- `SaveFile.version`;
+   299→   299→- `timestamp`;
+   300→   300→- `gameState`;
+   301→   301→- `gameConfig`;
+   302→   302→- `commandLog`;
+   303→   303→- `rngState`;
+   304→   304→- checksum;
+   305→   305→- migrations.
+   306→   306→
+   307→   307→Но фактический UI/API save его не использует.
+   308→   308→
+   309→   309→Файл: `src/store/slices/sessionSlice.ts`
+   310→   310→
+   311→   311→```ts
+   312→   312→body: JSON.stringify({
+   313→   313→  name: saveName,
+   314→   314→  turn: gameState.turn,
+   315→   315→  players: playerNames,
+   316→   316→  data: JSON.stringify(gameState),
+   317→   317→  checksum: '',
+   318→   318→}),
+   319→   319→```
+   320→   320→
+   321→   321→Проблема:
+   322→   322→
+   323→   323→- checksum пустой;
+   324→   324→- `SaveFile` не используется;
+   325→   325→- `gameConfig` не сохраняется полностью;
+   326→   326→- `commandLog` не сохраняется;
+   327→   327→- `rngState` не сохраняется;
+   328→   328→- migrations не используются;
+   329→   329→- engine reconstruct в `loadGame` собирает config приблизительно.
+   330→   330→
+   331→   331→### 5.5. Публичные API сохранений небезопасны
+   332→   332→
+   333→   333→Файлы:
+   334→   334→
+   335→   335→- `src/app/api/save/route.ts`
+   336→   336→- `src/app/api/load/route.ts`
+   337→   337→- `src/app/api/saves/route.ts`
+   338→   338→
+   339→   339→Проблемы:
+   340→   340→
+   341→   341→- нет auth;
+   342→   342→- нет owner/user/session ID;
+   343→   343→- нет проверки владельца сохранения;
+   344→   344→- `GET /api/saves` отдаёт все сохранения;
+   345→   345→- `GET /api/load?id=...` читает любое сохранение;
+   346→   346→- `DELETE /api/load?id=...` удаляет любое сохранение;
+   347→   347→- `POST /api/save` пишет произвольный JSON в БД;
+   348→   348→- нет body size limit;
+   349→   349→- нет Zod validation;
+   350→   350→- нет rate limit.
+   351→   351→
+   352→   352→### 5.6. Caddyfile содержит SSRF/open proxy риск
+   353→   353→
+   354→   354→Файл: `Caddyfile`
+   355→   355→
+   356→   356→```caddy
+   357→   357→@transform_port_query {
+   358→   358→  query XTransformPort=*
+   359→   359→}
+   360→   360→
+   361→   361→handle @transform_port_query {
+   362→   362→  reverse_proxy localhost:{query.XTransformPort} {
+   363→   363→    header_up Host {host}
+   364→   364→    header_up X-Forwarded-For {remote_host}
+   365→   365→    header_up X-Forwarded-Proto {scheme}
+   366→   366→    header_up X-Real-IP {remote_host}
+   367→   367→  }
+   368→   368→}
+   369→   369→```
+   370→   370→
+   371→   371→Проблема: пользовательский query-параметр управляет локальным портом reverse proxy. Это потенциальный SSRF/open local proxy.
+   372→   372→
+   373→   373→### 5.7. Детерминизм нарушен
+   374→   374→
+   375→   375→Архитектурная цель из `PROJECT_CONTEXT.md`:
+   376→   376→
+   377→   377→> один seed + один список команд = одно состояние
+   378→   378→
+   379→   379→Но в engine/rules/workers используются `Date.now()` и `Math.random()`:
+   380→   380→
+   381→   381→- `src/engine/core/GameConfig.ts` — default seed через `Date.now()`;
+   382→   382→- `src/engine/rules/cityRules.ts` — city id через `Date.now()` + `Math.random()`;
+   383→   383→- `src/engine/rules/recruitmentRules.ts` — unit id через `Date.now()` + `Math.random()`;
+   384→   384→- `src/engine/ai/AiDirector.ts` — mistake probability через `Math.random()`;
+   385→   385→- `src/workers/simulation.worker.ts` — city/unit ids через `Date.now()` + `Math.random()`;
+   386→   386→- `src/components/screens/NewGameScreen.tsx` — seed через `Date.now()`.
+   387→   387→
+   388→   388→UI/audio particles могут использовать `Math.random()` — это нормально, если не влияет на game state. Но engine/rules/simulation — нельзя.
+   389→   389→
+   390→   390→### 5.8. Worker protocol не содержит requestId
+   391→   391→
+   392→   392→Файлы:
+   393→   393→
+   394→   394→- `src/workers/workerProtocol.ts`
+   395→   395→- `src/workers/workerManager.ts`
+   396→   396→
+   397→   397→`WorkerManager` создаёт `requestId`, но не отправляет его в worker message и не получает обратно в response. Ответы мапятся по типу и FIFO:
+   398→   398→
+   399→   399→```ts
+   400→   400→for (const [requestId] of this.pendingRequests) {
+   401→   401→  if (
+   402→   402→    (responseType === 'findPathResult' && requestId.startsWith('pathfinding-')) ||
+   403→   403→    ...
+   404→   404→  ) {
+   405→   405→    matchedId = requestId;
+   406→   406→    break;
+   407→   407→  }
+   408→   408→}
+   409→   409→```
+   410→   410→
+   411→   411→Это хрупко для конкурентных запросов одного типа. Правильно: request/response должны содержать `requestId`.
+   412→   412→
+   413→   413→### 5.9. Terrain chunk rendering реализован неполно
+   414→   414→
+   415→   415→Файл: `src/components/game3d/TerrainLayer.tsx`
+   416→   416→
+   417→   417→При больших картах строятся chunks:
+   418→   418→
+   419→   419→```tsx
+   420→   420→{terrainChunks.length > 0 && (
+   421→   421→  <ChunkedTerrain chunks={terrainChunks} />
+   422→   422→)}
+   423→   423→```
+   424→   424→
+   425→   425→Но затем всё равно рендерятся индивидуальные `HexMesh` для всех tiles:
+   426→   426→
+   427→   427→```tsx
+   428→   428→{tiles.map((tile) => {
+   429→   429→  return (
+   430→   430→    <group key={key}>
+   431→   431→      <HexMesh ... />
+   432→   432→    </group>
+   433→   433→  );
+   434→   434→})}
+   435→   435→```
+   436→   436→
+   437→   437→То есть оптимизация частично нивелирована.
+   438→   438→
+   439→   439→Плюс cleanup сделан через `useMemo`, а не `useEffect`:
+   440→   440→
+   441→   441→```tsx
+   442→   442→useMemo(() => {
+   443→   443→  return () => {
+   444→   444→    if (terrainChunks.length > 0) {
+   445→   445→      disposeChunks(terrainChunks);
+   446→   446→    }
+   447→   447→  };
+   448→   448→}, [terrainChunks]);
+   449→   449→```
+   450→   450→
+   451→   451→Возвращаемая функция из `useMemo` не является React cleanup. Это риск GPU/resource leaks.
+   452→   452→
+   453→   453→### 5.10. UI содержит placeholder-действия
+   454→   454→
+   455→   455→Файл: `src/components/hud/UnitPanel.tsx`
+   456→   456→
+   457→   457→```ts
+   458→   458→const handleFortify = useCallback(() => {
+   459→   459→  if (!isOwnedByActive) return;
+   460→   460→  dispatchCommand({
+   461→   461→    type: 'EndTurn', // placeholder — real fortify command would be different
+   462→   462→    playerId: activePlayerId,
+   463→   463→  });
+   464→   464→}, [dispatchCommand, activePlayerId, isOwnedByActive]);
+   465→   465→```
+   466→   466→
+   467→   467→Кнопка Fortify фактически завершает ход. Это прямой UX/gameplay bug.
+   468→   468→
+   469→   469→### 5.11. Deploy scripts завязаны на конкретную среду
+   470→   470→
+   471→   471→Файлы:
+   472→   472→
+   473→   473→- `.zscripts/build.sh`;
+   474→   474→- `.zscripts/start.sh`;
+   475→   475→- `start-game.sh`;
+   476→   476→- `watchdog.sh`;
+   477→   477→- `mini-services/game-server/index.ts`.
+   478→   478→
+   479→   479→Примеры:
+   480→   480→
+   481→   481→```bash
+   482→   482→NEXTJS_PROJECT_DIR="/home/z/my-project"
+   483→   483→```
+   484→   484→
+   485→   485→```bash
+   486→   486→cd /home/z/my-project/mini-services/game-server
+   487→   487→```
+   488→   488→
+   489→   489→```ts
+   490→   490→const PUBLIC_DIR = '/home/z/my-project/public';
+   491→   491→```
+   492→   492→
+   493→   493→Это не переносимо и не production-friendly.
+   494→   494→
+   495→   495→---
+   496→   496→
+   497→   497→## 6. Критичные проблемы P0/P1/P2
+   498→   498→
+   499→   499→| Приоритет | Проблема | Файлы | Почему опасно | Как исправить |
+   500→   500→|---|---|---|---|---|
+   501→   501→| P0 | User-controlled Caddy reverse proxy | `Caddyfile` | SSRF/open proxy на localhost-порты | Удалить `XTransformPort` handler. Оставить фиксированный `reverse_proxy 127.0.0.1:3000`. |
+   502→   502→| P0 | Save/load/delete API без auth/ownership | `src/app/api/*` | Любой может прочитать/удалить/создать saves | Добавить auth/session/ownerId или сделать saves strictly local-only. |
+   503→   503→| P0 | Нет body size limit на `/api/save` | `src/app/api/save/route.ts` | DB/disk/memory DoS через большой JSON | Добавить лимит payload, Zod validation, rate limit. |
+   504→   504→| P0 | TypeScript errors игнорируются | `next.config.ts` | Broken code может уйти в build | Убрать `ignoreBuildErrors`, исправить TS errors. |
+   505→   505→| P1 | Нет тестов engine/rules/save | весь проект | Любая правка может сломать правила игры | Добавить Vitest unit tests + Playwright smoke tests. |
+   506→   506→| P1 | Engine save-module не используется | `sessionSlice.ts`, API routes | Save compatibility, checksum, rng, commandLog не работают | Сделать единый `SaveService`. |
+   507→   507→| P1 | Детерминизм нарушен | `cityRules.ts`, `recruitmentRules.ts`, `AiDirector.ts`, `simulation.worker.ts` | Replay/save/network sync невозможны | Перевести IDs/random на `GameRng` и counters в `GameState`. |
+   508→   508→| P1 | Worker responses без requestId | `workerProtocol.ts`, `workerManager.ts`, workers | Конкурентные запросы могут получить чужой ответ | Добавить `requestId` в request/response protocol. |
+   509→   509→| P1 | ESLint выключает критичные правила | `eslint.config.mjs` | Ошибки hooks/dead code/unreachable остаются | Включать правила поэтапно. |
+   510→   510→| P1 | `GameProvider` placeholder event subscription | `GameProvider.tsx` | Маскированная TS/runtime проблема | Удалить `eventBus.on('event')`; оставить конкретный `UnitKilled`. |
+   511→   511→| P1 | `UnitPanel` Fortify вызывает EndTurn | `UnitPanel.tsx` | Пользовательская кнопка делает не то действие | Dispatch `FortifyUnit`. |
+   512→   512→| P2 | Terrain chunks + per-hex rendering одновременно | `TerrainLayer.tsx` | Большие карты будут тормозить | Разделить visual chunk layer и interaction overlay. |
+   513→   513→| P2 | GPU cleanup через `useMemo` | `TerrainLayer.tsx` | Риск утечек geometries/materials | Использовать `useEffect` cleanup. |
+   514→   514→| P2 | Нет root README / `.env.example` | root | Сложный onboarding | Добавить setup docs. |
+   515→   515→| P2 | Hardcoded deploy paths | scripts, mini-services | Непереносимый деплой | Перейти на relative paths/env vars. |
+   516→   516→
+   517→   517→---
+   518→   518→
+   519→   519→## 7. Security review
+   520→   520→
+   521→   521→### 7.1. Критичные security-риски
+   522→   522→
+   523→   523→#### 7.1.1. SSRF/open proxy через Caddy
+   524→   524→
+   525→   525→**Файл:** `Caddyfile`
+   526→   526→
+   527→   527→Текущий код позволяет клиенту задать порт:
+   528→   528→
+   529→   529→```caddy
+   530→   530→reverse_proxy localhost:{query.XTransformPort}
+   531→   531→```
+   532→   532→
+   533→   533→**Сценарий атаки:**
+   534→   534→
+   535→   535→1. Атакующий отправляет запрос с `?XTransformPort=12345`.
+   536→   536→2. Caddy проксирует на `localhost:12345`.
+   537→   537→3. Если на localhost есть internal service/admin/debug endpoint, он может быть доступен извне через Caddy.
+   538→   538→
+   539→   539→**Что сделать:**
+   540→   540→
+   541→   541→```caddy
+   542→   542→:81 {
+   543→   543→  encode zstd gzip
+   544→   544→
+   545→   545→  header {
+   546→   546→    X-Content-Type-Options "nosniff"
+   547→   547→    X-Frame-Options "DENY"
+   548→   548→    Referrer-Policy "strict-origin-when-cross-origin"
+   549→   549→  }
+   550→   550→
+   551→   551→  reverse_proxy 127.0.0.1:3000 {
+   552→   552→    header_up Host {host}
+   553→   553→    header_up X-Forwarded-For {remote_host}
+   554→   554→    header_up X-Forwarded-Proto {scheme}
+   555→   555→    header_up X-Real-IP {remote_host}
+   556→   556→  }
+   557→   557→}
+   558→   558→```
+   559→   559→
+   560→   560→Если нужен transform proxy для dev-инфраструктуры — вынести его в отдельный dev-only Caddyfile, не в production.
+   561→   561→
+   562→   562→#### 7.1.2. Save API без ownership
+   563→   563→
+   564→   564→**Файлы:**
+   565→   565→
+   566→   566→- `src/app/api/save/route.ts`
+   567→   567→- `src/app/api/load/route.ts`
+   568→   568→- `src/app/api/saves/route.ts`
+   569→   569→- `prisma/schema.prisma`
+   570→   570→
+   571→   571→Текущая Prisma model:
+   572→   572→
+   573→   573→```prisma
+   574→   574→model SaveGame {
+   575→   575→  id        String   @id @default(cuid())
+   576→   576→  name      String
+   577→   577→  turn      Int
+   578→   578→  players   String
+   579→   579→  data      String
+   580→   580→  checksum  String
+   581→   581→  createdAt DateTime @default(now())
+   582→   582→  updatedAt DateTime @updatedAt
+   583→   583→}
+   584→   584→```
+   585→   585→
+   586→   586→Нет владельца.
+   587→   587→
+   588→   588→**Минимальный production-вариант:**
+   589→   589→
+   590→   590→```prisma
+   591→   591→model User {
+   592→   592→  id        String     @id @default(cuid())
+   593→   593→  email     String?    @unique
+   594→   594→  name      String?
+   595→   595→  saves     SaveGame[]
+   596→   596→  createdAt DateTime   @default(now())
+   597→   597→  updatedAt DateTime   @updatedAt
+   598→   598→}
+   599→   599→
+   600→   600→model SaveGame {
+   601→   601→  id        String   @id @default(cuid())
+   602→   602→  ownerId   String
+   603→   603→  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+   604→   604→  name      String
+   605→   605→  turn      Int
+   606→   606→  players   String
+   607→   607→  data      String
+   608→   608→  checksum  String
+   609→   609→  version   Int      @default(1)
+   610→   610→  createdAt DateTime @default(now())
+   611→   611→  updatedAt DateTime @updatedAt
+   612→   612→
+   613→   613→  @@index([ownerId, updatedAt])
+   614→   614→}
+   615→   615→```
+   616→   616→
+   617→   617→Если проект должен быть strictly local single-player, то лучше вообще убрать server-side saves и хранить saves в IndexedDB/local file export. Но если приложение публичное и API остаются — нужен owner.
+   618→   618→
+   619→   619→#### 7.1.3. Нет body limit и schema validation
+   620→   620→
+   621→   621→Текущий endpoint:
+   622→   622→
+   623→   623→```ts
+   624→   624→const body = await request.json();
+   625→   625→const { name, turn, players, data, checksum } = body;
+   626→   626→```
+   627→   627→
+   628→   628→Нужно:
+   629→   629→
+   630→   630→- ограничить body size;
+   631→   631→- валидировать `name`, `turn`, `players`, `data`, `checksum`, `version`;
+   632→   632→- reject unknown format;
+   633→   633→- reject huge saves;
+   634→   634→- reject malformed JSON;
+   635→   635→- validate loaded save through engine save module.
+   636→   636→
+   637→   637→Пример направления:
+   638→   638→
+   639→   639→```ts
+   640→   640→import { z } from 'zod';
+   641→   641→
+   642→   642→const MAX_SAVE_BYTES = 2_000_000;
+   643→   643→
+   644→   644→const SavePayloadSchema = z.object({
+   645→   645→  name: z.string().trim().min(1).max(80),
+   646→   646→  turn: z.number().int().min(0).max(100_000),
+   647→   647→  players: z.string().max(500),
+   648→   648→  data: z.string().min(2).max(MAX_SAVE_BYTES),
+   649→   649→  checksum: z.string().regex(/^[a-f0-9]{8}$/i),
+   650→   650→  version: z.number().int().min(1).max(100).optional(),
+   651→   651→});
+   652→   652→```
+   653→   653→
+   654→   654→Важно: FNV checksum не является security mechanism. Он годится для accidental corruption, но не для защиты от malicious tampering.
+   655→   655→
+   656→   656→### 7.2. Серьёзные security-риски
+   657→   657→
+   658→   658→#### 7.2.1. Prisma query logging всегда включён
+   659→   659→
+   660→   660→**Файл:** `src/lib/db.ts`
+   661→   661→
+   662→   662→```ts
+   663→   663→new PrismaClient({
+   664→   664→  log: ['query'],
+   665→   665→})
+   666→   666→```
+   667→   667→
+   668→   668→В production SQL-запросы и потенциально чувствительные данные могут попасть в логи. Исправить:
+   669→   669→
+   670→   670→```ts
+   671→   671→new PrismaClient({
+   672→   672→  log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
+   673→   673→});
+   674→   674→```
+   675→   675→
+   676→   676→#### 7.2.2. Next.js lock version требует security update
+   677→   677→
+   678→   678→В `bun.lock` фактически зафиксирован `next@16.1.3`. Для Next.js есть GitHub advisory `GHSA-q4gf-8mx6-v5v3`: affected range включает `>=16.0.0-beta.0 <16.2.3`, patched version — `16.2.3`.
+   679→   679→
+   680→   680→На практике лучше обновляться до актуальной patched 16.x-версии и прогонять полный regression test.
+   681→   681→
+   682→   682→Также в `package.json` указан `next-auth: ^4.24.11`, а в `bun.lock` фактически стоит `next-auth@4.24.13`. Advisory `GHSA-5jpx-9hw9-2fx4` затрагивает `<4.24.12`; lock уже выше, но manifest лучше поднять минимум до `^4.24.12` или актуального безопасного диапазона.
+   683→   683→
+   684→   684→#### 7.2.3. CSRF будущих mutation endpoints
+   685→   685→
+   686→   686→Сейчас auth нет. Если будет cookie-based auth, endpoints `POST /api/save` и `DELETE /api/load` должны иметь CSRF strategy:
+   687→   687→
+   688→   688→- SameSite cookies;
+   689→   689→- CSRF token для mutating requests;
+   690→   690→- Origin/Referer validation;
+   691→   691→- server-side auth check внутри каждого handler.
+   692→   692→
+   693→   693→### 7.3. Средние security-риски
+   694→   694→
+   695→   695→#### 7.3.1. Mini-service static server path traversal protection слабая
+   696→   696→
+   697→   697→**Файл:** `mini-services/game-server/index.ts`
+   698→   698→
+   699→   699→```ts
+   700→   700→if (path.includes('..')) {
+   701→   701→  return new Response('Forbidden', { status: 403 });
+   702→   702→}
+   703→   703→
+   704→   704→const filePath = PUBLIC_DIR + path;
+   705→   705→```
+   706→   706→
+   707→   707→Нужно использовать safe path normalization и проверку, что итоговый путь остаётся внутри `PUBLIC_DIR`.
+   708→   708→
+   709→   709→#### 7.3.2. localStorage settings без schema validation
+   710→   710→
+   711→   711→Проверить `src/store/slices/settingsSlice.ts`: настройки из localStorage должны валидироваться через schema/defaults, чтобы повреждённые значения не ломали UI.
+   712→   712→
+   713→   713→#### 7.3.3. `dangerouslySetInnerHTML`
+   714→   714→
+   715→   715→Найден в `src/components/ui/chart.tsx`. Если это shadcn-generated style injection без user input — ок. Но нужно зафиксировать правило: туда не должен попадать пользовательский ввод.
+   716→   716→
+   717→   717→---
+   718→   718→
+   719→   719→## 8. Архитектура: целевое состояние
+   720→   720→
+   721→   721→### 8.1. Текущая архитектура
+   722→   722→
+   723→   723→Текущая архитектура условно такая:
+   724→   724→
+   725→   725→```text
+   726→   726→Next.js App Router
+   727→   727→  ├─ UI screens / HUD
+   728→   728→  ├─ Zustand store
+   729→   729→  │   ├─ sessionSlice -> GameEngine
+   730→   730→  │   ├─ commandSlice
+   731→   731→  │   ├─ selectionSlice
+   732→   732→  │   └─ settingsSlice
+   733→   733→  ├─ GameEngine
+   734→   734→  │   ├─ rules
+   735→   735→  │   ├─ systems
+   736→   736→  │   ├─ EventBus
+   737→   737→  │   ├─ CommandQueue
+   738→   738→  │   └─ GameRng
+   739→   739→  ├─ rendering / React Three Fiber
+   740→   740→  ├─ Web Workers
+   741→   741→  └─ API routes + Prisma + SQLite
+   742→   742→```
+   743→   743→
+   744→   744→Идея правильная, но есть нарушение слоёв:
+   745→   745→
+   746→   746→- UI/API сохраняют raw `GameState`, обходя `src/engine/save`;
+   747→   747→- `sessionSlice.loadGame` приблизительно реконструирует `GameConfig`;
+   748→   748→- worker simulation имеет simplified duplicate rules;
+   749→   749→- AI может silent-skip invalid commands;
+   750→   750→- UI знает детали API сохранений напрямую.
+   751→   751→
+   752→   752→### 8.2. Целевая архитектура save/load
+   753→   753→
+   754→   754→Нужно сделать единый путь:
+   755→   755→
+   756→   756→```text
+   757→   757→UI
+   758→   758→  ↓
+   759→   759→SaveClient / store action
+   760→   760→  ↓
+   761→   761→SaveService
+   762→   762→  ├─ engine.saveGame(...)
+   763→   763→  ├─ serializeSave(...)
+   764→   764→  ├─ calculateChecksum(...)
+   765→   765→  ├─ validate size/schema
+   766→   766→  ↓
+   767→   767→/api/save
+   768→   768→  ├─ auth/owner check
+   769→   769→  ├─ zod validation
+   770→   770→  ├─ DB write
+   771→   771→  ↓
+   772→   772→Prisma SaveGame
+   773→   773→```
+   774→   774→
+   775→   775→Load:
+   776→   776→
+   777→   777→```text
+   778→   778→/api/load
+   779→   779→  ├─ auth/owner check
+   780→   780→  ├─ DB read
+   781→   781→  ↓
+   782→   782→SaveService
+   783→   783→  ├─ deserializeSave(...)
+   784→   784→  ├─ validateSave(...)
+   785→   785→  ├─ applyMigrations(...)
+   786→   786→  ├─ verify checksum
+   787→   787→  ↓
+   788→   788→sessionSlice.loadSaveFile(saveFile)
+   789→   789→  ├─ new GameEngine(saveFile.gameConfig)
+   790→   790→  ├─ engine.setState(saveFile.gameState)
+   791→   791→  ├─ rng.setState(saveFile.rngState.position/state)
+   792→   792→  ├─ restore commandLog if supported
+   793→   793→```
+   794→   794→
+   795→   795→### 8.3. Целевая архитектура determinism
+   796→   796→
+   797→   797→Запретить в `src/engine`, `src/workers/simulation.worker.ts`, `src/engine/rules`:
+   798→   798→
+   799→   799→- `Math.random()`;
+   800→   800→- `Date.now()` для game-state decisions;
+   801→   801→- random ID generation without seeded RNG/counter.
+   802→   802→
+   803→   803→Добавить в `GameState`:
+   804→   804→
+   805→   805→```ts
+   806→   806→nextEntitySeq: number;
+   807→   807→nextCitySeq: number;
+   808→   808→rngState: number;
+   809→   809→```
+   810→   810→
+   811→   811→Или отдельный `IdGenerator`:
+   812→   812→
+   813→   813→```ts
+   814→   814→function nextCityId(state: GameState): { state: GameState; id: CityId } {
+   815→   815→  const seq = state.nextCitySeq ?? 1;
+   816→   816→  return {
+   817→   817→    state: { ...state, nextCitySeq: seq + 1 },
+   818→   818→    id: `city-${seq}`,
+   819→   819→  };
+   820→   820→}
+   821→   821→```
+   822→   822→
+   823→   823→Для random:
+   824→   824→
+   825→   825→- engine owns `GameRng`;
+   826→   826→- systems/rules получают RNG или random decisions как аргумент;
+   827→   827→- save stores rng internal state;
+   828→   828→- load restores rng state.
+   829→   829→
+   830→   830→---
+   831→   831→
+   832→   832→## 9. Конкретные задачи по приоритету
+   833→   833→
+   834→   834→### P0-1. Удалить опасный Caddy proxy
+   835→   835→
+   836→   836→**Файл:** `Caddyfile`
+   837→   837→
+   838→   838→**Сделать:**
+   839→   839→
+   840→   840→- удалить matcher `@transform_port_query`;
+   841→   841→- удалить `reverse_proxy localhost:{query.XTransformPort}`;
+   842→   842→- оставить только фиксированный upstream;
+   843→   843→- добавить базовые security headers.
+   844→   844→
+   845→   845→**Acceptance criteria:**
+   846→   846→
+   847→   847→- запросы с `?XTransformPort=...` не меняют upstream;
+   848→   848→- `caddy validate --config Caddyfile` проходит;
+   849→   849→- приложение доступно через порт 81;
+   850→   850→- нет dynamic reverse_proxy на user-controlled input.
+   851→   851→
+   852→   852→---
+   853→   853→
+   854→   854→### P0-2. Убрать игнор TypeScript ошибок
+   855→   855→
+   856→   856→**Файл:** `next.config.ts`
+   857→   857→
+   858→   858→**Сделать:**
+   859→   859→
+   860→   860→```ts
+   861→   861→const nextConfig: NextConfig = {
+   862→   862→  output: "standalone",
+   863→   863→  reactStrictMode: true,
+   864→   864→};
+   865→   865→```
+   866→   866→
+   867→   867→`allowedDevOrigins` убрать или вынести в dev-only config/env, если реально нужен.
+   868→   868→
+   869→   869→**Acceptance criteria:**
+   870→   870→
+   871→   871→- `typescript.ignoreBuildErrors` отсутствует;
+   872→   872→- `reactStrictMode: true`;
+   873→   873→- `bunx tsc --noEmit` проходит;
+   874→   874→- `bun run build` проходит без ignored TS errors.
+   875→   875→
+   876→   876→---
+   877→   877→
+   878→   878→### P0-3. Исправить API сохранений
+   879→   879→
+   880→   880→**Файлы:**
+   881→   881→
+   882→   882→- `src/app/api/save/route.ts`
+   883→   883→- `src/app/api/load/route.ts`
+   884→   884→- `src/app/api/saves/route.ts`
+   885→   885→- `prisma/schema.prisma`
+   886→   886→- новый `src/lib/saveService.ts` или `src/server/saveService.ts`
+   887→   887→
+   888→   888→**Сделать минимум:**
+   889→   889→
+   890→   890→- Zod validation;
+   891→   891→- max payload size;
+   892→   892→- owner/session model;
+   893→   893→- safe errors;
+   894→   894→- no global list all saves;
+   895→   895→- no delete without owner check.
+   896→   896→
+   897→   897→**Если нет полноценного auth:**
+   898→   898→
+   899→   899→Временно можно сделать `ownerKey` через signed cookie или local anonymous session. Но это временный вариант. Для production лучше NextAuth/session.
+   900→   900→
+   901→   901→**Acceptance criteria:**
+   902→   902→
+   903→   903→- пользователь A не может получить/удалить save пользователя B;
+   904→   904→- invalid payload возвращает 400;
+   905→   905→- oversized payload возвращает 413 или 400;
+   906→   906→- save list фильтруется по owner;
+   907→   907→- raw server errors не отдаются клиенту;
+   908→   908→- тесты API покрывают positive/negative cases.
+   909→   909→
+   910→   910→---
+   911→   911→
+   912→   912→### P0-4. Обновить Next.js и security-sensitive deps
+   913→   913→
+   914→   914→**Файлы:**
+   915→   915→
+   916→   916→- `package.json`
+   917→   917→- `bun.lock`
+   918→   918→
+   919→   919→**Сделать:**
+   920→   920→
+   921→   921→- обновить `next` до patched/current 16.x;
+   922→   922→- обновить `eslint-config-next` совместимо с Next;
+   923→   923→- поднять lower bound `next-auth` минимум выше vulnerable range;
+   924→   924→- прогнать audit.
+   925→   925→
+   926→   926→**Acceptance criteria:**
+   927→   927→
+   928→   928→- `bun.lock` больше не фиксирует `next@16.1.3`;
+   929→   929→- `bun run build` проходит;
+   930→   930→- UI smoke test проходит;
+   931→   931→- API routes работают;
+   932→   932→- R3F canvas загружается.
+   933→   933→
+   934→   934→---
+   935→   935→
+   936→   936→### P1-1. Исправить `GameProvider` placeholder subscription
+   937→   937→
+   938→   938→**Файл:** `src/components/providers/GameProvider.tsx`
+   939→   939→
+   940→   940→Удалить:
+   941→   941→
+   942→   942→```ts
+   943→   943→const unsubKilled = eventBus.on('event') as () => void; // placeholder
+   944→   944→```
+   945→   945→
+   946→   946→И убрать `unsubKilled` из массива `unsubscribeRefs.current`.
+   947→   947→
+   948→   948→**Acceptance criteria:**
+   949→   949→
+   950→   950→- нет подписки на несуществующий event type;
+   951→   951→- TypeScript больше не ругается;
+   952→   952→- `UnitKilled` notification остаётся через `unsubUnitKilled`;
+   953→   953→- нет fake cast `as () => void`.
+   954→   954→
+   955→   955→---
+   956→   956→
+   957→   957→### P1-2. Исправить Fortify в UI
+   958→   958→
+   959→   959→**Файл:** `src/components/hud/UnitPanel.tsx`
+   960→   960→
+   961→   961→Заменить:
+   962→   962→
+   963→   963→```ts
+   964→   964→ dispatchCommand({
+   965→   965→   type: 'EndTurn',
+   966→   966→   playerId: activePlayerId,
+   967→   967→ });
+   968→   968→```
+   969→   969→
+   970→   970→На:
+   971→   971→
+   972→   972→```ts
+   973→   973→ dispatchCommand({
+   974→   974→   type: 'FortifyUnit',
+   975→   975→   playerId: activePlayerId,
+   976→   976→   entityId: entity.id,
+   977→   977→ });
+   978→   978→```
+   979→   979→
+   980→   980→**Acceptance criteria:**
+   981→   981→
+   982→   982→- кнопка Fortify добавляет `fortified` status;
+   983→   983→- не завершает ход;
+   984→   984→- movementPoints становится 0;
+   985→   985→- hasActed становится true;
+   986→   986→- тест или ручной сценарий подтверждает поведение.
+   987→   987→
+   988→   988→---
+   989→   989→
+   990→   990→### P1-3. Ввести единый SaveService
+   991→   991→
+   992→   992→**Файлы:**
+   993→   993→
+   994→   994→- `src/engine/save/saveGame.ts`
+   995→   995→- `src/engine/save/loadGame.ts`
+   996→   996→- `src/store/slices/sessionSlice.ts`
+   997→   997→- `src/app/api/save/route.ts`
+   998→   998→- `src/app/api/load/route.ts`
+   999→   999→- новый `src/lib/saveService.ts` или `src/server/saveService.ts`
+  1000→  1000→
+  1001→  1001→**Сделать:**
+  1002→  1002→
+  1003→  1003→- UI больше не отправляет raw `JSON.stringify(gameState)` как финальный формат;
+  1004→  1004→- сохраняется `SaveFile`;
+  1005→  1005→- checksum считается;
+  1006→  1006→- load проверяет checksum;
+  1007→  1007→- load прогоняет `deserializeSave`;
+  1008→  1008→- migrations используются;
+  1009→  1009→- sessionSlice умеет load by SaveFile, а не только raw GameState.
+  1010→  1010→
+  1011→  1011→**Acceptance criteria:**
+  1012→  1012→
+  1013→  1013→- save JSON содержит `version`, `timestamp`, `name`, `gameState`, `gameConfig`, `commandLog`, `rngState`;
+  1014→  1014→- checksum не пустой;
+  1015→  1015→- corrupted save не загружается;
+  1016→  1016→- старый формат либо мигрируется, либо явно rejected с понятной ошибкой;
+  1017→  1017→- unit tests покрывают serialize/deserialize/checksum/migration.
+  1018→  1018→
+  1019→  1019→---
+  1020→  1020→
+  1021→  1021→### P1-4. Детерминированные ID и RNG
+  1022→  1022→
+  1023→  1023→**Файлы:**
+  1024→  1024→
+  1025→  1025→- `src/engine/core/GameState.ts`
+  1026→  1026→- `src/engine/core/GameEngine.ts`
+  1027→  1027→- `src/engine/rules/cityRules.ts`
+  1028→  1028→- `src/engine/rules/recruitmentRules.ts`
+  1029→  1029→- `src/engine/ai/AiDirector.ts`
+  1030→  1030→- `src/workers/simulation.worker.ts`
+  1031→  1031→- `src/engine/save/*`
+  1032→  1032→
+  1033→  1033→**Сделать:**
+  1034→  1034→
+  1035→  1035→- убрать `Date.now()` и `Math.random()` из game-state logic;
+  1036→  1036→- добавить deterministic counters;
+  1037→  1037→- прокинуть `GameRng` туда, где нужна случайность;
+  1038→  1038→- сохранить/восстановить RNG state.
+  1039→  1039→
+  1040→  1040→**Acceptance criteria:**
+  1041→  1041→
+  1042→  1042→- `rg "Math\.random|Date\.now" src/engine src/workers/simulation.worker.ts` не находит state-affecting usage;
+  1043→  1043→- два запуска с одним seed и одним command list дают одинаковый state hash;
+  1044→  1044→- save/load не меняет дальнейшую последовательность random outcomes.
+  1045→  1045→
+  1046→  1046→---
+  1047→  1047→
+  1048→  1048→### P1-5. Worker protocol requestId
+  1049→  1049→
+  1050→  1050→**Файлы:**
+  1051→  1051→
+  1052→  1052→- `src/workers/workerProtocol.ts`
+  1053→  1053→- `src/workers/workerManager.ts`
+  1054→  1054→- `src/workers/pathfinding.worker.ts`
+  1055→  1055→- `src/workers/mapgen.worker.ts`
+  1056→  1056→- `src/workers/ai.worker.ts`
+  1057→  1057→- `src/workers/simulation.worker.ts`
+  1058→  1058→
+  1059→  1059→**Сделать:**
+  1060→  1060→
+  1061→  1061→- добавить `requestId` в base request;
+  1062→  1062→- workers возвращают тот же `requestId`;
+  1063→  1063→- `WorkerManager.handleWorkerMessage` ищет pending request строго по `data.requestId`;
+  1064→  1064→- ошибки тоже несут `requestId`.
+  1065→  1065→
+  1066→  1066→**Acceptance criteria:**
+  1067→  1067→
+  1068→  1068→- concurrent 10 pathfinding requests возвращают корректные результаты своим callers;
+  1069→  1069→- FIFO matching удалён;
+  1070→  1070→- timeout продолжает работать;
+  1071→  1071→- fallback продолжает работать.
+  1072→  1072→
+  1073→  1073→---
+  1074→  1074→
+  1075→  1075→### P1-6. Включить базовые ESLint правила
+  1076→  1076→
+  1077→  1077→**Файл:** `eslint.config.mjs`
+  1078→  1078→
+  1079→  1079→Первый этап:
+  1080→  1080→
+  1081→  1081→```js
+  1082→  1082→"no-debugger": "error",
+  1083→  1083→"no-unreachable": "error",
+  1084→  1084→"no-empty": "error",
+  1085→  1085→"no-undef": "error",
+  1086→  1086→"react-hooks/exhaustive-deps": "warn",
+  1087→  1087→"@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+  1088→  1088→```
+  1089→  1089→
+  1090→  1090→Потом вторым этапом:
+  1091→  1091→
+  1092→  1092→```js
+  1093→  1093→"@typescript-eslint/no-explicit-any": "warn"
+  1094→  1094→```
+  1095→  1095→
+  1096→  1096→**Acceptance criteria:**
+  1097→  1097→
+  1098→  1098→- `bun run lint` проходит;
+  1099→  1099→- нет `debugger`;
+  1100→  1100→- нет unreachable code;
+  1101→  1101→- hooks deps warnings разобраны или осознанно suppress с комментарием.
+  1102→  1102→
+  1103→  1103→---
+  1104→  1104→
+  1105→  1105→### P1-7. Добавить тестовую инфраструктуру
+  1106→  1106→
+  1107→  1107→**Файлы:**
+  1108→  1108→
+  1109→  1109→- `package.json`
+  1110→  1110→- `vitest.config.ts`
+  1111→  1111→- `tests/` или `src/**/*.test.ts`
+  1112→  1112→- optional `playwright.config.ts`
+  1113→  1113→
+  1114→  1114→**Сделать:**
+  1115→  1115→
+  1116→  1116→Добавить dev dependencies:
+  1117→  1117→
+  1118→  1118→- `vitest`;
+  1119→  1119→- `@vitest/coverage-v8`;
+  1120→  1120→- optional `happy-dom` для UI hooks;
+  1121→  1121→- `playwright` для e2e.
+  1122→  1122→
+  1123→  1123→Scripts:
+  1124→  1124→
+  1125→  1125→```json
+  1126→  1126→{
+  1127→  1127→  "typecheck": "tsc --noEmit",
+  1128→  1128→  "test": "vitest run",
+  1129→  1129→  "test:watch": "vitest",
+  1130→  1130→  "test:coverage": "vitest run --coverage",
+  1131→  1131→  "e2e": "playwright test"
+  1132→  1132→}
+  1133→  1133→```
+  1134→  1134→
+  1135→  1135→Минимальные unit tests:
+  1136→  1136→
+  1137→  1137→1. hex distance/coordinates;
+  1138→  1138→2. movement can/cannot move;
+  1139→  1139→3. combat can/cannot attack;
+  1140→  1140→4. city canFound/foundCity;
+  1141→  1141→5. recruitment canRecruit/start/process;
+  1142→  1142→6. research canResearch/start/process;
+  1143→  1143→7. turn end pipeline;
+  1144→  1144→8. save serialize/deserialize/checksum;
+  1145→  1145→9. deterministic replay smoke;
+  1146→  1146→10. workerManager requestId mapping.
+  1147→  1147→
+  1148→  1148→**Acceptance criteria:**
+  1149→  1149→
+  1150→  1150→- `bun run test` проходит;
+  1151→  1151→- minimum coverage для `src/engine` хотя бы 40% на первом этапе;
+  1152→  1152→- critical rules покрыты negative cases;
+  1153→  1153→- CI запускает tests.
+  1154→  1154→
+  1155→  1155→---
+  1156→  1156→
+  1157→  1157→### P2-1. Исправить TerrainLayer performance/cleanup
+  1158→  1158→
+  1159→  1159→**Файл:** `src/components/game3d/TerrainLayer.tsx`
+  1160→  1160→
+  1161→  1161→Сделать:
+  1162→  1162→
+  1163→  1163→- заменить cleanup `useMemo` на `useEffect`;
+  1164→  1164→- если `terrainChunks.length > 0`, не рендерить full `HexMesh` visual для каждого tile;
+  1165→  1165→- оставить lightweight interaction layer, например invisible planes/hex outlines только для picking;
+  1166→  1166→- dispose `GridOverlay` geometry.
+  1167→  1167→
+  1168→  1168→Пример cleanup:
+  1169→  1169→
+  1170→  1170→```tsx
+  1171→  1171→useEffect(() => {
+  1172→  1172→  return () => {
+  1173→  1173→    if (terrainChunks.length > 0) {
+  1174→  1174→      disposeChunks(terrainChunks);
+  1175→  1175→    }
+  1176→  1176→  };
+  1177→  1177→}, [terrainChunks]);
+  1178→  1178→```
+  1179→  1179→
+  1180→  1180→**Acceptance criteria:**
+  1181→  1181→
+  1182→  1182→- на large map нет одновременного full chunk terrain + full per-hex visual terrain;
+  1183→  1183→- geometries/materials disposed при смене карты;
+  1184→  1184→- FPS/performance не хуже текущего на small map;
+  1185→  1185→- визуально terrain остаётся кликабельным.
+  1186→  1186→
+  1187→  1187→---
+  1188→  1188→
+  1189→  1189→### P2-2. README и env docs
+  1190→  1190→
+  1191→  1191→**Файлы:**
+  1192→  1192→
+  1193→  1193→- `README.md`
+  1194→  1194→- `.env.example`
+  1195→  1195→
+  1196→  1196→README должен содержать:
+  1197→  1197→
+  1198→  1198→- что это за проект;
+  1199→  1199→- стек;
+  1200→  1200→- требования;
+  1201→  1201→- установка;
+  1202→  1202→- env vars;
+  1203→  1203→- команды запуска;
+  1204→  1204→- Prisma setup;
+  1205→  1205→- build;
+  1206→  1206→- tests;
+  1207→  1207→- project structure;
+  1208→  1208→- known limitations;
+  1209→  1209→- security notes.
+  1210→  1210→
+  1211→  1211→`.env.example`:
+  1212→  1212→
+  1213→  1213→```env
+  1214→  1214→DATABASE_URL="file:./dev.db"
+  1215→  1215→NEXT_TELEMETRY_DISABLED=1
+  1216→  1216→```
+  1217→  1217→
+  1218→  1218→Если будет auth:
+  1219→  1219→
+  1220→  1220→```env
+  1221→  1221→NEXTAUTH_SECRET="change-me"
+  1222→  1222→NEXTAUTH_URL="http://localhost:3000"
+  1223→  1223→```
+  1224→  1224→
+  1225→  1225→**Acceptance criteria:**
+  1226→  1226→
+  1227→  1227→- новый разработчик может запустить проект по README;
+  1228→  1228→- README не содержит выдуманных команд;
+  1229→  1229→- все env vars описаны.
+  1230→  1230→
+  1231→  1231→---
+  1232→  1232→
+  1233→  1233→### P2-3. CI/CD
+  1234→  1234→
+  1235→  1235→**Файл:** `.github/workflows/ci.yml`
+  1236→  1236→
+  1237→  1237→Pipeline:
+  1238→  1238→
+  1239→  1239→```yaml
+  1240→  1240→name: CI
+  1241→  1241→
+  1242→  1242→on:
+  1243→  1243→  push:
+  1244→  1244→    branches: [main]
+  1245→  1245→  pull_request:
+  1246→  1246→
+  1247→  1247→jobs:
+  1248→  1248→  check:
+  1249→  1249→    runs-on: ubuntu-latest
+  1250→  1250→    steps:
+  1251→  1251→      - uses: actions/checkout@v4
+  1252→  1252→      - uses: oven-sh/setup-bun@v2
+  1253→  1253→      - run: bun install --frozen-lockfile
+  1254→  1254→      - run: bunx prisma generate
+  1255→  1255→      - run: bun run typecheck
+  1256→  1256→      - run: bun run lint
+  1257→  1257→      - run: bun run test
+  1258→  1258→      - run: bun run build
+  1259→  1259→```
+  1260→  1260→
+  1261→  1261→**Acceptance criteria:**
+  1262→  1262→
+  1263→  1263→- PR cannot merge if typecheck/lint/test/build fails;
+  1264→  1264→- CI uses lockfile;
+  1265→  1265→- Prisma client generated;
+  1266→  1266→- artifacts/cache optional but not required initially.
+  1267→  1267→
+  1268→  1268→---
+  1269→  1269→
+  1270→  1270→## 10. Задачи, которые можно поручить AI/Codex
+  1271→  1271→
+  1272→  1272→| Задача | Сложность | Риск | Что проверить после выполнения |
+  1273→  1273→|---|---:|---:|---|
+  1274→  1274→| Удалить `XTransformPort` из Caddyfile | Низкая | Низкий | Caddyfile не содержит dynamic reverse proxy; `caddy validate` проходит. |
+  1275→  1275→| Исправить `next.config.ts` | Низкая | Средний | Build/typecheck проходят после исправления TS ошибок. |
+  1276→  1276→| Удалить placeholder `eventBus.on('event')` | Низкая | Низкий | `GameProvider` компилируется, notifications работают. |
+  1277→  1277→| Исправить Fortify button | Низкая | Низкий | Fortify не завершает ход, а dispatch-ит `FortifyUnit`. |
+  1278→  1278→| Добавить root README | Низкая | Низкий | Команды соответствуют package scripts. |
+  1279→  1279→| Добавить `.env.example` | Низкая | Низкий | Не содержит реальных секретов. |
+  1280→  1280→| Добавить Vitest config и первые engine tests | Средняя | Средний | Тесты deterministic, не зависят от time/random. |
+  1281→  1281→| Добавить SaveService вокруг engine save/load | Средняя | Средний | Save format совпадает с `SaveFile`, checksum работает. |
+  1282→  1282→| Добавить Zod validation для save API | Средняя | Средний | Invalid payload returns 400, oversized rejected. |
+  1283→  1283→| Добавить worker `requestId` protocol | Средняя | Средний | Concurrent worker tests проходят. |
+  1284→  1284→| Исправить TerrainLayer cleanup | Средняя | Средний | Нет dispose активных chunks, visual не ломается. |
+  1285→  1285→| Убрать hardcoded paths из scripts | Средняя | Средний | Scripts работают из project root. |
+  1286→  1286→| Включить часть ESLint rules | Средняя | Средний | Lint проходит без массового suppress. |
+  1287→  1287→| Добавить GitHub Actions CI | Средняя | Низкий | Workflow проходит на clean checkout. |
+  1288→  1288→
+  1289→  1289→---
+  1290→  1290→
+  1291→  1291→## 11. Задачи, которые НЕ стоит отдавать AI без ручного контроля
+  1292→  1292→
+  1293→  1293→### 11.1. Полная auth-модель
+  1294→  1294→
+  1295→  1295→AI может написать код, но владелец проекта должен решить продуктово:
+  1296→  1296→
+  1297→  1297→- нужны ли user accounts;
+  1298→  1298→- нужны ли anonymous sessions;
+  1299→  1299→- нужны ли cloud saves;
+  1300→  1300→- можно ли хранить saves локально;
+  1301→  1301→- какой privacy model.
+  1302→  1302→
+  1303→  1303→### 11.2. Баланс игры
+  1304→  1304→
+  1305→  1305→Не давать AI самостоятельно менять:
+  1306→  1306→
+  1307→  1307→- damage formulas;
+  1308→  1308→- unit costs;
+  1309→  1309→- tech costs;
+  1310→  1310→- economy yields;
+  1311→  1311→- victory thresholds;
+  1312→  1312→- AI difficulty modifiers.
+  1313→  1313→
+  1314→  1314→AI может написать тесты и рефакторинг, но balance changes должны проходить ручной product/game-design review.
+  1315→  1315→
+  1316→  1316→### 11.3. Save migrations
+  1317→  1317→
+  1318→  1318→Миграции могут сломать существующие saves. AI должен писать migration tests, но решение о breaking changes принимает человек.
+  1319→  1319→
+  1320→  1320→### 11.4. Production deploy/security config
+  1321→  1321→
+  1322→  1322→Caddy, auth, cookies, headers, DB backup, rate limit, deployment topology — только с ручным ревью.
+  1323→  1323→
+  1324→  1324→### 11.5. Детерминизм engine
+  1325→  1325→
+  1326→  1326→Перенос RNG/IDs влияет на:
+  1327→  1327→
+  1328→  1328→- saves;
+  1329→  1329→- replay;
+  1330→  1330→- AI;
+  1331→  1331→- simulation;
+  1332→  1332→- tests;
+  1333→  1333→- future multiplayer.
+  1334→  1334→
+  1335→  1335→AI может подготовить PR, но нужен ручной diff review.
+  1336→  1336→
+  1337→  1337→---
+  1338→  1338→
+  1339→  1339→## 12. План доработки
+  1340→  1340→
+  1341→  1341→### 12.1. День 1 — emergency hardening
+  1342→  1342→
+  1343→  1343→1. Удалить `XTransformPort` reverse proxy из `Caddyfile`.
+  1344→  1344→2. Убрать `ignoreBuildErrors` из `next.config.ts`.
+  1345→  1345→3. Включить `reactStrictMode`.
+  1346→  1346→4. Исправить `GameProvider` placeholder `eventBus.on('event')`.
+  1347→  1347→5. Исправить `UnitPanel` Fortify.
+  1348→  1348→6. Отключить Prisma query logging в production.
+  1349→  1349→7. Добавить `.env.example`.
+  1350→  1350→8. Добавить root `README.md`.
+  1351→  1351→9. Добавить `typecheck` script.
+  1352→  1352→10. Обновить Next.js до patched/current 16.x и прогнать build.
+  1353→  1353→
+  1354→  1354→### 12.2. 3–5 дней — базовая инженерная стабилизация
+  1355→  1355→
+  1356→  1356→1. Добавить Vitest.
+  1357→  1357→2. Написать первые tests для `src/engine/hex`.
+  1358→  1358→3. Написать tests для city/recruitment/combat/movement/research.
+  1359→  1359→4. Добавить Zod validation для API routes.
+  1360→  1360→5. Добавить body limit для saves.
+  1361→  1361→6. Ввести `SaveService`.
+  1362→  1362→7. Использовать engine save format в UI/API.
+  1363→  1363→8. Добавить checksum validation.
+  1364→  1364→9. Добавить worker `requestId`.
+  1365→  1365→10. Исправить TerrainLayer cleanup.
+  1366→  1366→11. Включить базовые ESLint rules.
+  1367→  1367→12. Добавить GitHub Actions CI.
+  1368→  1368→
+  1369→  1369→### 12.3. 1–2 недели — production readiness foundation
+  1370→  1370→
+  1371→  1371→1. Добавить auth/owner модель или перевести saves в local-only storage.
+  1372→  1372→2. Добавить Prisma migrations.
+  1373→  1373→3. Перевести engine IDs на deterministic counters.
+  1374→  1374→4. Перевести AI random decisions на `GameRng`.
+  1375→  1375→5. Добавить deterministic replay test.
+  1376→  1376→6. Добавить save/load compatibility tests.
+  1377→  1377→7. Добавить Playwright smoke e2e.
+  1378→  1378→8. Разобрать hardcoded deployment scripts.
+  1379→  1379→9. Провести dependency audit.
+  1380→  1380→10. Добавить manual QA checklist.
+  1381→  1381→11. Добавить error boundaries и понятные UI error states.
+  1382→  1382→12. Провести performance smoke на small/medium/large map.
+  1383→  1383→
+  1384→  1384→### 12.4. Перед production
+  1385→  1385→
+  1386→  1386→Production checklist:
+  1387→  1387→
+  1388→  1388→- [ ] `bun install --frozen-lockfile` проходит на clean checkout.
+  1389→  1389→- [ ] `bunx prisma generate` проходит.
+  1390→  1390→- [ ] `bun run typecheck` проходит.
+  1391→  1391→- [ ] `bun run lint` проходит.
+  1392→  1392→- [ ] `bun run test` проходит.
+  1393→  1393→- [ ] `bun run build` проходит.
+  1394→  1394→- [ ] Dependency audit без high/critical vulnerabilities.
+  1395→  1395→- [ ] Caddyfile без dynamic upstream.
+  1396→  1396→- [ ] Save API защищены auth/ownership или отключены публично.
+  1397→  1397→- [ ] Payload size limits включены.
+  1398→  1398→- [ ] Rate limit включён.
+  1399→  1399→- [ ] Prisma migrations используются.
+  1400→  1400→- [ ] DB backup/restore documented.
+  1401→  1401→- [ ] Logs не содержат sensitive data.
+  1402→  1402→- [ ] Manual QA core loop пройден.
+  1403→  1403→- [ ] Save/load после refresh работает.
+  1404→  1404→- [ ] Large map не фризит UI.
+  1405→  1405→- [ ] Error states показываются пользователю.
+  1406→  1406→
+  1407→  1407→---
+  1408→  1408→
+  1409→  1409→## 13. Минимальный план тестирования
+  1410→  1410→
+  1411→  1411→### 13.1. Unit tests — engine/hex
+  1412→  1412→
+  1413→  1413→Файлы:
+  1414→  1414→
+  1415→  1415→- `src/engine/hex/coordinates.ts`
+  1416→  1416→- `src/engine/hex/distance.ts`
+  1417→  1417→- `src/engine/hex/pathfinding.ts`
+  1418→  1418→
+  1419→  1419→Проверить:
+  1420→  1420→
+  1421→  1421→- distance symmetry;
+  1422→  1422→- distance from hex to itself = 0;
+  1423→  1423→- neighbors count = 6;
+  1424→  1424→- path avoids impassable terrain;
+  1425→  1425→- path returns null if unreachable;
+  1426→  1426→- reachable hexes respect movement points.
+  1427→  1427→
+  1428→  1428→### 13.2. Unit tests — movement
+  1429→  1429→
+  1430→  1430→Файл: `src/engine/rules/movementRules.ts`
+  1431→  1431→
+  1432→  1432→Проверить:
+  1433→  1433→
+  1434→  1434→- cannot move enemy unit;
+  1435→  1435→- cannot move when not enough movement;
+  1436→  1436→- cannot move to water/mountain;
+  1437→  1437→- can move on road cheaper if road rules есть;
+  1438→  1438→- moving updates hex and movement points;
+  1439→  1439→- invalid path rejected.
+  1440→  1440→
+  1441→  1441→### 13.3. Unit tests — combat
+  1442→  1442→
+  1443→  1443→Файлы:
+  1444→  1444→
+  1445→  1445→- `src/engine/rules/combatRules.ts`
+  1446→  1446→- `src/engine/ecs/systems/CombatSystem.ts`
+  1447→  1447→
+  1448→  1448→Проверить:
+  1449→  1449→
+  1450→  1450→- cannot attack own unit;
+  1451→  1451→- cannot attack out of range;
+  1452→  1452→- damage is deterministic;
+  1453→  1453→- death removes unit;
+  1454→  1454→- counterattack rules;
+  1455→  1455→- city attack rules if implemented.
+  1456→  1456→
+  1457→  1457→### 13.4. Unit tests — city
+  1458→  1458→
+  1459→  1459→Файлы:
+  1460→  1460→
+  1461→  1461→- `src/engine/rules/cityRules.ts`
+  1462→  1462→- `src/engine/ecs/systems/CitySystem.ts`
+  1463→  1463→
+  1464→  1464→Проверить:
+  1465→  1465→
+  1466→  1466→- cannot found without settler;
+  1467→  1467→- cannot found on water/mountain;
+  1468→  1468→- cannot found on occupied city hex;
+  1469→  1469→- founding consumes settler;
+  1470→  1470→- city gets territory;
+  1471→  1471→- city ownership updates tiles.
+  1472→  1472→
+  1473→  1473→### 13.5. Unit tests — recruitment
+  1474→  1474→
+  1475→  1475→Файл: `src/engine/rules/recruitmentRules.ts`
+  1476→  1476→
+  1477→  1477→Проверить:
+  1478→  1478→
+  1479→  1479→- cannot recruit unknown/enemy unit;
+  1480→  1480→- cannot recruit without resources;
+  1481→  1481→- cannot recruit without required tech/building;
+  1482→  1482→- recruitment deducts resources;
+  1483→  1483→- production queue progresses;
+  1484→  1484→- completed unit appears near city;
+  1485→  1485→- no-space case is handled predictably.
+  1486→  1486→
+  1487→  1487→### 13.6. Unit tests — research
+  1488→  1488→
+  1489→  1489→Файлы:
+  1490→  1490→
+  1491→  1491→- `src/engine/rules/researchRules.ts`
+  1492→  1492→- `src/engine/ecs/systems/ResearchSystem.ts`
+  1493→  1493→
+  1494→  1494→Проверить:
+  1495→  1495→
+  1496→  1496→- cannot research unknown tech;
+  1497→  1497→- cannot research without prerequisites;
+  1498→  1498→- start research sets currentResearch;
+  1499→  1499→- progress accumulates per turn;
+  1500→  1500→- completed tech appears in `player.techs`;
+  1501→  1501→- era progression if implemented.
+  1502→  1502→
+  1503→  1503→### 13.7. Unit tests — save/load
+  1504→  1504→
+  1505→  1505→Файлы:
+  1506→  1506→
+  1507→  1507→- `src/engine/save/saveGame.ts`
+  1508→  1508→- `src/engine/save/loadGame.ts`
+  1509→  1509→- `src/engine/save/migrations.ts`
+  1510→  1510→
+  1511→  1511→Проверить:
+  1512→  1512→
+  1513→  1513→- serialize/deserialize roundtrip;
+  1514→  1514→- invalid JSON rejected;
+  1515→  1515→- invalid version rejected;
+  1516→  1516→- future version rejected;
+  1517→  1517→- checksum mismatch rejected;
+  1518→  1518→- migration missing throws clear error;
+  1519→  1519→- save includes config/commandLog/rngState.
+  1520→  1520→
+  1521→  1521→### 13.8. API integration tests
+  1522→  1522→
+  1523→  1523→Файлы:
+  1524→  1524→
+  1525→  1525→- `src/app/api/save/route.ts`
+  1526→  1526→- `src/app/api/load/route.ts`
+  1527→  1527→- `src/app/api/saves/route.ts`
+  1528→  1528→
+  1529→  1529→Проверить:
+  1530→  1530→
+  1531→  1531→- unauthenticated behavior;
+  1532→  1532→- authenticated save create;
+  1533→  1533→- list only own saves;
+  1534→  1534→- load only own save;
+  1535→  1535→- delete only own save;
+  1536→  1536→- invalid body returns 400;
+  1537→  1537→- oversized body rejected;
+  1538→  1538→- missing id returns 400;
+  1539→  1539→- not found returns 404.
+  1540→  1540→
+  1541→  1541→### 13.9. E2E smoke test
+  1542→  1542→
+  1543→  1543→Playwright сценарий:
+  1544→  1544→
+  1545→  1545→1. Открыть `/`.
+  1546→  1546→2. Нажать “Новая игра”.
+  1547→  1547→3. Стартовать игру с seed фиксированным, 2 players.
+  1548→  1548→4. Дождаться карты.
+  1549→  1549→5. Выбрать unit.
+  1550→  1550→6. Выполнить move или Fortify.
+  1551→  1551→7. End turn.
+  1552→  1552→8. Save.
+  1553→  1553→9. Вернуться в меню.
+  1554→  1554→10. Load save.
+  1555→  1555→11. Проверить turn/state сохранились.
+  1556→  1556→
+  1557→  1557→---
+  1558→  1558→
+  1559→  1559→## 14. Manual QA checklist
+  1560→  1560→
+  1561→  1561→### Core gameplay
+  1562→  1562→
+  1563→  1563→- [ ] Новая игра создаётся без ошибок.
+  1564→  1564→- [ ] Карта генерируется с фиксированным seed.
+  1565→  1565→- [ ] На карте есть стартовые города/юниты.
+  1566→  1566→- [ ] Можно выбрать hex.
+  1567→  1567→- [ ] Можно выбрать unit.
+  1568→  1568→- [ ] Movement preview работает.
+  1569→  1569→- [ ] Unit move обновляет позицию.
+  1570→  1570→- [ ] Attack доступен только по валидным целям.
+  1571→  1571→- [ ] Found city работает только с settler.
+  1572→  1572→- [ ] Recruitment добавляет production item.
+  1573→  1573→- [ ] End turn запускает income/research/production.
+  1574→  1574→- [ ] AI ход не softlock-ит игру.
+  1575→  1575→- [ ] Victory/gameOver не ломает UI.
+  1576→  1576→
+  1577→  1577→### Save/load
+  1578→  1578→
+  1579→  1579→- [ ] Save создаётся.
+  1580→  1580→- [ ] Save появляется в списке.
+  1581→  1581→- [ ] Load восстанавливает карту, turn, active player, units, cities.
+  1582→  1582→- [ ] Corrupted save не загружается.
+  1583→  1583→- [ ] Delete удаляет только выбранный save.
+  1584→  1584→- [ ] Refresh страницы не ломает load.
+  1585→  1585→
+  1586→  1586→### UI
+  1587→  1587→
+  1588→  1588→- [ ] Main menu responsive.
+  1589→  1589→- [ ] Settings открываются/закрываются.
+  1590→  1590→- [ ] Tech tree не падает на empty state.
+  1591→  1591→- [ ] Diplomacy screen не падает при 1/2/4 players.
+  1592→  1592→- [ ] City panel показывает production queue.
+  1593→  1593→- [ ] UnitPanel Fortify не завершает ход.
+  1594→  1594→- [ ] Error notifications видны пользователю.
+  1595→  1595→
+  1596→  1596→### Performance
+  1597→  1597→
+  1598→  1598→- [ ] Small map FPS приемлемый.
+  1599→  1599→- [ ] Medium map FPS приемлемый.
+  1600→  1600→- [ ] Large map не зависает при загрузке.
+  1601→  1601→- [ ] Workers fallback не фризит UI слишком долго.
+  1602→  1602→- [ ] Memory не растёт бесконечно после reset/new game.
+  1603→  1603→
+  1604→  1604→---
+  1605→  1605→
+  1606→  1606→## 15. Рекомендованные issue prompts для AI/Codex
+  1607→  1607→
+  1608→  1608→### Issue 1 — Remove unsafe Caddy dynamic proxy
+  1609→  1609→
+  1610→  1610→```text
+  1611→  1611→Task: Remove the unsafe user-controlled Caddy reverse proxy from Caddyfile.
+  1612→  1612→
+  1613→  1613→Context:
+  1614→  1614→- Current Caddyfile contains query matcher XTransformPort and reverse_proxy localhost:{query.XTransformPort}.
+  1615→  1615→- This is an SSRF/open proxy risk.
+  1616→  1616→
+  1617→  1617→Requirements:
+  1618→  1618→1. Delete the @transform_port_query matcher and its handle block.
+  1619→  1619→2. Keep only a fixed reverse_proxy to 127.0.0.1:3000 or localhost:3000.
+  1620→  1620→3. Add basic security headers if safe.
+  1621→  1621→4. Do not add any user-controlled upstream selection.
+  1622→  1622→
+  1623→  1623→Acceptance:
+  1624→  1624→- grep XTransformPort Caddyfile returns nothing.
+  1625→  1625→- caddy validate passes.
+  1626→  1626→- App remains reachable through Caddy.
+  1627→  1627→```
+  1628→  1628→
+  1629→  1629→### Issue 2 — Re-enable TypeScript build safety
+  1630→  1630→
+  1631→  1631→```text
+  1632→  1632→Task: Remove TypeScript build error ignoring and fix resulting type errors.
+  1633→  1633→
+  1634→  1634→Files:
+  1635→  1635→- next.config.ts
+  1636→  1636→- src/components/providers/GameProvider.tsx
+  1637→  1637→- any files reported by tsc
+  1638→  1638→
+  1639→  1639→Requirements:
+  1640→  1640→1. Remove typescript.ignoreBuildErrors from next.config.ts.
+  1641→  1641→2. Set reactStrictMode true.
+  1642→  1642→3. Run bunx tsc --noEmit.
+  1643→  1643→4. Fix real type errors, do not suppress them with any/ts-ignore unless justified.
+  1644→  1644→5. Remove placeholder eventBus.on('event') from GameProvider.
+  1645→  1645→
+  1646→  1646→Acceptance:
+  1647→  1647→- bunx tsc --noEmit passes.
+  1648→  1648→- bun run build passes.
+  1649→  1649→- No new ts-ignore added without explanation.
+  1650→  1650→```
+  1651→  1651→
+  1652→  1652→### Issue 3 — Fix Fortify button behavior
+  1653→  1653→
+  1654→  1654→```text
+  1655→  1655→Task: Make UnitPanel Fortify dispatch FortifyUnit instead of EndTurn.
+  1656→  1656→
+  1657→  1657→File:
+  1658→  1658→- src/components/hud/UnitPanel.tsx
+  1659→  1659→
+  1660→  1660→Requirements:
+  1661→  1661→1. handleFortify must dispatch { type: 'FortifyUnit', playerId, entityId }.
+  1662→  1662→2. Do not end the turn.
+  1663→  1663→3. Add/update a small test if test infra exists.
+  1664→  1664→
+  1665→  1665→Acceptance:
+  1666→  1666→- Clicking Fortify adds fortified status to the unit.
+  1667→  1667→- The active player's turn remains active.
+  1668→  1668→- movementPoints becomes 0 and hasActed is true.
+  1669→  1669→```
+  1670→  1670→
+  1671→  1671→### Issue 4 — Add SaveService and use engine save format
+  1672→  1672→
+  1673→  1673→```text
+  1674→  1674→Task: Unify save/load around src/engine/save SaveFile format.
+  1675→  1675→
+  1676→  1676→Files:
+  1677→  1677→- src/engine/save/*
+  1678→  1678→- src/store/slices/sessionSlice.ts
+  1679→  1679→- src/app/api/save/route.ts
+  1680→  1680→- src/app/api/load/route.ts
+  1681→  1681→- new src/lib/saveService.ts or src/server/saveService.ts
+  1682→  1682→
+  1683→  1683→Requirements:
+  1684→  1684→1. Store SaveFile, not raw GameState only.
+  1685→  1685→2. Include version, timestamp, name, gameState, gameConfig, commandLog, rngState.
+  1686→  1686→3. Calculate checksum for serialized save.
+  1687→  1687→4. Verify checksum on load.
+  1688→  1688→5. Run deserializeSave/validateSave/applyMigrations on load.
+  1689→  1689→6. Keep error messages user-safe.
+  1690→  1690→
+  1691→  1691→Acceptance:
+  1692→  1692→- checksum is not empty.
+  1693→  1693→- corrupted save is rejected.
+  1694→  1694→- save/load roundtrip test passes.
+  1695→  1695→- sessionSlice no longer sends checksum: ''.
+  1696→  1696→```
+  1697→  1697→
+  1698→  1698→### Issue 5 — Secure save API with validation and owner checks
+  1699→  1699→
+  1700→  1700→```text
+  1701→  1701→Task: Harden save/load/list/delete API routes.
+  1702→  1702→
+  1703→  1703→Files:
+  1704→  1704→- src/app/api/save/route.ts
+  1705→  1705→- src/app/api/load/route.ts
+  1706→  1706→- src/app/api/saves/route.ts
+  1707→  1707→- prisma/schema.prisma
+  1708→  1708→
+  1709→  1709→Requirements:
+  1710→  1710→1. Add Zod validation for request body/query params.
+  1711→  1711→2. Add max save payload size.
+  1712→  1712→3. Add ownerId/session/user model or documented local-only alternative.
+  1713→  1713→4. List only current owner's saves.
+  1714→  1714→5. Load/delete only current owner's save.
+  1715→  1715→6. Return 400/401/403/404 appropriately.
+  1716→  1716→7. Do not leak internal error details.
+  1717→  1717→
+  1718→  1718→Acceptance:
+  1719→  1719→- Unauthorized access cannot read/delete another user's save.
+  1720→  1720→- Invalid payload returns 400.
+  1721→  1721→- Oversized payload rejected.
+  1722→  1722→- Tests cover create/list/load/delete negative cases.
+  1723→  1723→```
+  1724→  1724→
+  1725→  1725→### Issue 6 — Add deterministic IDs and RNG
+  1726→  1726→
+  1727→  1727→```text
+  1728→  1728→Task: Remove non-deterministic Date.now()/Math.random() from engine state logic.
+  1729→  1729→
+  1730→  1730→Files:
+  1731→  1731→- src/engine/core/GameState.ts
+  1732→  1732→- src/engine/core/GameEngine.ts
+  1733→  1733→- src/engine/rules/cityRules.ts
+  1734→  1734→- src/engine/rules/recruitmentRules.ts
+  1735→  1735→- src/engine/ai/AiDirector.ts
+  1736→  1736→- src/workers/simulation.worker.ts
+  1737→  1737→- src/engine/save/*
+  1738→  1738→
+  1739→  1739→Requirements:
+  1740→  1740→1. Add deterministic counters for city/entity IDs.
+  1741→  1741→2. Use GameRng for AI/gameplay randomness.
+  1742→  1742→3. Persist and restore rng state.
+  1743→  1743→4. Keep UI-only visual randomness untouched if it does not affect game state.
+  1744→  1744→
+  1745→  1745→Acceptance:
+  1746→  1746→- Same seed + same command list => identical serialized GameState.
+  1747→  1747→- rg "Math.random|Date.now" src/engine src/workers/simulation.worker.ts finds no gameplay state usage.
+  1748→  1748→- Deterministic replay test passes.
+  1749→  1749→```
+  1750→  1750→
+  1751→  1751→### Issue 7 — Add requestId to Worker protocol
+  1752→  1752→
+  1753→  1753→```text
+  1754→  1754→Task: Make WorkerManager match worker responses by requestId.
+  1755→  1755→
+  1756→  1756→Files:
+  1757→  1757→- src/workers/workerProtocol.ts
+  1758→  1758→- src/workers/workerManager.ts
+  1759→  1759→- src/workers/*.worker.ts
+  1760→  1760→
+  1761→  1761→Requirements:
+  1762→  1762→1. Add requestId to every request type.
+  1763→  1763→2. Add requestId to every response/error type.
+  1764→  1764→3. WorkerManager sends requestId with postMessage.
+  1765→  1765→4. Workers echo requestId.
+  1766→  1766→5. handleWorkerMessage resolves pendingRequests.get(data.requestId).
+  1767→  1767→6. Remove FIFO/prefix matching.
+  1768→  1768→
+  1769→  1769→Acceptance:
+  1770→  1770→- Multiple concurrent requests of same worker type resolve correctly.
+  1771→  1771→- Timeout cleanup still works.
+  1772→  1772→- Fallback behavior still works.
+  1773→  1773→```
+  1774→  1774→
+  1775→  1775→### Issue 8 — Add test infrastructure and first tests
+  1776→  1776→
+  1777→  1777→```text
+  1778→  1778→Task: Add Vitest and initial engine tests.
+  1779→  1779→
+  1780→  1780→Files:
+  1781→  1781→- package.json
+  1782→  1782→- vitest.config.ts
+  1783→  1783→- tests or src/**/*.test.ts
+  1784→  1784→
+  1785→  1785→Requirements:
+  1786→  1786→1. Add typecheck/test/test:coverage scripts.
+  1787→  1787→2. Add tests for hex distance, movement, city founding, recruitment, save/load.
+  1788→  1788→3. Tests must be deterministic.
+  1789→  1789→4. Do not rely on real time/random/network.
+  1790→  1790→
+  1791→  1791→Acceptance:
+  1792→  1792→- bun run test passes.
+  1793→  1793→- bun run typecheck passes.
+  1794→  1794→- CI can run tests.
+  1795→  1795→```
+  1796→  1796→
+  1797→  1797→### Issue 9 — Fix TerrainLayer cleanup and large-map rendering
+  1798→  1798→
+  1799→  1799→```text
+  1800→  1800→Task: Fix TerrainLayer chunk cleanup and avoid double-rendering terrain on large maps.
+  1801→  1801→
+  1802→  1802→File:
+  1803→  1803→- src/components/game3d/TerrainLayer.tsx
+  1804→  1804→
+  1805→  1805→Requirements:
+  1806→  1806→1. Replace cleanup useMemo with useEffect cleanup.
+  1807→  1807→2. When chunked terrain is active, do not render full visual HexMesh for every tile.
+  1808→  1808→3. Preserve click/hover/select behavior through lightweight interaction layer.
+  1809→  1809→4. Dispose grid geometry when it changes/unmounts.
+  1810→  1810→
+  1811→  1811→Acceptance:
+  1812→  1812→- Large map does not render both chunked terrain and per-hex full meshes.
+  1813→  1813→- No memory/GPU resource leak on new game/reset.
+  1814→  1814→- Selection/hover still works.
+  1815→  1815→```
+  1816→  1816→
+  1817→  1817→### Issue 10 — Add CI workflow
+  1818→  1818→
+  1819→  1819→```text
+  1820→  1820→Task: Add GitHub Actions CI for Bun + Prisma + Next.js.
+  1821→  1821→
+  1822→  1822→File:
+  1823→  1823→- .github/workflows/ci.yml
+  1824→  1824→
+  1825→  1825→Requirements:
+  1826→  1826→1. checkout
+  1827→  1827→2. setup bun
+  1828→  1828→3. bun install --frozen-lockfile
+  1829→  1829→4. bunx prisma generate
+  1830→  1830→5. bun run typecheck
+  1831→  1831→6. bun run lint
+  1832→  1832→7. bun run test
+  1833→  1833→8. bun run build
+  1834→  1834→
+  1835→  1835→Acceptance:
+  1836→  1836→- Workflow passes on clean checkout.
+  1837→  1837→- PR fails if typecheck/lint/test/build fails.
+  1838→  1838→```
+  1839→  1839→
+  1840→  1840→---
+  1841→  1841→
+  1842→  1842→## 16. Конкретные файлы с замечаниями
+  1843→  1843→
+  1844→  1844→### `next.config.ts`
+  1845→  1845→
+  1846→  1846→Проблемы:
+  1847→  1847→
+  1848→  1848→- `ignoreBuildErrors: true`;
+  1849→  1849→- `reactStrictMode: false`;
+  1850→  1850→- hardcoded `allowedDevOrigins`.
+  1851→  1851→
+  1852→  1852→Рекомендация:
+  1853→  1853→
+  1854→  1854→- убрать ignore;
+  1855→  1855→- включить StrictMode;
+  1856→  1856→- dev origins вынести в env/dev-only.
+  1857→  1857→
+  1858→  1858→### `eslint.config.mjs`
+  1859→  1859→
+  1860→  1860→Проблемы:
+  1861→  1861→
+  1862→  1862→- отключены критичные правила;
+  1863→  1863→- нет quality gate.
+  1864→  1864→
+  1865→  1865→Рекомендация:
+  1866→  1866→
+  1867→  1867→- включать правила по этапам;
+  1868→  1868→- не пытаться включить всё сразу, иначе PR будет слишком большой.
+  1869→  1869→
+  1870→  1870→### `Caddyfile`
+  1871→  1871→
+  1872→  1872→Проблемы:
+  1873→  1873→
+  1874→  1874→- SSRF/open proxy через `XTransformPort`.
+  1875→  1875→
+  1876→  1876→Рекомендация:
+  1877→  1877→
+  1878→  1878→- удалить полностью;
+  1879→  1879→- добавить headers;
+  1880→  1880→- separate dev/prod Caddyfile if needed.
+  1881→  1881→
+  1882→  1882→### `prisma/schema.prisma`
+  1883→  1883→
+  1884→  1884→Проблемы:
+  1885→  1885→
+  1886→  1886→- `SaveGame` без owner;
+  1887→  1887→- no indexes;
+  1888→  1888→- no version field в DB;
+  1889→  1889→- no size strategy;
+  1890→  1890→- no migration history in repo.
+  1891→  1891→
+  1892→  1892→Рекомендация:
+  1893→  1893→
+  1894→  1894→- добавить owner model или local-only альтернативу;
+  1895→  1895→- migration-based workflow;
+  1896→  1896→- index by owner/update time.
+  1897→  1897→
+  1898→  1898→### `src/lib/db.ts`
+  1899→  1899→
+  1900→  1900→Проблемы:
+  1901→  1901→
+  1902→  1902→- query logging всегда включён.
+  1903→  1903→
+  1904→  1904→Рекомендация:
+  1905→  1905→
+  1906→  1906→- dev-only query logs;
+  1907→  1907→- production только `error`/`warn`.
+  1908→  1908→
+  1909→  1909→### `src/app/api/save/route.ts`
+  1910→  1910→
+  1911→  1911→Проблемы:
+  1912→  1912→
+  1913→  1913→- raw `request.json()`;
+  1914→  1914→- no validation;
+  1915→  1915→- no auth;
+  1916→  1916→- no body limit;
+  1917→  1917→- accepts empty checksum;
+  1918→  1918→- stores arbitrary JSON.
+  1919→  1919→
+  1920→  1920→Рекомендация:
+  1921→  1921→
+  1922→  1922→- Zod schema;
+  1923→  1923→- SaveService;
+  1924→  1924→- owner checks;
+  1925→  1925→- size limit;
+  1926→  1926→- structured error responses.
+  1927→  1927→
+  1928→  1928→### `src/app/api/load/route.ts`
+  1929→  1929→
+  1930→  1930→Проблемы:
+  1931→  1931→
+  1932→  1932→- `findUnique({ where: { id } })` без owner;
+  1933→  1933→- `DELETE` удаляет любой save by id;
+  1934→  1934→- no validation of `id` format;
+  1935→  1935→- no checksum validation;
+  1936→  1936→- raw save data returned.
+  1937→  1937→
+  1938→  1938→Рекомендация:
+  1939→  1939→
+  1940→  1940→- `findFirst({ where: { id, ownerId } })`;
+  1941→  1941→- validate `id`;
+  1942→  1942→- load through SaveService;
+  1943→  1943→- delete only own save.
+  1944→  1944→
+  1945→  1945→### `src/app/api/saves/route.ts`
+  1946→  1946→
+  1947→  1947→Проблемы:
+  1948→  1948→
+  1949→  1949→- returns all saves globally;
+  1950→  1950→- no auth;
+  1951→  1951→- no pagination;
+  1952→  1952→- no owner filtering.
+  1953→  1953→
+  1954→  1954→Рекомендация:
+  1955→  1955→
+  1956→  1956→- owner filtering;
+  1957→  1957→- pagination/limit;
+  1958→  1958→- no raw data field in list.
+  1959→  1959→
+  1960→  1960→### `src/store/slices/sessionSlice.ts`
+  1961→  1961→
+  1962→  1962→Проблемы:
+  1963→  1963→
+  1964→  1964→- save sends raw `GameState`;
+  1965→  1965→- checksum empty;
+  1966→  1966→- load reconstructs config approximately;
+  1967→  1967→- catches often return false without error details;
+  1968→  1968→- command history not reliably integrated with engine save.
+  1969→  1969→
+  1970→  1970→Рекомендация:
+  1971→  1971→
+  1972→  1972→- integrate SaveService;
+  1973→  1973→- expose user-visible error state;
+  1974→  1974→- save command log/rng/config;
+  1975→  1975→- add `loadSaveFile` not just `loadGame(state)`.
+  1976→  1976→
+  1977→  1977→### `src/engine/save/saveGame.ts`
+  1978→  1978→
+  1979→  1979→Плюсы:
+  1980→  1980→
+  1981→  1981→- good SaveFile concept;
+  1982→  1982→- includes config/commandLog/rngState;
+  1983→  1983→- checksum function documented as non-crypto;
+  1984→  1984→- deterministic serialization attempt.
+  1985→  1985→
+  1986→  1986→Проблемы:
+  1987→  1987→
+  1988→  1988→- `timestamp: Date.now()` makes serialized save non-deterministic. Это нормально для metadata, но не для state hash/replay. Нужно отделить metadata timestamp от deterministic state hash.
+  1989→  1989→- `rngState` interface `{ seed, position }`, но `GameRng.getState()` возвращает internal state, not position. Термины надо синхронизировать.
+  1990→  1990→
+  1991→  1991→### `src/engine/save/loadGame.ts`
+  1992→  1992→
+  1993→  1993→Плюсы:
+  1994→  1994→
+  1995→  1995→- есть validation;
+  1996→  1996→- есть migration hook;
+  1997→  1997→- future version rejected.
+  1998→  1998→
+  1999→  1999→Проблемы:
+  2000→  2000→
+
+[showing lines 1-2000 of 2002; use offset=2001 with limit to continue reading]
