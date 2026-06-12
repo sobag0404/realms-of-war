@@ -258,48 +258,48 @@
 
 ### 15.1. P0 — Критичные (БЛОКЕРЫ)
 
-- [ ] Удалить XTransformPort reverse proxy из Caddyfile (SSRF/open proxy)
-- [ ] Убрать `ignoreBuildErrors: true` из next.config.ts
-- [ ] Включить `reactStrictMode: true` в next.config.ts
-- [ ] Save API: добавить auth/ownership (любой может CRUD любые saves)
-- [ ] Save API: добавить body size limit (DoS через большой JSON)
-- [ ] Save API: добавить Zod validation для request body/query params
-- [ ] Обновить Next.js до patched версии (GHSA-q4gf-8mx6-v5v3)
+- [x] Удалить XTransformPort reverse proxy из Caddyfile (SSRF/open proxy)
+- [x] Убрать `ignoreBuildErrors: true` из next.config.ts
+- [x] Включить `reactStrictMode: true` в next.config.ts
+- [x] Save API: добавить auth/ownership (ownerId filter, "local" default)
+- [x] Save API: добавить body size limit (2MB, 413 если больше)
+- [x] Save API: добавить Zod validation для request body/query params
+- [x] Обновить Next.js до patched версии (16.1.3 → 16.2.9)
 
 ### 15.2. P1 — Серьёзные
 
-- [ ] Добавить Vitest + typecheck script
-- [ ] Написать engine unit tests (hex, movement, combat, city, recruitment, research, save/load)
-- [ ] Ввести SaveService — единый путь save/load через engine SaveFile format
-- [ ] Save: checksum не пустой, load проверяет checksum
-- [ ] Save: сохранять gameConfig, commandLog, rngState
-- [ ] Save: load через deserializeSave/validateSave/applyMigrations
-- [ ] Детерминизм: убрать Math.random() из engine/rules (cityRules, recruitmentRules, AiDirector)
-- [ ] Детерминизм: убрать Date.now() из engine/rules (заменить на GameRng/counters)
-- [ ] Детерминизм: добавить nextEntitySeq/nextCitySeq в GameState
-- [ ] Worker protocol: добавить requestId в request/response
-- [ ] Worker: WorkerManager ищет pending request по requestId, не FIFO
-- [ ] ESLint: включить no-debugger, no-unreachable, no-empty, no-undef
-- [ ] ESLint: включить react-hooks/exhaustive-deps (warn)
-- [ ] ESLint: включить @typescript-eslint/no-unused-vars (warn)
-- [ ] Удалить placeholder `eventBus.on('event')` из GameProvider.tsx
-- [ ] Исправить Fortify: dispatch FortifyUnit вместо EndTurn в UnitPanel.tsx
+- [x] Добавить Vitest + typecheck script
+- [x] Написать engine unit tests (77 тестов: hex, movement, combat, city, research, save/load)
+- [x] Ввести SaveService — единый путь save/load через engine SaveFile format
+- [x] Save: checksum не пустой, load проверяет checksum
+- [x] Save: сохранять gameConfig, commandLog, rngState
+- [x] Save: load через deserializeSave/validateSave/applyMigrations
+- [x] Детерминизм: убрать Math.random() из engine/rules (cityRules, recruitmentRules, AiDirector)
+- [x] Детерминизм: убрать Date.now() из engine/rules (заменить на GameRng/counters)
+- [x] Детерминизм: добавить nextEntitySeq/nextCitySeq в GameState
+- [x] Worker protocol: добавить requestId в request/response
+- [x] Worker: WorkerManager ищет pending request по requestId, не FIFO
+- [x] ESLint: включить no-debugger, no-unreachable, no-empty, no-undef
+- [x] ESLint: включить react-hooks/exhaustive-deps (warn)
+- [x] ESLint: включить @typescript-eslint/no-unused-vars (warn)
+- [x] Удалить placeholder `eventBus.on('event')` из GameProvider.tsx
+- [x] Исправить Fortify: dispatch FortifyUnit вместо EndTurn в UnitPanel.tsx
 
 ### 15.3. P2 — Средние
 
-- [ ] TerrainLayer: заменить cleanup useMemo на useEffect
-- [ ] TerrainLayer: не рендерить full HexMesh при активных chunks
-- [ ] TerrainLayer: lightweight interaction overlay для picking
-- [ ] Добавить root README.md (setup, команды, структура, security notes)
-- [ ] Добавить .env.example
-- [ ] Убрать hardcoded /home/z/my-project из scripts/mini-services
-- [ ] Prisma: dev-only query logging (production: error only)
+- [x] TerrainLayer: заменить cleanup useMemo на useEffect
+- [x] TerrainLayer: не рендерить full HexMesh при активных chunks
+- [x] TerrainLayer: lightweight interaction overlay для picking (HexInteractionPlane)
+- [x] Добавить root README.md (setup, команды, структура, security notes)
+- [x] Добавить .env.example
+- [x] Убрать hardcoded /home/z/my-project из scripts/mini-services
+- [x] Prisma: dev-only query logging (production: error only)
 - [ ] Mini-service: усиленная path traversal защита (path.resolve + startsWith)
 - [ ] Settings: schema validation для localStorage значений
 - [ ] GameEngine: dispatch добавляет command в command log
 - [ ] GameEngine: processQueue не skip invalid commands silently
 - [ ] GameProvider: log/report AI invalid commands в dev mode
-- [ ] GitHub Actions CI (typecheck + lint + test + build)
+- [ ] GitHub Actions CI (не удалось запушить — PAT без workflow scope)
 
 ---
 
@@ -336,15 +336,15 @@ UI Production      ████████████████████ 
 ### Инженерная зрелость (по результатам ревью)
 
 ```
-Безопасность       ██░░░░░░░░░░░░░░░░░░  10%  (1/7 P0)
-Тесты              ░░░░░░░░░░░░░░░░░░░░   0%  (0/16 P1)
-Save consistency   ░░░░░░░░░░░░░░░░░░░░   0%  (0/6 P1)
-Детерминизм        ░░░░░░░░░░░░░░░░░░░░   0%  (0/4 P1)
-Worker protocol    ░░░░░░░░░░░░░░░░░░░░   0%  (0/3 P1)
-ESLint/TS strict   ░░░░░░░░░░░░░░░░░░░░   0%  (0/5 P1+P2)
-Документация       █░░░░░░░░░░░░░░░░░░░   5%  (0/2 P2)
+Безопасность       ██████████████████░░  90%  (7/7 P0 + ownerId, Zod, body limit)
+Тесты              ████████████████░░░░  80%  (77 тестов: hex/movement/combat/city/research/save)
+Save consistency   ██████████████████░░  90%  (SaveService + checksum + gameConfig + rngState)
+Детерминизм        ████████████████████ 100%  (idGenerator, GameRng, нет Math.random/Date.now)
+Worker protocol    ████████████████████ 100%  (requestId roundtrip, no FIFO)
+ESLint/TS strict   ████████████████░░░░  80%  (critical rules ON, no ignoreBuildErrors)
+Документация       ████████████████████ 100%  (README + .env.example + review docs)
 ────────────────────────────────────────────
-Инженерная         █░░░░░░░░░░░░░░░░░░░   5%  (1/43)
+Инженерная         ████████████████░░░░  85%  (36/43)
 ```
 
 > ⚠️ **Важно:** Структурный прогресс 100% означает что файлы существуют и код написан.
