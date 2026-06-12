@@ -8,7 +8,7 @@
  * Commands are pure data — no functions, no references to runtime objects.
  */
 
-import type { CityId, DiplomacyStatus, EntityId, HexCoord, PlayerId } from './types';
+import type { CityId, DiplomacyStatus, EntityId, HexCoord, PlayerId, ResourceId } from './types';
 
 // ─── Command Types ────────────────────────────────────────────────────────────
 
@@ -21,7 +21,11 @@ export type GameCommandType =
   | 'ResearchTechnology'
   | 'ChangeDiplomacy'
   | 'EndTurn'
-  | 'HotseatSwitch';
+  | 'HotseatSwitch'
+  | 'FortifyUnit'
+  | 'BuildImprovement'
+  | 'SellResource'
+  | 'BuyResource';
 
 // ─── Command Payloads ─────────────────────────────────────────────────────────
 
@@ -91,6 +95,34 @@ export interface HotseatSwitchCommand {
   toPlayerId: PlayerId;
 }
 
+export interface FortifyUnitCommand {
+  type: 'FortifyUnit';
+  playerId: PlayerId;
+  entityId: EntityId;
+}
+
+export interface BuildImprovementCommand {
+  type: 'BuildImprovement';
+  playerId: PlayerId;
+  entityId: EntityId; // worker unit
+  hex: HexCoord;
+  improvementType: string; // 'farm', 'mine', 'lumber_mill', 'quarry_improvement', 'road', 'mana_focus'
+}
+
+export interface SellResourceCommand {
+  type: 'SellResource';
+  playerId: PlayerId;
+  resource: ResourceId;
+  amount: number;
+}
+
+export interface BuyResourceCommand {
+  type: 'BuyResource';
+  playerId: PlayerId;
+  resource: ResourceId;
+  amount: number;
+}
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 export type GameCommand =
@@ -102,7 +134,11 @@ export type GameCommand =
   | ResearchTechnologyCommand
   | ChangeDiplomacyCommand
   | EndTurnCommand
-  | HotseatSwitchCommand;
+  | HotseatSwitchCommand
+  | FortifyUnitCommand
+  | BuildImprovementCommand
+  | SellResourceCommand
+  | BuyResourceCommand;
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
 

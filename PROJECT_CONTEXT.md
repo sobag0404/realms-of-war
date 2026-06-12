@@ -44,33 +44,44 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-12 (Фаза 6 — Интеграция и исправления)
+> Последнее обновление: 2026-06-12 (Фаза 7 — Подключение правил и новые команды)
 
 ### Что реализовано
 
 - ✅ GDD (полная спецификация 5531 строк)
 - ✅ Hex-математика (`src/engine/hex/`) — координаты, дистанции, пути, округление, хранение карты, **линия видимости, регионы**
 - ✅ Ядро движка (`src/engine/core/`) — GameState, GameConfig, GameRng, CommandQueue, EventBus, типы
-- ✅ **GameEngine.ts** — главный фасад движка (диспетчеризация команд, валидация, иммутабельные обновления, **setState для загрузки**)
+- ✅ **GameEngine.ts** — фасад движка с делегированием в rules/ и systems/ (Фаза 7)
 - ✅ ECS ядро (`src/engine/ecs/`) — Entity, 14 компонентов, ComponentStorage
 - ✅ **ECS-системы** (`src/engine/ecs/systems/`) — Movement, Combat, Vision, Economy, Research, City, AI, StatusEffect, Turn
 - ✅ Генератор карты (`src/engine/mapgen/`) — шум, биомы, реки, ресурсы, руины, стартовые позиции, валидация
 - ✅ Правила игры (`src/engine/rules/`) — движение, бой, экономика, исследование, города, найм, дипломатия, победа
 - ✅ **AI Director** (`src/engine/ai/`) — StrategicPlanner, TacticalPlanner, UtilityScoring, BehaviorTree, InfluenceMap, AiMemory, DifficultyModifiers
 - ✅ **Сохранения/загрузки** (`src/engine/save/`) — сериализация, десериализация, валидация, миграции
-- ✅ **AI автоплей** — GameProvider автоматически выполняет ходы AI игроков с задержкой 800мс
-- ✅ **Дипломатия** — ChangeDiplomacy команда, кнопки работают (мир/война/союз)
-- ✅ **Save/Load UI** — кнопка "Загрузить" в меню, кнопка "Save" в HUD, API routes, Prisma DB
-- ✅ **Zustand Store** (`src/store/`) — 6 слайсов: session, gameView, selection, command, ui, settings
-- ✅ **Providers** (`src/components/providers/`) — GameProvider (AI + EventBus), I18nProvider, AudioProvider
-- ✅ **3D рендеринг** (`src/components/game3d/`) — Canvas, Camera, Lighting, Terrain, Water, Units, Buildings, Fog, Selection, PathPreview, Decorations, Projectiles, Particles, PostProcessing
-- ✅ **UI/HUD** (`src/components/hud/`) — GameHud, ResourceBar, TurnPanel, SelectionPanel, UnitPanel, CityPanel, Minimap, NotificationStack, ControlsHelp
-- ✅ **Экраны** (`src/components/screens/`) — MainMenuScreen, NewGameScreen, SettingsScreen, TechTreeScreen, CityManagementScreen, RecruitmentScreen, DiplomacyScreen, EndTurnSummaryScreen
-- ✅ **Data-конфиги** (`src/data/`) — юниты, здания, технологии, террейн, ресурсы, враги, эры, биомы, сложность, горячие клавиши
-- ✅ **Локализация** (`src/data/localization/`) — ru.ts (265+ записей), en.ts (265+ записей)
-- ✅ **Web Workers** (`src/workers/`) — pathfinding, AI, mapgen, simulation + workerProtocol + **WorkerManager (интегрирован)**
-- ✅ **Rendering утилиты** (`src/rendering/`) — AssetManifest, AssetLoader, ModelRegistry, buildHexGeometry, buildTerrainChunks, terrainMaterials, InstancedModelPool, HexRaycaster, minimapRenderer — **интегрированы в game3d/**
-- ✅ **Three.js PCFShadowMap** — убрано deprecation предупреждение
+- ✅ **GameEngine → rules/systems интеграция (Фаза 7)**:
+  - validateCommand() делегирует в rules/ (canMoveTo, canAttack, canFoundCity, canRecruitUnit, canResearch, canPropose)
+  - applyCommand() делегирует в systems/ (MovementSystem, CombatSystem, CitySystem, ResearchSystem)
+  - applyEndTurn() использует TurnSystem.endTurn() — полный pipeline: income → research → city growth → production → status effects → heal → vision
+  - Исследование теперь требует времени (не мгновенное)
+  - Рекрут и здания идут через production queue
+  - Основание города требует поселенца
+- ✅ **Новые команды (Фаза 7)**: FortifyUnit, BuildImprovement, SellResource, BuyResource
+- ✅ **Старт игры (Фаза 7)**: populateStartingPositions() — столица + копейщик + поселенец
+- ✅ AI автоплей — GameProvider автоматически выполняет ходы AI игроков с задержкой 800мс
+- ✅ Дипломатия — ChangeDiplomacy команда + валидация через canPropose()
+- ✅ Save/Load UI — кнопка "Загрузить" в меню, кнопка "Save" в HUD, API routes, Prisma DB
+- ✅ **Экономика работает**: доход за ход от городов, terrain yields, buildings; upkeep вычитается
+- ✅ **Исследование работает**: старт → прогресс за ход → завершение → эпоха
+- ✅ **Production queue работает**: здания и юниты строятся за несколько ходов
+- ✅ Zustand Store (`src/store/`) — 6 слайсов: session, gameView, selection, command, ui, settings
+- ✅ Providers (`src/components/providers/`) — GameProvider (AI + EventBus), I18nProvider, AudioProvider
+- ✅ 3D рендеринг (`src/components/game3d/`) — Canvas, Camera, Lighting, Terrain, Water, Units, Buildings, Fog, Selection, PathPreview, Decorations, Projectiles, Particles, PostProcessing
+- ✅ UI/HUD (`src/components/hud/`) — GameHud, ResourceBar, TurnPanel, SelectionPanel, UnitPanel, CityPanel, Minimap, NotificationStack, ControlsHelp
+- ✅ Экраны (`src/components/screens/`) — MainMenuScreen, NewGameScreen, SettingsScreen, TechTreeScreen, CityManagementScreen, RecruitmentScreen, DiplomacyScreen, EndTurnSummaryScreen
+- ✅ Data-конфиги (`src/data/`) — юниты, здания, технологии, террейн, ресурсы, враги, эры, биомы, сложность, горячие клавиши
+- ✅ Локализация (`src/data/localization/`) — ru.ts (265+ записей), en.ts (265+ записей)
+- ✅ Web Workers (`src/workers/`) — pathfinding, AI, mapgen, simulation + workerProtocol + WorkerManager
+- ✅ Rendering утилиты (`src/rendering/`) — AssetManifest, AssetLoader, ModelRegistry, buildHexGeometry, buildTerrainChunks, terrainMaterials, InstancedModelPool, HexRaycaster, minimapRenderer
 - ✅ Прототип 2D (Canvas) — `public/prototype/index.html`
 - ✅ Next.js проект с shadcn/ui компонентами
 - ✅ Prisma schema + SQLite (SaveGame model)
@@ -79,7 +90,10 @@
 
 - ❌ Декорации и пост-процессинг — нужны 3D модели/ассеты
 - ❌ Звуковое оформление — AudioProvider есть, но нужны реальные звуки
-- ❌ Полная игровая механика — бой, найм, строительство пока placeholder логика
+- ❌ Полная торговля между городами — trade route formula из GDD §10.5
+- ❌ Чудеса света — wonders из GDD §9.8 (данные есть, но нет специальных эффектов)
+- ❌ Rift порталы — контроль и victory condition
+- ❌ Culture pressure — территориальная экспансия через культуру (§9.5)
 
 ---
 
@@ -153,10 +167,12 @@ realms-of-war/
 
 ## Приоритеты разработки (следующие шаги)
 
-1. **Полная игровая механика** — заменить placeholder логику в GameEngine на правила из rules/
-2. **Звук** — реальные звуки вместо синтезированных (или оставить синтез для MVP)
-3. **3D модели** — заменить примитивы на AssetLoader/ModelRegistry
-4. **Тестирование и баланс** — playtest, настройка баланса
+1. **Trade routes** — торговля между городами (§10.5)
+2. **Culture pressure** — территориальная экспансия через культуру (§9.5)
+3. **Wonders** — чудеса света с уникальными эффектами (§9.8)
+4. **Rift portals** — контроль и victory condition
+5. **3D модели** — заменить примитивы на AssetLoader/ModelRegistry
+6. **Звук** — реальные звуки вместо синтезированных
 
 ---
 
@@ -187,4 +203,4 @@ realms-of-war/
 | 2026-06-11 | **Фаза 3:** UI/HUD + Экраны + Интеграция (19 файлов, 2 параллельных агента + интеграция) |
 | 2026-06-11 | **Фаза 4:** LineOfSight + Regions + Save/Load + AI Director + Data configs + Localization (30 файлов, 3 параллельных агента) |
 | 2026-06-11 | **Фаза 5:** 3D Polish + Audio + Workers + Rendering utils (19 файлов, 3 параллельных агента + TS fixes) |
-| 2026-06-12 | **Фаза 6:** AI autoplay fix + Save/Load UI + Diplomacy actions + Workers integration + Rendering integration + Three.js fix |
+| 2026-06-12 | **Фаза 7:** GameEngine → rules/systems интеграция + новые команды + старт игры + UI production queue |

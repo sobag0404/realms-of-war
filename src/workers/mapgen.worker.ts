@@ -414,7 +414,8 @@ self.onmessage = function (e: MessageEvent) {
 
       self.postMessage({
         type: 'generateMapResult',
-        mapData,
+        mapData: { radius: mapData.radius, tiles: mapData.tiles },
+        startingPositions: mapData.startingPositions,
       });
     } else {
       self.postMessage({

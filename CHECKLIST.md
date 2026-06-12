@@ -216,6 +216,40 @@
 - [x] Three.js PCFShadowMap — убрано deprecation предупреждение
 - [x] GameProvider в layout — подключён к React-дереву
 
+## 11. Подключение правил (Фаза 7) — GameEngine → rules/systems
+
+- [x] GameEngine.validateCommand() — делегирует в rules/ (canMoveTo, canAttack, canFoundCity, canRecruitUnit, canResearch, canPropose)
+- [x] GameEngine.applyCommand() — делегирует в systems/ (MovementSystem, CombatSystem, CitySystem, ResearchSystem, EconomySystem)
+- [x] GameEngine.applyEndTurn() — использует TurnSystem.endTurn() (полный pipeline: income → research → cities → status → heal → vision)
+- [x] Исследование теперь требует времени — ResearchSystem.startResearch() вместо мгновенного завершения
+- [x] Рекрут добавляет в production queue — startRecruitment() вместо мгновенного создания
+- [x] Здания строятся через production queue — CitySystem.buildBuilding()
+- [x] Основание города требует поселенца — canFoundCity() проверяет наличие settler
+- [x] Боевая формула из GDD — terrain/height/flanking/crit/counterattack бонусы
+- [x] Дипломатия через rules — canPropose() + setDiplomacyStatus()
+
+## 12. Новые команды (Фаза 7)
+
+- [x] FortifyUnit — юнит окапывается (+DEF, конец хода)
+- [x] BuildImprovement — worker строит улучшение (ферма, шахта, лесопилка, карьер, дорога, мана-фокус)
+- [x] SellResource — продажа ресурсов на рынке (50% от цены покупки)
+- [x] BuyResource — покупка ресурсов на рынке
+- [x] commandHandlers.ts — валидация и применение новых команд
+
+## 13. Старт игры (Фаза 7)
+
+- [x] populateStartingPositions() — создаёт столицу, копейщика и поселенца для каждого игрока
+- [x] Territory claiming — стартовые города получают зону влияния
+- [x] Starting resources — золото 100, еда 50, дерево 50, камень 30
+- [x] sessionSlice.startNewGame() — вызывает populateStartingPositions после генерации карты
+
+## 14. UI Production Queue (Фаза 7)
+
+- [x] RecruitmentScreen — показывает production queue + прогресс-бары
+- [x] CityManagementScreen — доступные здания + yield breakdown + production queue
+- [x] CityPanel — компактный вид: текущее производство + доходы
+- [x] ResourceBar — net income (доход - содержание) с цветовой кодировкой + tooltips
+
 ---
 
 ## 📊 Прогресс v0.1-alpha
@@ -229,7 +263,7 @@ ECS ядро+системы   ████████████████�
 Правила            ████████████████████ 100%  (8/8)
 AI Director        ████████████████████ 100%  (9/9)
 Сохранения         ████████████████████ 100%  (4/4)
-Команды/События    ████████████████████ 100%  (3/3)
+Команды/События    ████████████████████ 100%  (7/7)
 Data-конфиги       ████████████████████ 100%  (12/12)
 3D Рендеринг       ████████████████████ 100%  (16/16)
 UI/HUD             ████████████████████ 100%  (18/18)
@@ -238,8 +272,12 @@ Providers          ████████████████████ 
 Workers            ████████████████████ 100%  (6/6)
 Rendering utils    ████████████████████ 100%  (9/9)
 Интеграция         ████████████████████ 100%  (9/9)
+Rules→Engine       ████████████████████ 100%  (9/9)
+Новые команды      ████████████████████ 100%  (5/5)
+Старт игры         ████████████████████ 100%  (4/4)
+UI Production      ████████████████████ 100%  (4/4)
 ────────────────────────────────────────────
-Общий прогресс     ████████████████████ 100%  (148/148)
+Общий прогресс     ████████████████████ 100%  (186/186)
 ```
 
 ---

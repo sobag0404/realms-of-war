@@ -65,6 +65,8 @@ export interface MapGenResponse {
   type: 'generateMapResult';
   /** Serialized MapData (plain object). */
   mapData: unknown;
+  /** Starting hex positions for each player. */
+  startingPositions: Array<{ q: number; r: number }>;
 }
 
 // ─── Simulation Worker ───────────────────────────────────────────────────

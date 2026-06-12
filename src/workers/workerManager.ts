@@ -513,6 +513,7 @@ class WorkerManager {
       return {
         type: 'generateMapResult',
         mapData: result.mapData,
+        startingPositions: result.startingPositions,
       };
     } catch (error) {
       console.error('[WorkerManager] Sync mapgen fallback failed:', error);

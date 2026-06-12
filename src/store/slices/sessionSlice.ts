@@ -19,6 +19,7 @@ import { GameEngine, EngineError } from '@/engine/core/GameEngine';
 import { generateMap } from '@/engine/mapgen/generateMap';
 import { createDefaultConfig } from '@/engine/core/GameConfig';
 import { getWorkerManager } from '@/workers/workerManager';
+import { populateStartingPositions } from '@/engine/core/startPositions';
 
 // ─── Slice Interface ──────────────────────────────────────────────────────────
 
@@ -99,14 +100,36 @@ export const createSessionSlice: StateCreator<
       const workerManager = getWorkerManager();
       const initialState = engine.getState();
 
+      // Helper: build starting positions from mapgen result
+      const buildStartingPositions = (
+        startingHexes: Array<{ q: number; r: number }>,
+      ) => {
+        const playerIds = config.players.map((p) => p.id);
+        return startingHexes
+          .slice(0, playerIds.length)
+          .map((hex, i) => ({
+            playerId: playerIds[i],
+            hex,
+          }));
+      };
+
       workerManager
         .requestMapgen(mapGenWidth, mapGenHeight, mapGenSeed, mapGenPlayers)
         .then((result) => {
           // Merge generated map into engine state
-          const stateWithMap: GameState = {
+          let stateWithMap: GameState = {
             ...initialState,
             map: result.mapData as GameState['map'],
           };
+
+          // Populate starting units and cities at the generated starting positions
+          const positions = buildStartingPositions(result.startingPositions);
+          if (positions.length > 0) {
+            stateWithMap = populateStartingPositions(stateWithMap, positions);
+          }
+
+          // Sync engine state with the populated state
+          engine.setState(stateWithMap);
 
           set(
             {
@@ -133,10 +156,19 @@ export const createSessionSlice: StateCreator<
               playerCount: mapGenPlayers,
             });
 
-            const stateWithMap: GameState = {
+            let stateWithMap: GameState = {
               ...initialState,
               map: mapResult.mapData,
             };
+
+            // Populate starting units and cities
+            const positions = buildStartingPositions(mapResult.startingPositions);
+            if (positions.length > 0) {
+              stateWithMap = populateStartingPositions(stateWithMap, positions);
+            }
+
+            // Sync engine state with the populated state
+            engine.setState(stateWithMap);
 
             set(
               {

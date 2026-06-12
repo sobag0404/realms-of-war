@@ -1,8 +1,9 @@
 /**
  * CityPanel — selected city details for the SelectionPanel.
  *
- * Displays city info, population, HP, production queue, buildings,
- * and action buttons for city management and recruitment.
+ * Displays compact city info: name, population, current production item
+ * with progress, key yields per turn, and quick access buttons.
+ * All text in Russian.
  */
 
 'use client';
@@ -14,8 +15,35 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { BUILDINGS } from '@/data/buildings';
+import { UNIT_TYPES } from '@/data/units';
+import { calculateCityYield } from '@/engine/rules/cityRules';
 import type { BuildingId } from '@/data/buildings';
-import type { CityState } from '@/engine/core/GameState';
+import type { UnitTypeId } from '@/data/units';
+import type { ResourceId } from '@/engine/core/types';
+import type { CityState, ProductionItem } from '@/engine/core/GameState';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const YIELD_ICONS: Partial<Record<ResourceId, string>> = {
+  gold: '🪙',
+  food: '🌾',
+  wood: '🪵',
+  stone: '🪨',
+  iron: '⚔️',
+  mana: '🔮',
+  progress: '📜',
+  science: '🔬',
+};
+
+/** Get display name for a production item */
+function getProductionItemName(item: ProductionItem): string {
+  if (item.kind === 'building') {
+    const building = BUILDINGS[item.id as BuildingId];
+    return building?.nameRu ?? item.id;
+  }
+  const unit = UNIT_TYPES[item.id as UnitTypeId];
+  return unit?.nameRu ?? item.id;
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -43,6 +71,23 @@ export function CityPanel({ city }: CityPanelProps) {
       : 0
     : 0;
 
+  // Turns left for current production
+  const turnsLeft =
+    currentProduction && city.productionPerTurn > 0
+      ? Math.ceil((currentProduction.cost - currentProduction.progress) / city.productionPerTurn)
+      : currentProduction
+      ? '?'
+      : null;
+
+  // ── City yield from rules ──────────────────────────────────────────────
+  const cityYield = useMemo(() => {
+    if (!gameState || !city.id) return null;
+    return calculateCityYield(gameState, city.id);
+  }, [gameState, city.id]);
+
+  // Food surplus
+  const foodSurplus = (cityYield?.food ?? 0) - city.population;
+
   // Building names
   const buildingNames = useMemo(() => {
     return city.buildings.map((id) => {
@@ -54,6 +99,15 @@ export function CityPanel({ city }: CityPanelProps) {
       };
     });
   }, [city.buildings]);
+
+  // Key yield items for compact display
+  const keyYields = useMemo(() => {
+    if (!cityYield) return [];
+    const keys: ResourceId[] = ['food', 'progress', 'gold', 'science'];
+    return keys
+      .map((k) => ({ key: k, value: cityYield[k] ?? 0 }))
+      .filter((item) => item.value !== 0);
+  }, [cityYield]);
 
   const handleManage = useCallback(() => {
     setOpenPanel('city');
@@ -71,18 +125,18 @@ export function CityPanel({ city }: CityPanelProps) {
           <span
             className="w-3 h-3 rounded-full border border-white/30 shrink-0"
             style={{ backgroundColor: owner.color }}
-            aria-label={`Owner: ${owner.name}`}
+            aria-label={`Владелец: ${owner.name}`}
           />
         )}
         <h3 className="text-white text-sm font-semibold truncate">
           {city.name}
         </h3>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-300 border-amber-500/30 bg-amber-500/10">
-          Lvl {city.level}
+          Ур. {city.level}
         </Badge>
         {city.isUnderSiege && (
           <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-            Under Siege
+            Осада
           </Badge>
         )}
       </div>
@@ -90,7 +144,7 @@ export function CityPanel({ city }: CityPanelProps) {
       {/* Population + growth */}
       <div className="space-y-0.5">
         <div className="flex justify-between text-[10px] text-white/60">
-          <span>Population</span>
+          <span>Население</span>
           <span className="tabular-nums">
             {city.population} ({city.growthProgress}/{city.growthTarget})
           </span>
@@ -105,7 +159,7 @@ export function CityPanel({ city }: CityPanelProps) {
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-0.5">
           <div className="flex justify-between text-[10px] text-white/60">
-            <span>City HP</span>
+            <span>HP города</span>
             <span className="tabular-nums">
               {city.hp}/{city.maxHp}
             </span>
@@ -122,7 +176,7 @@ export function CityPanel({ city }: CityPanelProps) {
         {city.maxWallHp > 0 && (
           <div className="space-y-0.5">
             <div className="flex justify-between text-[10px] text-white/60">
-              <span>Walls</span>
+              <span>Стены</span>
               <span className="tabular-nums">
                 {city.wallHp}/{city.maxWallHp}
               </span>
@@ -137,33 +191,57 @@ export function CityPanel({ city }: CityPanelProps) {
         )}
       </div>
 
-      {/* Production Queue */}
+      {/* Production Queue — current item */}
       {currentProduction && (
         <div className="space-y-0.5">
           <div className="flex justify-between text-[10px] text-white/60">
             <span>
-              Building: {currentProduction.kind === 'building' ? '🏗️' : '⚔️'}{' '}
-              {currentProduction.id.replace(/_/g, ' ')}
+              {currentProduction.kind === 'building' ? '🏗️' : '⚔️'}{' '}
+              {getProductionItemName(currentProduction)}
             </span>
             <span className="tabular-nums">
-              {currentProduction.progress}/{currentProduction.cost}
+              {Math.floor(currentProduction.progress)}/{currentProduction.cost}
+              {turnsLeft && typeof turnsLeft === 'number' && (
+                <span className="text-zinc-500"> ({turnsLeft} ход.)</span>
+              )}
             </span>
           </div>
           <Progress
             value={productionRatio * 100}
             className="h-1.5 bg-white/10 [&>div]:bg-amber-500"
           />
+          {/* Show queue count if more items */}
+          {city.productionQueue.length > 1 && (
+            <div className="text-[9px] text-zinc-500">
+              +{city.productionQueue.length - 1} в очереди
+            </div>
+          )}
         </div>
       )}
 
-      {/* Per-turn yields */}
-      <div className="flex gap-2 text-[10px] text-white/60">
-        <span>
-          🌾 {city.foodPerTurn}
-        </span>
-        <span>
-          🔨 {city.productionPerTurn}
-        </span>
+      {/* Per-turn yields — compact */}
+      <div className="flex gap-2 text-[10px] text-white/60 flex-wrap">
+        {keyYields.map((item) => {
+          const icon = YIELD_ICONS[item.key] ?? '';
+          const displayValue =
+            item.key === 'food'
+              ? foodSurplus
+              : item.value;
+          return (
+            <span
+              key={item.key}
+              className={
+                item.key === 'food' && foodSurplus < 0
+                  ? 'text-red-400'
+                  : item.key === 'food' && foodSurplus >= 0
+                  ? 'text-emerald-400'
+                  : ''
+              }
+            >
+              {icon} {displayValue >= 0 && item.key === 'food' ? '+' : ''}{displayValue}
+            </span>
+          );
+        })}
       </div>
 
       {/* Buildings list */}
@@ -196,7 +274,7 @@ export function CityPanel({ city }: CityPanelProps) {
               className="h-7 text-xs flex-1"
               onClick={handleManage}
             >
-              Manage
+              Управление
             </Button>
             <Button
               size="sm"
@@ -204,7 +282,7 @@ export function CityPanel({ city }: CityPanelProps) {
               className="h-7 text-xs flex-1"
               onClick={handleRecruit}
             >
-              Recruit
+              Найм
             </Button>
           </div>
         </>

@@ -2,14 +2,21 @@
  * ResourceBar — horizontal resource display at the top of the screen.
  *
  * Shows the active player's resources with per-turn deltas.
+ * Displays income per turn, net income (income - upkeep) with color coding,
+ * and tooltips with income breakdown by source.
  * Responsive: collapses to essential resources on mobile with expand button.
  */
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import type { ResourceId } from '@/engine/core/types';
 
 // ─── Resource Display Config ──────────────────────────────────────────────────
@@ -18,17 +25,18 @@ interface ResourceDisplay {
   id: ResourceId;
   icon: string;
   label: string;
+  labelRu: string;
 }
 
 const RESOURCE_DISPLAYS: ResourceDisplay[] = [
-  { id: 'gold', icon: '💰', label: 'Gold' },
-  { id: 'food', icon: '🌾', label: 'Food' },
-  { id: 'wood', icon: '🪵', label: 'Wood' },
-  { id: 'stone', icon: '🪨', label: 'Stone' },
-  { id: 'iron', icon: '⚔️', label: 'Iron' },
-  { id: 'mana', icon: '✨', label: 'Mana' },
-  { id: 'science', icon: '🔬', label: 'Science' },
-  { id: 'progress', icon: '🔨', label: 'Progress' },
+  { id: 'gold', icon: '🪙', label: 'Gold', labelRu: 'Золото' },
+  { id: 'food', icon: '🌾', label: 'Food', labelRu: 'Еда' },
+  { id: 'wood', icon: '🪵', label: 'Wood', labelRu: 'Дерево' },
+  { id: 'stone', icon: '🪨', label: 'Stone', labelRu: 'Камень' },
+  { id: 'iron', icon: '⚔️', label: 'Iron', labelRu: 'Железо' },
+  { id: 'mana', icon: '🔮', label: 'Mana', labelRu: 'Мана' },
+  { id: 'science', icon: '🔬', label: 'Science', labelRu: 'Наука' },
+  { id: 'progress', icon: '📜', label: 'Progress', labelRu: 'Производство' },
 ];
 
 /** Resources shown on mobile by default */
@@ -46,6 +54,48 @@ export function ResourceBar() {
   const toggleExpanded = useCallback(() => {
     setExpanded((prev) => !prev);
   }, []);
+
+  // ── Compute income breakdown by source ────────────────────────────────
+  const incomeBreakdown = useMemo(() => {
+    if (!gameState || !activePlayerId) return {};
+
+    const player = gameState.players[activePlayerId];
+    if (!player) return {};
+
+    const breakdown: Record<ResourceId, { cityNames: string[]; cityYields: Record<string, number> }> = {};
+
+    // Initialize all resource keys
+    for (const res of RESOURCE_DISPLAYS) {
+      breakdown[res.id] = { cityNames: [], cityYields: {} };
+    }
+
+    // Calculate income from each city
+    for (const city of Object.values(gameState.cities)) {
+      if (city.ownerId !== activePlayerId) continue;
+
+      // Count worked hexes yield + building bonuses
+      // We approximate from the city's cached values + building info
+      const cityName = city.name;
+
+      // Use the player's incomePerTurn as the aggregate, but we can show
+      // per-city contribution by examining each city's production/food output
+      // For simplicity, use the cached city values as the primary source
+      if (city.foodPerTurn !== 0) {
+        const key = 'food';
+        if (!breakdown[key]) breakdown[key] = { cityNames: [], cityYields: {} };
+        breakdown[key].cityNames.push(cityName);
+        breakdown[key].cityYields[cityName] = (breakdown[key].cityYields[cityName] ?? 0) + city.foodPerTurn;
+      }
+      if (city.productionPerTurn !== 0) {
+        const key = 'progress';
+        if (!breakdown[key]) breakdown[key] = { cityNames: [], cityYields: {} };
+        breakdown[key].cityNames.push(cityName);
+        breakdown[key].cityYields[cityName] = (breakdown[key].cityYields[cityName] ?? 0) + city.productionPerTurn;
+      }
+    }
+
+    return breakdown;
+  }, [gameState, activePlayerId]);
 
   if (!gameState) return null;
 
@@ -71,31 +121,88 @@ export function ResourceBar() {
           const amount = resources[res.id] ?? 0;
           const incomeValue = income[res.id] ?? 0;
           const upkeepValue = upkeep[res.id] ?? 0;
-          const delta = incomeValue - upkeepValue;
+          const netIncome = incomeValue - upkeepValue;
+
+          // Build tooltip content
+          const bd = incomeBreakdown[res.id];
+          const hasCityBreakdown = bd && bd.cityNames.length > 0;
+          const tooltipLines: string[] = [];
+
+          tooltipLines.push(`${res.labelRu}`);
+
+          if (incomeValue > 0) {
+            tooltipLines.push(`Доход: +${incomeValue}`);
+          }
+          if (upkeepValue > 0) {
+            tooltipLines.push(`Содержание: -${upkeepValue}`);
+          }
+          if (netIncome !== 0) {
+            tooltipLines.push(
+              `Чистый: ${netIncome > 0 ? '+' : ''}${netIncome}/ход`
+            );
+          }
+
+          // Show city-by-city breakdown if available
+          if (hasCityBreakdown) {
+            tooltipLines.push('─'.repeat(12));
+            for (const cityName of bd.cityNames) {
+              const val = bd.cityYields[cityName] ?? 0;
+              if (val !== 0) {
+                tooltipLines.push(`${cityName}: ${val > 0 ? '+' : ''}${val}`);
+              }
+            }
+          }
 
           return (
-            <div
-              key={res.id}
-              className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-colors"
-              aria-label={`${res.label}: ${amount}, ${delta >= 0 ? '+' : ''}${delta} per turn`}
-            >
-              <span className="text-sm sm:text-base" role="img" aria-hidden="true">
-                {res.icon}
-              </span>
-              <span className="text-white text-xs sm:text-sm font-medium tabular-nums">
-                {amount}
-              </span>
-              {delta !== 0 && (
-                <span
-                  className={`text-[10px] sm:text-xs tabular-nums ${
-                    delta > 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}
+            <Tooltip key={res.id}>
+              <TooltipTrigger asChild>
+                <div
+                  className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-colors cursor-default"
+                  aria-label={`${res.labelRu}: ${amount}, ${netIncome >= 0 ? '+' : ''}${netIncome} за ход`}
                 >
-                  {delta > 0 ? '+' : ''}
-                  {delta}
-                </span>
-              )}
-            </div>
+                  <span className="text-sm sm:text-base" role="img" aria-hidden="true">
+                    {res.icon}
+                  </span>
+                  <span className="text-white text-xs sm:text-sm font-medium tabular-nums">
+                    {amount}
+                  </span>
+                  {netIncome !== 0 && (
+                    <span
+                      className={`text-[10px] sm:text-xs tabular-nums font-medium ${
+                        netIncome > 0 ? 'text-emerald-400' : 'text-red-400'
+                      }`}
+                    >
+                      {netIncome > 0 ? '+' : ''}
+                      {netIncome}
+                    </span>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                className="bg-zinc-900 text-zinc-200 border-zinc-700 text-[11px] max-w-[200px]"
+              >
+                {tooltipLines.map((line, i) => (
+                  <div key={i} className={
+                    line === '─'.repeat(12)
+                      ? 'text-zinc-600 my-0.5'
+                      : line.startsWith('Чистый')
+                      ? netIncome >= 0 ? 'text-emerald-400 font-medium' : 'text-red-400 font-medium'
+                      : line.startsWith('Доход')
+                      ? 'text-emerald-400/80'
+                      : line.startsWith('Содержание')
+                      ? 'text-red-400/80'
+                      : ''
+                  }>
+                    {line === '─'.repeat(12) ? (
+                      <div className="border-t border-zinc-700 my-0.5" />
+                    ) : (
+                      line
+                    )}
+                  </div>
+                ))}
+              </TooltipContent>
+            </Tooltip>
           );
         })}
 
@@ -103,7 +210,7 @@ export function ResourceBar() {
         <button
           onClick={toggleExpanded}
           className="ml-auto flex items-center justify-center w-8 h-8 sm:hidden rounded bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
-          aria-label={expanded ? 'Collapse resources' : 'Expand resources'}
+          aria-label={expanded ? 'Свернуть ресурсы' : 'Развернуть ресурсы'}
           aria-expanded={expanded}
         >
           <span className="text-sm">{expanded ? '◀' : '▶'}</span>
