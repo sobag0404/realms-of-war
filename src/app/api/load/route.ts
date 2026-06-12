@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // NOTE: The response includes the checksum for the frontend to verify
+    // integrity. MainMenuScreen.tsx performs client-side checksum verification
+    // on load to detect accidental data corruption.
     return NextResponse.json({
       id: save.id,
       name: save.name,

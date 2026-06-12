@@ -252,7 +252,7 @@
 
 ---
 
-## 15. Техническое ревью (2026-06-12)
+## 15. Техническое ревью 1 (2026-06-12)
 
 > Полный текст: `docs/realms-of-war-ai-dev-review.md` | Секция GDD: §16
 
@@ -294,12 +294,37 @@
 - [x] Добавить .env.example
 - [x] Убрать hardcoded /home/z/my-project из scripts/mini-services
 - [x] Prisma: dev-only query logging (production: error only)
-- [ ] Mini-service: усиленная path traversal защита (path.resolve + startsWith)
-- [ ] Settings: schema validation для localStorage значений
-- [ ] GameEngine: dispatch добавляет command в command log
+- [x] Settings: schema validation для localStorage значений (Zod SettingsSchema)
+- [x] GameEngine: dispatch добавляет command в executedCommands log
+- [x] GameEngine: getCommandLog() + restoreCommandLog() для save/load
 - [ ] GameEngine: processQueue не skip invalid commands silently
 - [ ] GameProvider: log/report AI invalid commands в dev mode
 - [ ] GitHub Actions CI (не удалось запушить — PAT без workflow scope)
+- [ ] Mini-service: усиленная path traversal защита (path.resolve + startsWith)
+
+### 15.4. Ревью 2 — P0 (2026-06-12, второй ревьюер)
+
+> Полный текст: `docs/realms-of-war-ai-developer-review.md`
+
+- [x] Save/load flow: MainMenuScreen использует loadSaveFile() + verifyChecksum()
+- [x] Production build: build.sh не зависит от ./db/custom.db
+
+### 15.5. Ревью 2 — P1
+
+- [x] Checksum regex: {8,16} вместо {0,16} (пустой checksum не проходит)
+- [x] Server-side checksum verification в POST /api/save
+- [x] SaveFile structure validation через loadSaveFile() перед DB insert
+- [x] Body size protection: Content-Length + raw text guard до JSON.parse
+- [x] Command log: executedCommands в GameEngine.dispatch()
+- [x] MoveUnit path validation: validateMovementPath() в movementRules
+- [x] API tests: 19 тестов для save/load schemas и routes
+- [x] Worker typing: убран @ts-nocheck из pathfinding.worker.ts
+
+### 15.6. Ревью 2 — P2
+
+- [x] .gitignore: исправлена склеенная строка, tool-results/ убран из git
+- [x] Hardcoded scripts: start-game.sh, watchdog.sh используют относительные пути
+- [x] localStorage settings validation: Zod SettingsSchema
 
 ---
 
@@ -336,15 +361,16 @@ UI Production      ████████████████████ 
 ### Инженерная зрелость (по результатам ревью)
 
 ```
-Безопасность       ██████████████████░░  90%  (7/7 P0 + ownerId, Zod, body limit)
-Тесты              ████████████████░░░░  80%  (77 тестов: hex/movement/combat/city/research/save)
-Save consistency   ██████████████████░░  90%  (SaveService + checksum + gameConfig + rngState)
+Безопасность       ████████████████████ 100%  (checksum server-side, body guard, Zod, ownerId)
+Тесты              ██████████████████░░  90%  (96 тестов: hex/movement/combat/city/research/save/API)
+Save consistency   ████████████████████ 100%  (SaveService + checksum + loadSaveFile + gameConfig + rngState)
 Детерминизм        ████████████████████ 100%  (idGenerator, GameRng, нет Math.random/Date.now)
 Worker protocol    ████████████████████ 100%  (requestId roundtrip, no FIFO)
-ESLint/TS strict   ████████████████░░░░  80%  (critical rules ON, no ignoreBuildErrors)
+ESLint/TS strict   ██████████████████░░  90%  (critical rules ON, no ignoreBuildErrors, pathfinding typed)
 Документация       ████████████████████ 100%  (README + .env.example + review docs)
+Movement validation████████████████████ 100%  (validateMovementPath)
 ────────────────────────────────────────────
-Инженерная         ████████████████░░░░  85%  (36/43)
+Инженерная         ███████████████████░  95%  (41/43)
 ```
 
 > ⚠️ **Важно:** Структурный прогресс 100% означает что файлы существуют и код написан.
@@ -357,7 +383,8 @@ ESLint/TS strict   ████████████████░░░░ 
 | Что посмотреть | Где | Зачем |
 |---|---|---|
 | Полная спецификация | `docs/realms-of-war-design-spec.md` | Все правила, формулы, архитектура |
-| Техническое ревью | `docs/realms-of-war-ai-dev-review.md` | Результаты ревью 2026-06-12, P0/P1/P2 задачи |
+| Техническое ревью 1 | `docs/realms-of-war-ai-dev-review.md` | Результаты ревью 2026-06-12, P0/P1/P2 задачи |
+| Техническое ревью 2 | `docs/realms-of-war-ai-developer-review.md` | Второй ревью 2026-06-12, новые P0/P1/P2 задачи |
 | Типы движка | `src/engine/core/types.ts` | Базовые типы игры |
 | Конфиг игры | `src/engine/core/GameConfig.ts` | Настройки карты, баланса |
 | Баланс юнитов | `src/data/units.ts` | Характеристики юнитов |

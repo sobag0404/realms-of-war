@@ -56,7 +56,7 @@ import { TurnSystem } from '../ecs/systems/TurnSystem';
 // ─── Rules imports (validation only) ───────────────────────────────────────────
 
 import { canAttack as rulesCanAttack } from '../rules/combatRules';
-import { canMoveTo } from '../rules/movementRules';
+import { canMoveTo, validateMovementPath } from '../rules/movementRules';
 import { canFoundCity } from '../rules/cityRules';
 import { canRecruitUnit } from '../rules/recruitmentRules';
 import { canResearch } from '../rules/researchRules';
@@ -89,6 +89,7 @@ export class GameEngine {
   private rng: GameRng;
   private commandQueue: CommandQueue;
   private eventBus: EventBus;
+  private executedCommands: GameCommand[] = [];
 
   constructor(config: GameConfig) {
     this.config = config;
@@ -116,6 +117,7 @@ export class GameEngine {
       );
     }
     this.state = this.applyCommand(command);
+    this.executedCommands.push(structuredClone(command));
     return this.state;
   }
 
@@ -136,6 +138,7 @@ export class GameEngine {
   setState(state: GameState): void {
     this.state = state;
     this.eventBus.setTurn(state.turn);
+    this.executedCommands = [];
   }
 
   /** Access the event bus for subscribing to game events. */
@@ -146,6 +149,16 @@ export class GameEngine {
   /** Access the command queue (e.g. to pre-queue commands). */
   getCommandQueue(): CommandQueue {
     return this.commandQueue;
+  }
+
+  /** Get the log of all successfully executed commands. Returns a readonly copy. */
+  getCommandLog(): readonly GameCommand[] {
+    return this.executedCommands;
+  }
+
+  /** Restore a previously saved command log (used during loadSaveFile). */
+  restoreCommandLog(commands: GameCommand[]): void {
+    this.executedCommands = commands.map(c => structuredClone(c));
   }
 
   /** Access the PRNG (e.g. for map generation). */
@@ -242,11 +255,20 @@ export class GameEngine {
     if (command.path.length === 0) {
       return { valid: false, error: 'Path is empty' };
     }
+
+    // Validate destination
     const destination = command.path[command.path.length - 1];
     const result = canMoveTo(this.state, command.entityId, destination);
     if (!result.canMove) {
       return { valid: false, error: result.reason ?? 'Cannot move to target' };
     }
+
+    // Validate the full path step-by-step
+    const pathResult = validateMovementPath(this.state, command.entityId, command.path);
+    if (!pathResult.valid) {
+      return { valid: false, error: pathResult.error ?? 'Invalid movement path' };
+    }
+
     return { valid: true };
   }
 

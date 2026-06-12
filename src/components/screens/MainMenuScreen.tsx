@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGameStore } from '@/store/useGameStore';
-import type { GameState } from '@/engine/core/GameState';
+import { loadSaveFile, verifyChecksum } from '@/lib/saveService';
 
 // ─── Save Entry ──────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ interface SaveEntry {
 export function MainMenuScreen() {
   const mode = useGameStore((s) => s.mode);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
-  const loadGame = useGameStore((s) => s.loadGame);
+  const loadSaveFileIntoStore = useGameStore((s) => s.loadSaveFile);
   const addNotification = useGameStore((s) => s.addNotification);
   const [visible, setVisible] = useState(false);
   const [showLoadPanel, setShowLoadPanel] = useState(false);
@@ -49,7 +49,7 @@ export function MainMenuScreen() {
         setSaves(data.saves ?? []);
       }
     } catch {
-      // Silently fail
+      // Non-critical: failed to fetch saves list
     } finally {
       setLoadingSaves(false);
     }
@@ -64,15 +64,49 @@ export function MainMenuScreen() {
     async (saveId: string) => {
       try {
         const res = await fetch(`/api/load?id=${saveId}`);
-        if (!res.ok) throw new Error('Load failed');
-        const data = await res.json();
-        const gameState: GameState = JSON.parse(data.data);
-        loadGame(gameState);
+        if (!res.ok) {
+          addNotification({
+            type: 'error',
+            title: 'Ошибка',
+            message: res.status === 404 ? 'Сохранение не найдено' : 'Ошибка сервера при загрузке',
+            duration: 4000,
+          });
+          return;
+        }
+
+        const payload = await res.json();
+        const { data: saveData, checksum, name: saveName, turn: saveTurn } = payload;
+
+        // 1. Verify checksum before trusting the data
+        if (!verifyChecksum(saveData, checksum)) {
+          addNotification({
+            type: 'error',
+            title: 'Ошибка',
+            message: 'Повреждённое сохранение: checksum не совпадает',
+            duration: 5000,
+          });
+          return;
+        }
+
+        // 2. Deserialize and validate the save file through the engine save format
+        const result = loadSaveFile(saveData);
+        if (!result.success || !result.saveFile) {
+          addNotification({
+            type: 'error',
+            title: 'Ошибка',
+            message: result.error ?? 'Неверный формат сохранения',
+            duration: 5000,
+          });
+          return;
+        }
+
+        // 3. Load into the store using the proper SaveFile path
+        loadSaveFileIntoStore(result.saveFile);
         setShowLoadPanel(false);
         addNotification({
           type: 'success',
           title: 'Загрузка',
-          message: `Игра "${data.name}" загружена (ход ${data.turn})`,
+          message: `Игра "${saveName}" загружена (ход ${saveTurn})`,
           duration: 3000,
         });
       } catch {
@@ -84,7 +118,7 @@ export function MainMenuScreen() {
         });
       }
     },
-    [loadGame, addNotification],
+    [loadSaveFileIntoStore, addNotification],
   );
 
   const handleDeleteSave = useCallback(
@@ -101,7 +135,7 @@ export function MainMenuScreen() {
           });
         }
       } catch {
-        // Silently fail
+        // Non-critical: failed to delete save
       }
     },
     [addNotification],

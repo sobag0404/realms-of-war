@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { SavePayloadSchema, MAX_SAVE_BYTES } from '@/lib/saveSchemas';
+import { SavePayloadSchema } from '@/lib/saveSchemas';
+import { calculateChecksum } from '@/engine/save/saveGame';
+import { loadSaveFile } from '@/lib/saveService';
+
+const MAX_REQUEST_BYTES = 2_200_000; // slightly above MAX_SAVE_BYTES for JSON overhead
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Pre-parse body size guard — check BEFORE JSON.parse to avoid
+    // allocating memory for oversized payloads.
+    const contentLength = request.headers.get('content-length');
+    if (contentLength && Number(contentLength) > MAX_REQUEST_BYTES) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
 
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).length > MAX_REQUEST_BYTES) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    // Zod schema validation
     const parsed = SavePayloadSchema.safeParse(body);
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => i.message).join('; ');
@@ -17,10 +39,21 @@ export async function POST(request: NextRequest) {
 
     const { name, turn, players, data, checksum, version } = parsed.data;
 
-    if (data.length > MAX_SAVE_BYTES) {
+    // Server-side checksum verification
+    const actualChecksum = calculateChecksum(data);
+    if (actualChecksum !== checksum) {
       return NextResponse.json(
-        { error: 'Save data exceeds maximum allowed size' },
-        { status: 413 },
+        { error: 'Checksum mismatch' },
+        { status: 400 },
+      );
+    }
+
+    // Validate the SaveFile structure before persisting
+    const loadResult = loadSaveFile(data);
+    if (!loadResult.success) {
+      return NextResponse.json(
+        { error: `Invalid save format: ${loadResult.error}` },
+        { status: 400 },
       );
     }
 
@@ -40,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ id: save.id, name: save.name });
   } catch (error) {
-    console.error('Save failed:', error);
+    console.error('Save failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 },

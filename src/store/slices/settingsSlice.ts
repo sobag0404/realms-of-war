@@ -7,6 +7,7 @@
  */
 
 import type { StateCreator } from 'zustand';
+import { z } from 'zod';
 import type { GameStore } from '../useGameStore';
 
 // ─── Storage Key ──────────────────────────────────────────────────────────────
@@ -77,6 +78,21 @@ const DEFAULT_SETTINGS: Omit<
   uiScale: 1.0,
 };
 
+// ─── Zod Validation Schema ────────────────────────────────────────────────────
+
+const SettingsSchema = z.object({
+  language: z.enum(['ru', 'en']).default('ru'),
+  masterVolume: z.number().min(0).max(1).default(0.8),
+  musicVolume: z.number().min(0).max(1).default(0.7),
+  sfxVolume: z.number().min(0).max(1).default(0.8),
+  ambienceVolume: z.number().min(0).max(1).default(0.6),
+  graphicsPreset: z.enum(['low', 'medium', 'high', 'ultra']).default('high'),
+  shadowQuality: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).default(2),
+  maxFps: z.union([z.literal(30), z.literal(60), z.literal(120), z.literal(0)]).default(60),
+  colorBlindMode: z.enum(['none', 'protanopia', 'deuteranopia', 'tritanopia']).default('none'),
+  uiScale: z.number().min(0.5).max(2.0).default(1.0),
+});
+
 // ─── Persistence Helpers ──────────────────────────────────────────────────────
 
 function loadSettingsFromStorage(): Partial<typeof DEFAULT_SETTINGS> {
@@ -84,8 +100,27 @@ function loadSettingsFromStorage(): Partial<typeof DEFAULT_SETTINGS> {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as Partial<typeof DEFAULT_SETTINGS>;
+    const parsed = JSON.parse(raw);
+    // Validate through Zod — invalid values get replaced by defaults
+    const result = SettingsSchema.safeParse(parsed);
+    if (!result.success) {
+      // Some values were invalid — strip invalid keys so defaults fill in
+      const cleaned = { ...parsed };
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as string;
+        delete cleaned[key];
+      }
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[Settings] Invalid localStorage values, using defaults:', result.error.issues);
+      }
+      return SettingsSchema.parse(cleaned);
+    }
+    return result.data;
   } catch {
+    // Malformed JSON — return empty to use all defaults
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[Settings] Malformed localStorage JSON, using defaults');
+    }
     return {};
   }
 }

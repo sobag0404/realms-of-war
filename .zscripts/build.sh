@@ -76,20 +76,14 @@ if [ -d "public" ]; then
     cp -r public "$BUILD_DIR/next-service-dist/"
 fi
 
-# Copy the database into the build output (production uses this database)
-if [ -f "./db/custom.db" ]; then
-    echo "Copying test database into build output..."
-    mkdir -p "$BUILD_DIR/db"
-    cp -r ./db/. "$BUILD_DIR/db/"
-
-    echo "Syncing database schema in build output..."
-    DATABASE_URL="file:$BUILD_DIR/db/custom.db" bun run db:push
-    echo "Build database ready"
-    ls -lah "$BUILD_DIR/db"
-else
-    echo "Error: Test database not found at ./db/custom.db, cannot build production package"
-    exit 1
-fi
+# Initialize the database for production.
+# Production does NOT depend on a pre-existing dev database.
+# Instead, we create a fresh DB and run migrations via db:push.
+echo "Initializing production database..."
+mkdir -p "$BUILD_DIR/db"
+DATABASE_URL="file:$BUILD_DIR/db/custom.db" bun run db:push
+echo "Production database ready"
+ls -lah "$BUILD_DIR/db"
 
 # Copy Caddyfile if present
 if [ -f "Caddyfile" ]; then

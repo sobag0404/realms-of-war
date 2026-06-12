@@ -291,6 +291,99 @@ export function canMoveTo(
   };
 }
 
+// ─── Validate Movement Path ─────────────────────────────────────────────────
+
+/**
+ * Result of validating a movement path step-by-step.
+ */
+export interface MovementPathValidationResult {
+  valid: boolean;
+  error?: string;
+  totalCost?: number;
+}
+
+/**
+ * Validate a movement path step-by-step.
+ *
+ * Checks:
+ * 1. Path has at least 2 points (start + destination)
+ * 2. First hex matches unit's current position
+ * 3. Each step is adjacent (hex distance === 1)
+ * 4. Each intermediate hex is walkable
+ * 5. Path doesn't pass through enemy-occupied hexes (except the final hex for attack moves)
+ * 6. Destination is not occupied by a friendly unit
+ * 7. Total cost doesn't exceed unit's remaining movement points
+ *
+ * @param state - Current game state
+ * @param entityId - The unit attempting to move
+ * @param path - Sequence of hex coordinates (first = current position, last = destination)
+ * @returns Validation result with valid flag, optional error, and total cost
+ */
+export function validateMovementPath(
+  state: GameState,
+  entityId: EntityId,
+  path: HexCoord[],
+): MovementPathValidationResult {
+  // 1. Path must have at least 2 points
+  if (!path || path.length < 2) {
+    return { valid: false, error: 'Path must have at least 2 points' };
+  }
+
+  // 2. Find the unit
+  const entity = getEntity(state, entityId);
+  if (!entity) {
+    return { valid: false, error: 'Unit not found' };
+  }
+
+  // 3. First hex must match current position
+  const currentHex = entity.hex;
+  if (!currentHex || path[0].q !== currentHex.q || path[0].r !== currentHex.r) {
+    return { valid: false, error: 'Path must start at unit current position' };
+  }
+
+  // 4. Validate each step
+  let totalCost = 0;
+  for (let i = 1; i < path.length; i++) {
+    const prev = path[i - 1];
+    const curr = path[i];
+
+    // Each step must be adjacent (distance 1)
+    const dist = hexDistance(prev, curr);
+    if (dist !== 1) {
+      return { valid: false, error: `Non-adjacent step at index ${i}: distance ${dist}` };
+    }
+
+    // Check terrain walkability via calculateMovementCost
+    const stepCost = calculateMovementCost(state, prev, curr, entityId);
+    if (stepCost === 0) {
+      return { valid: false, error: `Impassable terrain at (${curr.q},${curr.r})` };
+    }
+    totalCost += stepCost;
+
+    // Check for enemy units blocking intermediate hexes (not the last one)
+    if (i < path.length - 1) {
+      const occupant = getEntityAtHex(state, curr);
+      if (occupant && !isFriendly(entity, occupant)) {
+        return { valid: false, error: `Enemy unit blocks path at (${curr.q},${curr.r})` };
+      }
+    }
+  }
+
+  // 5. Check destination not occupied by friendly unit
+  const dest = path[path.length - 1];
+  const destOccupant = getEntityAtHex(state, dest);
+  if (destOccupant && isFriendly(entity, destOccupant) && destOccupant.id !== entityId) {
+    return { valid: false, error: 'Destination occupied by friendly unit' };
+  }
+
+  // 6. Check total cost against movement points
+  if (totalCost > entity.movementPoints) {
+    return { valid: false, error: `Path cost ${totalCost} exceeds movement points ${entity.movementPoints}`, totalCost };
+  }
+
+  return { valid: true, totalCost };
+}
+
 // ─── Reachable Hexes ─────────────────────────────────────────────────────────
 
 /**

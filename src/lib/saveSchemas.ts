@@ -9,7 +9,7 @@ export const SavePayloadSchema = z.object({
   turn: z.number().int().min(0).max(100_000),
   players: z.string().max(500),
   data: z.string().min(2),
-  checksum: z.string().regex(/^[a-f0-9]{0,16}$/i),
+  checksum: z.string().regex(/^[a-f0-9]{8,16}$/i),
   version: z.number().int().min(1).max(100).optional(),
 });
 

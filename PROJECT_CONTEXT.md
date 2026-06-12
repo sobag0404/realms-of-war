@@ -11,7 +11,8 @@
 
 - **GitHub:** https://github.com/sobag0404/realms-of-war (приватный)
 - **GDD (полная спецификация):** `docs/realms-of-war-design-spec.md` (5644 строки)
-- **Техническое ревью:** `docs/realms-of-war-ai-dev-review.md` (2298 строк, 2026-06-12)
+- **Техническое ревью 1:** `docs/realms-of-war-ai-dev-review.md` (2298 строк, 2026-06-12)
+- **Техническое ревью 2:** `docs/realms-of-war-ai-developer-review.md` (1730 строк, 2026-06-12)
 - **Чек-лист:** `CHECKLIST.md` — быстрый обзор состояния проекта
 
 ---
@@ -45,16 +46,27 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-12 (Пост-ревью: стабилизация)
+> Последнее обновление: 2026-06-12 (Пост-ревью 2: стабилизация)
 
-### ⚠️ ТЕКУЩИЙ ПРИОРИТЕТ: стабилизация по результатам ревью
+### ⚠️ ТЕКУЩИЙ ПРИОРИТЕТ: доработка по результатам второго ревью
 
-**Ревьюер рекомендует:** НЕ добавлять новые фичи до закрытия P0/P1 проблем.
+**Второй ревьюер (2026-06-12):** Оценка выше первого (Overall 6/10 вместо 4/10), но есть новые P0/P1 проблемы.
 
 Приоритетный порядок работ:
-1. **Security** (P0) → 2. **Build/TypeCheck** (P0) → 3. **Save/Load consistency** (P1) → 4. **Deterministic engine** (P1) → 5. **Tests** (P1) → 6. **CI** → 7. Rendering → 8. UX cleanup → 9. Новые фичи
+1. ✅ **Save/Load flow** (P0) — исправлено: MainMenuScreen → loadSaveFile()
+2. ✅ **Production build** (P0) — исправлено: убрана зависимость от ./db/custom.db
+3. ✅ **API Security** (P1) — исправлено: checksum, body size, server-side validation
+4. ✅ **Command log** (P1) — исправлено: executedCommands в GameEngine
+5. ✅ **Movement validation** (P1) — исправлено: validateMovementPath()
+6. ✅ **Tests** (P1) — 96 тестов (19 новых API тестов)
+7. ✅ **Worker typing** (P1) — pathfinding.worker.ts без @ts-nocheck
+8. ✅ **.gitignore** (P2) — исправлено, tool-results/ убран из git
+9. ✅ **Scripts** (P2) — убраны hardcoded пути
+10. ✅ **Settings validation** (P2) — Zod-схема для localStorage
+11. 🔲 **CI pipeline** — GitHub Actions (требует PAT с workflow scope)
+12. 🔲 **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker
 
-### Результаты технического ревью (2026-06-12)
+### Результаты ревью 1 (2026-06-12, первый ревьюер)
 
 | Категория | Оценка /10 |
 |---|---:|
@@ -69,35 +81,53 @@
 | Готовность к продакшену | **1** |
 | Общий уровень проекта | **4** |
 
-**Полный текст ревью:** `docs/realms-of-war-ai-dev-review.md`
+### Результаты ревью 2 (2026-06-12, второй ревьюер)
+
+| Категория | Оценка /10 |
+|---|---:|
+| Идея и продуктовая ценность | 7.0 |
+| Архитектура | 7.0 |
+| Качество кода | 6.0 |
+| Безопасность | 4.0 |
+| Тесты | 5.0 |
+| Документация | 6.0 |
+| Производительность | 6.0 |
+| Поддерживаемость | 6.5 |
+| Готовность к продакшену | 3.0 |
+| Общий уровень проекта | **6.0** |
+
+**Полный текст ревью 1:** `docs/realms-of-war-ai-dev-review.md`
+**Полный текст ревью 2:** `docs/realms-of-war-ai-developer-review.md`
 **Секция в GDD:** §16 — Результаты технического ревью
 
-### Критичные проблемы P0 (БЛОКЕРЫ)
+### P0 из ревью 2 — исправлены ✅
 
-- [ ] **SSRF/open proxy** — Caddyfile содержит `XTransformPort` dynamic reverse proxy
-- [ ] **Save API без auth/ownership** — любой может CRUD любые saves
-- [ ] **Нет body size limit** — DoS через большой JSON в `/api/save`
-- [ ] **TypeScript errors игнорируются** — `ignoreBuildErrors: true` в next.config.ts
+- [x] **Save/load flow несовместим** — MainMenuScreen использует loadSaveFile() + verifyChecksum()
+- [x] **Production build требует ./db/custom.db** — build.sh создаёт свежую БД через db:push
 
-### Серьёзные проблемы P1
+### P1 из ревью 2 — исправлены ✅
 
-- [ ] **Нет тестов** — ни одного unit/integration/e2e теста
-- [ ] **Engine save-module не используется** — UI/API обходит SaveFile/checksum/rngState/commandLog
-- [ ] **Детерминизм нарушен** — `Math.random()` и `Date.now()` в cityRules, recruitmentRules, AiDirector, simulation.worker
-- [ ] **Worker protocol без requestId** — конкурентные запросы могут получить чужой ответ
-- [ ] **ESLint обезврежен** — критичные правила выключены
-- [ ] **GameProvider placeholder** — `eventBus.on('event')` с несуществующим типом
-- [ ] **Fortify вызывает EndTurn** — кнопка Fortify в UnitPanel отправляет EndTurn
+- [x] **Checksum regex допускает пустой** — изменено на {8,16}
+- [x] **Server-side checksum verification** — calculateChecksum() на сервере
+- [x] **Body size проверяется после JSON.parse** — Content-Length + raw text guard
+- [x] **Command log не записывает dispatch** — executedCommands + getCommandLog() + restoreCommandLog()
+- [x] **MoveUnit path validation** — validateMovementPath() в movementRules
+- [x] **API tests** — 19 новых тестов для save/load schemas и routes
+- [x] **@ts-nocheck в pathfinding.worker** — убран, добавлены типы
 
-### Средние проблемы P2
+### P2 из ревью 2 — исправлены ✅
 
-- [ ] Terrain chunks + per-hex rendering одновременно
-- [ ] GPU cleanup через useMemo (не useEffect)
-- [ ] Нет root README / .env.example
-- [ ] Hardcoded deploy paths (/home/z/my-project)
-- [ ] Prisma query logging всегда включён
-- [ ] Mini-service path traversal защита слабая
-- [ ] localStorage settings без validation
+- [x] **.gitignore сломан** — исправлена склеенная строка, tool-results/ убран из git
+- [x] **Hardcoded scripts** — start-game.sh, watchdog.sh используют относительные пути
+- [x] **localStorage settings без validation** — Zod-схема SettingsSchema
+
+### Оставшиеся задачи
+
+- [ ] **CI pipeline** — GitHub Actions (требует PAT с workflow scope)
+- [ ] **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker
+- [ ] **Auth/ownership модель** — для публичного деплоя (пока local-only mode)
+- [ ] **Rate limiting** — для Save API
+- [ ] **E2E тесты** — Playwright smoke test
 
 ### Что реализовано (структурно)
 
@@ -273,3 +303,4 @@ realms-of-war/
 | 2026-06-12 | **Фаза 7:** GameEngine → rules/systems интеграция + новые команды + старт игры + UI production queue |
 | 2026-06-12 | **Security cleanup:** Удалены screenshots из git, убран PAT из remote URL |
 | 2026-06-12 | **Ревью:** Добавлено техническое ревью в docs/, обновлён GDD §16, PROJECT_CONTEXT, CHECKLIST |
+| 2026-06-12 | **Ревью 2:** Добавлено второе ревью, исправлены все P0/P1/P2: save/load flow, build.sh, checksum, body size, command log, move validation, API tests, worker typing, .gitignore, scripts, settings validation |

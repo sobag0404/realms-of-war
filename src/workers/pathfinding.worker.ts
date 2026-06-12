@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Web Worker for pathfinding computations.
  *
@@ -268,9 +267,34 @@ function findReachable(
   return reachable;
 }
 
+// ─── Message Types ────────────────────────────────────────────────────────────
+
+interface PathfindingRequest {
+  type: 'findPath';
+  requestId: string;
+  tiles: Record<string, { terrain: string }>;
+  from: { q: number; r: number };
+  to: { q: number; r: number };
+  movementPoints: number;
+}
+
+type PathfindingResponse = {
+  type: 'findPathResult';
+  requestId: string;
+  path: Array<{ q: number; r: number }> | null;
+  reachable: Array<{ q: number; r: number }>;
+};
+
+type ErrorResponse = {
+  type: 'error';
+  requestId: string;
+  requestType: string;
+  message: string;
+};
+
 // ─── Message Handler ───────────────────────────────────────────────────────────
 
-self.onmessage = function (e: MessageEvent) {
+self.onmessage = function (e: MessageEvent<PathfindingRequest>) {
   const request = e.data;
   const requestId: string = request.requestId ?? '';
 
@@ -308,3 +332,6 @@ self.onmessage = function (e: MessageEvent) {
     });
   }
 };
+
+// Module export to ensure file is treated as a module (avoids global scope conflicts)
+export {};

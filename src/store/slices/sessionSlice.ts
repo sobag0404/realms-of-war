@@ -298,6 +298,11 @@ export const createSessionSlice: StateCreator<
         engine.getRng().setState(rngState.position);
       }
 
+      // 4. Restore command log if available
+      if (saveFile.commandLog && saveFile.commandLog.length > 0) {
+        engine.restoreCommandLog(saveFile.commandLog);
+      }
+
       const localPlayerIds = Object.values(loadedState.players)
         .filter((p) => !p.isAI)
         .map((p) => p.id);
@@ -348,7 +353,7 @@ export const createSessionSlice: StateCreator<
         name: saveName,
         gameState,
         gameConfig,
-        commandLog: engine.getCommandQueue().toArray() as GameCommand[],
+        commandLog: [...engine.getCommandLog()] as GameCommand[],
         rngState: {
           seed: gameConfig.seed,
           position: rngPosition,
