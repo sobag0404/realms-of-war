@@ -8,7 +8,7 @@
  * Commands are pure data — no functions, no references to runtime objects.
  */
 
-import type { CityId, EntityId, HexCoord, PlayerId } from './types';
+import type { CityId, DiplomacyStatus, EntityId, HexCoord, PlayerId } from './types';
 
 // ─── Command Types ────────────────────────────────────────────────────────────
 
@@ -19,6 +19,7 @@ export type GameCommandType =
   | 'BuildBuilding'
   | 'RecruitUnit'
   | 'ResearchTechnology'
+  | 'ChangeDiplomacy'
   | 'EndTurn'
   | 'HotseatSwitch';
 
@@ -70,6 +71,13 @@ export interface ResearchTechnologyCommand {
   techId: string;
 }
 
+export interface ChangeDiplomacyCommand {
+  type: 'ChangeDiplomacy';
+  playerId: PlayerId;
+  targetPlayerId: PlayerId;
+  newStatus: DiplomacyStatus;
+}
+
 export interface EndTurnCommand {
   type: 'EndTurn';
   playerId: PlayerId;
@@ -92,6 +100,7 @@ export type GameCommand =
   | BuildBuildingCommand
   | RecruitUnitCommand
   | ResearchTechnologyCommand
+  | ChangeDiplomacyCommand
   | EndTurnCommand
   | HotseatSwitchCommand;
 

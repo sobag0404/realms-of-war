@@ -1,0 +1,595 @@
+     1→// ============================================================================
+     2→// Model Registry — Realms of War
+     3→// ============================================================================
+     4→// Registry for 3D model definitions using primitive shapes as placeholders
+     5→// for future GLB model loading. Each definition describes how to build a
+     6→// Three.js mesh from basic shapes (box, sphere, cylinder, cone, compound).
+     7→
+     8→import * as THREE from 'three';
+     9→
+    10→// ─── Types ───────────────────────────────────────────────────────────────────
+    11→
+    12→/** Model definition using primitive shapes */
+    13→export interface ModelDefinition {
+    14→  id: string;
+    15→  /** Shape type for primitive generation */
+    16→  shape: 'box' | 'sphere' | 'cylinder' | 'cone' | 'compound';
+    17→  /** Dimensions (width = X, height = Y, depth = Z) */
+    18→  dimensions: { width: number; height: number; depth: number };
+    19→  /** Base color as CSS string */
+    20→  color: string;
+    21→  /** Emissive color (subtle glow, optional) */
+    22→  emissive?: string;
+    23→  /** Additional shapes for compound models */
+    24→  children?: Array<{
+    25→    shape: 'box' | 'sphere' | 'cylinder' | 'cone';
+    26→    position: [number, number, number];
+    27→    dimensions: { width: number; height: number; depth: number };
+    28→    color: string;
+    29→    emissive?: string;
+    30→  }>;
+    31→}
+    32→
+    33→// ─── Model Definitions ──────────────────────────────────────────────────────
+    34→// All unit and building IDs match those in src/data/units.ts and src/data/buildings.ts
+    35→
+    36→export const MODEL_REGISTRY: Record<string, ModelDefinition> = {
+    37→  // ===== Player Units =====
+    38→  unit_hero: {
+    39→    id: 'unit_hero',
+    40→    shape: 'compound',
+    41→    dimensions: { width: 0.35, height: 0.7, depth: 0.35 },
+    42→    color: '#ffd700',
+    43→    emissive: '#332200',
+    44→    children: [
+    45→      { shape: 'cylinder', position: [0, 0.2, 0], dimensions: { width: 0.3, height: 0.5, depth: 0.3 }, color: '#ffd700', emissive: '#332200' },
+    46→      { shape: 'sphere',   position: [0, 0.55, 0], dimensions: { width: 0.18, height: 0.18, depth: 0.18 }, color: '#ffe066' },
+    47→      { shape: 'cone',     position: [0, 0.7, 0],  dimensions: { width: 0.2, height: 0.2, depth: 0.2 }, color: '#cc0000' },
+    48→    ],
+    49→  },
+    50→  unit_settler: {
+    51→    id: 'unit_settler',
+    52→    shape: 'compound',
+    53→    dimensions: { width: 0.3, height: 0.5, depth: 0.3 },
+    54→    color: '#4488cc',
+    55→    children: [
+    56→      { shape: 'box',      position: [0, 0.15, 0], dimensions: { width: 0.25, height: 0.35, depth: 0.25 }, color: '#4488cc' },
+    57→      { shape: 'sphere',   position: [0, 0.4, 0],  dimensions: { width: 0.14, height: 0.14, depth: 0.14 }, color: '#ddccaa' },
+    58→      { shape: 'cylinder', position: [0, 0.5, 0.1], dimensions: { width: 0.08, height: 0.2, depth: 0.08 }, color: '#8B4513' },
+    59→    ],
+    60→  },
+    61→  unit_worker: {
+    62→    id: 'unit_worker',
+    63→    shape: 'compound',
+    64→    dimensions: { width: 0.28, height: 0.45, depth: 0.28 },
+    65→    color: '#aa8844',
+    66→    children: [
+    67→      { shape: 'box',    position: [0, 0.15, 0],  dimensions: { width: 0.24, height: 0.3, depth: 0.24 }, color: '#aa8844' },
+    68→      { shape: 'sphere', position: [0, 0.37, 0],  dimensions: { width: 0.13, height: 0.13, depth: 0.13 }, color: '#ddccaa' },
+    69→    ],
+    70→  },
+    71→  unit_spearman: {
+    72→    id: 'unit_spearman',
+    73→    shape: 'compound',
+    74→    dimensions: { width: 0.3, height: 0.6, depth: 0.3 },
+    75→    color: '#cc4444',
+    76→    children: [
+    77→      { shape: 'cylinder', position: [0, 0.2, 0],    dimensions: { width: 0.26, height: 0.4, depth: 0.26 }, color: '#cc4444' },
+    78→      { shape: 'sphere',   position: [0, 0.48, 0],   dimensions: { width: 0.14, height: 0.14, depth: 0.14 }, color: '#ddccaa' },
+    79→      { shape: 'cylinder', position: [0.05, 0.45, 0], dimensions: { width: 0.03, height: 0.5, depth: 0.03 }, color: '#666666' },
+    80→    ],
+    81→  },
+    82→  unit_scout: {
+    83→    id: 'unit_scout',
+    84→    shape: 'compound',
+    85→    dimensions: { width: 0.25, height: 0.5, depth: 0.25 },
+    86→    color: '#44aa66',
+    87→    children: [
+    88→      { shape: 'cylinder', position: [0, 0.18, 0],  dimensions: { width: 0.2, height: 0.35, depth: 0.2 }, color: '#44aa66' },
+    89→      { shape: 'sphere',   position: [0, 0.42, 0],  dimensions: { width: 0.12, height: 0.12, depth: 0.12 }, color: '#ddccaa' },
+    90→    ],
+    91→  },
+    92→  unit_archer: {
+    93→    id: 'unit_archer',
+    94→    shape: 'compound',
+    95→    dimensions: { width: 0.25, height: 0.55, depth: 0.25 },
+    96→    color: '#44cc44',
+    97→    children: [
+    98→      { shape: 'cylinder', position: [0, 0.18, 0],  dimensions: { width: 0.22, height: 0.35, depth: 0.22 }, color: '#44cc44' },
+    99→      { shape: 'sphere',   position: [0, 0.42, 0],  dimensions: { width: 0.13, height: 0.13, depth: 0.13 }, color: '#ddccaa' },
+   100→      { shape: 'cylinder', position: [-0.1, 0.35, 0.05], dimensions: { width: 0.02, height: 0.4, depth: 0.02 }, color: '#8B4513' },
+   101→    ],
+   102→  },
+   103→  unit_swordsman: {
+   104→    id: 'unit_swordsman',
+   105→    shape: 'compound',
+   106→    dimensions: { width: 0.32, height: 0.6, depth: 0.32 },
+   107→    color: '#7777cc',
+   108→    children: [
+   109→      { shape: 'cylinder', position: [0, 0.2, 0],    dimensions: { width: 0.28, height: 0.4, depth: 0.28 }, color: '#7777cc' },
+   110→      { shape: 'sphere',   position: [0, 0.48, 0],   dimensions: { width: 0.15, height: 0.15, depth: 0.15 }, color: '#ddccaa' },
+   111→      { shape: 'box',      position: [0.15, 0.35, 0], dimensions: { width: 0.04, height: 0.35, depth: 0.04 }, color: '#cccccc' },
+   112→    ],
+   113→  },
+   114→  unit_knight: {
+   115→    id: 'unit_knight',
+   116→    shape: 'compound',
+   117→    dimensions: { width: 0.4, height: 0.7, depth: 0.4 },
+   118→    color: '#cccccc',
+   119→    children: [
+   120→      { shape: 'cylinder', position: [0, 0.22, 0],  dimensions: { width: 0.34, height: 0.45, depth: 0.34 }, color: '#888899' },
+   121→      { shape: 'sphere',   position: [0, 0.52, 0],  dimensions: { width: 0.16, height: 0.16, depth: 0.16 }, color: '#cccccc' },
+   122→      { shape: 'cone',     position: [0, 0.68, 0],  dimensions: { width: 0.18, height: 0.2, depth: 0.18 }, color: '#cc0000' },
+   123→      { shape: 'box',      position: [0.18, 0.4, 0], dimensions: { width: 0.05, height: 0.4, depth: 0.04 }, color: '#dddddd' },
+   124→    ],
+   125→  },
+   126→  unit_mage: {
+   127→    id: 'unit_mage',
+   128→    shape: 'compound',
+   129→    dimensions: { width: 0.28, height: 0.6, depth: 0.28 },
+   130→    color: '#9944cc',
+   131→    emissive: '#1a0033',
+   132→    children: [
+   133→      { shape: 'cylinder', position: [0, 0.2, 0],  dimensions: { width: 0.24, height: 0.4, depth: 0.24 }, color: '#9944cc', emissive: '#1a0033' },
+   134→      { shape: 'sphere',   position: [0, 0.48, 0], dimensions: { width: 0.14, height: 0.14, depth: 0.14 }, color: '#ddccaa' },
+   135→      { shape: 'cone',     position: [0, 0.6, 0],  dimensions: { width: 0.22, height: 0.22, depth: 0.22 }, color: '#6622aa' },
+   136→      { shape: 'sphere',   position: [0.12, 0.55, 0.05], dimensions: { width: 0.06, height: 0.06, depth: 0.06 }, color: '#ff66ff', emissive: '#330033' },
+   137→    ],
+   138→  },
+   139→  unit_crossbowman: {
+   140→    id: 'unit_crossbowman',
+   141→    shape: 'compound',
+   142→    dimensions: { width: 0.28, height: 0.55, depth: 0.28 },
+   143→    color: '#669944',
+   144→    children: [
+   145→      { shape: 'cylinder', position: [0, 0.18, 0],  dimensions: { width: 0.24, height: 0.35, depth: 0.24 }, color: '#669944' },
+   146→      { shape: 'sphere',   position: [0, 0.42, 0],  dimensions: { width: 0.13, height: 0.13, depth: 0.13 }, color: '#ddccaa' },
+   147→      { shape: 'box',      position: [-0.1, 0.38, 0.08], dimensions: { width: 0.2, height: 0.04, depth: 0.04 }, color: '#8B4513' },
+   148→    ],
+   149→  },
+   150→  unit_catapult: {
+   151→    id: 'unit_catapult',
+   152→    shape: 'compound',
+   153→    dimensions: { width: 0.5, height: 0.4, depth: 0.5 },
+   154→    color: '#8B6914',
+   155→    children: [
+   156→      { shape: 'box',      position: [0, 0.1, 0],  dimensions: { width: 0.45, height: 0.2, depth: 0.35 }, color: '#8B6914' },
+   157→      { shape: 'cylinder', position: [0, 0.25, -0.1], dimensions: { width: 0.06, height: 0.35, depth: 0.06 }, color: '#666666' },
+   158→      { shape: 'cylinder', position: [0.2, 0.05, 0.15], dimensions: { width: 0.08, height: 0.08, depth: 0.08 }, color: '#555555' },
+   159→      { shape: 'cylinder', position: [-0.2, 0.05, 0.15], dimensions: { width: 0.08, height: 0.08, depth: 0.08 }, color: '#555555' },
+   160→    ],
+   161→  },
+   162→  unit_paladin: {
+   163→    id: 'unit_paladin',
+   164→    shape: 'compound',
+   165→    dimensions: { width: 0.38, height: 0.75, depth: 0.38 },
+   166→    color: '#eeeecc',
+   167→    emissive: '#222211',
+   168→    children: [
+   169→      { shape: 'cylinder', position: [0, 0.22, 0],  dimensions: { width: 0.32, height: 0.45, depth: 0.32 }, color: '#cccc99', emissive: '#222211' },
+   170→      { shape: 'sphere',   position: [0, 0.52, 0],  dimensions: { width: 0.16, height: 0.16, depth: 0.16 }, color: '#eeeecc' },
+   171→      { shape: 'cone',     position: [0, 0.72, 0],  dimensions: { width: 0.2, height: 0.2, depth: 0.2 }, color: '#ffdd44' },
+   172→      { shape: 'box',      position: [0.18, 0.4, 0], dimensions: { width: 0.05, height: 0.45, depth: 0.04 }, color: '#ffffff' },
+   173→    ],
+   174→  },
+   175→
+   176→  // ===== Enemy Units =====
+   177→  unit_goblin: {
+   178→    id: 'unit_goblin',
+   179→    shape: 'compound',
+   180→    dimensions: { width: 0.22, height: 0.4, depth: 0.22 },
+   181→    color: '#558833',
+   182→    children: [
+   183→      { shape: 'cylinder', position: [0, 0.12, 0], dimensions: { width: 0.18, height: 0.25, depth: 0.18 }, color: '#558833' },
+   184→      { shape: 'sphere',   position: [0, 0.3, 0],  dimensions: { width: 0.12, height: 0.12, depth: 0.12 }, color: '#88aa44' },
+   185→    ],
+   186→  },
+   187→  unit_goblin_archer: {
+   188→    id: 'unit_goblin_archer',
+   189→    shape: 'compound',
+   190→    dimensions: { width: 0.22, height: 0.42, depth: 0.22 },
+   191→    color: '#667733',
+   192→    children: [
+   193→      { shape: 'cylinder', position: [0, 0.13, 0], dimensions: { width: 0.18, height: 0.26, depth: 0.18 }, color: '#667733' },
+   194→      { shape: 'sphere',   position: [0, 0.32, 0], dimensions: { width: 0.11, height: 0.11, depth: 0.11 }, color: '#88aa44' },
+   195→      { shape: 'cylinder', position: [-0.08, 0.28, 0.04], dimensions: { width: 0.02, height: 0.3, depth: 0.02 }, color: '#8B4513' },
+   196→    ],
+   197→  },
+   198→  unit_wolf: {
+   199→    id: 'unit_wolf',
+   200→    shape: 'compound',
+   201→    dimensions: { width: 0.35, height: 0.3, depth: 0.5 },
+   202→    color: '#666666',
+   203→    children: [
+   204→      { shape: 'box',    position: [0, 0.1, 0],    dimensions: { width: 0.2, height: 0.18, depth: 0.35 }, color: '#666666' },
+   205→      { shape: 'sphere', position: [0, 0.15, -0.2], dimensions: { width: 0.12, height: 0.12, depth: 0.12 }, color: '#777777' },
+   206→    ],
+   207→  },
+   208→  unit_bandit: {
+   209→    id: 'unit_bandit',
+   210→    shape: 'compound',
+   211→    dimensions: { width: 0.3, height: 0.55, depth: 0.3 },
+   212→    color: '#554433',
+   213→    children: [
+   214→      { shape: 'cylinder', position: [0, 0.18, 0], dimensions: { width: 0.24, height: 0.36, depth: 0.24 }, color: '#554433' },
+   215→      { shape: 'sphere',   position: [0, 0.43, 0], dimensions: { width: 0.13, height: 0.13, depth: 0.13 }, color: '#aa9977' },
+   216→      { shape: 'cylinder', position: [0.12, 0.35, 0], dimensions: { width: 0.03, height: 0.3, depth: 0.03 }, color: '#888888' },
+   217→    ],
+   218→  },
+   219→  unit_cultist: {
+   220→    id: 'unit_cultist',
+   221→    shape: 'compound',
+   222→    dimensions: { width: 0.28, height: 0.55, depth: 0.28 },
+   223→    color: '#662244',
+   224→    emissive: '#220011',
+   225→    children: [
+   226→      { shape: 'cylinder', position: [0, 0.18, 0], dimensions: { width: 0.24, height: 0.35, depth: 0.24 }, color: '#662244', emissive: '#220011' },
+   227→      { shape: 'sphere',   position: [0, 0.42, 0], dimensions: { width: 0.13, height: 0.13, depth: 0.13 }, color: '#aa8899' },
+   228→      { shape: 'cone',     position: [0, 0.55, 0], dimensions: { width: 0.2, height: 0.15, depth: 0.2 }, color: '#440022' },
+   229→    ],
+   230→  },
+   231→
+   232→  // ===== Buildings =====
+   233→  building_city_center: {
+   234→    id: 'building_city_center',
+   235→    shape: 'compound',
+   236→    dimensions: { width: 0.7, height: 0.6, depth: 0.7 },
+   237→    color: '#ddcc99',
+   238→    children: [
+   239→      { shape: 'box',      position: [0, 0.15, 0],  dimensions: { width: 0.6, height: 0.3, depth: 0.6 }, color: '#ddcc99' },
+   240→      { shape: 'cone',     position: [0, 0.45, 0],  dimensions: { width: 0.65, height: 0.3, depth: 0.65 }, color: '#bb3322' },
+   241→      { shape: 'cylinder', position: [0, 0.6, 0],   dimensions: { width: 0.06, height: 0.15, depth: 0.06 }, color: '#888888' },
+   242→    ],
+   243→  },
+   244→  building_castle: {
+   245→    id: 'building_castle',
+   246→    shape: 'compound',
+   247→    dimensions: { width: 0.8, height: 0.8, depth: 0.8 },
+   248→    color: '#999999',
+   249→    children: [
+   250→      { shape: 'box',  position: [0, 0.2, 0], dimensions: { width: 0.7, height: 0.4, depth: 0.7 }, color: '#999999' },
+   251→      { shape: 'box',  position: [0.25, 0.5, 0.25],  dimensions: { width: 0.15, height: 0.2, depth: 0.15 }, color: '#888888' },
+   252→      { shape: 'box',  position: [-0.25, 0.5, 0.25], dimensions: { width: 0.15, height: 0.2, depth: 0.15 }, color: '#888888' },
+   253→      { shape: 'box',  position: [0.25, 0.5, -0.25], dimensions: { width: 0.15, height: 0.2, depth: 0.15 }, color: '#888888' },
+   254→      { shape: 'box',  position: [-0.25, 0.5, -0.25],dimensions: { width: 0.15, height: 0.2, depth: 0.15 }, color: '#888888' },
+   255→    ],
+   256→  },
+   257→  building_barracks: {
+   258→    id: 'building_barracks',
+   259→    shape: 'compound',
+   260→    dimensions: { width: 0.6, height: 0.45, depth: 0.6 },
+   261→    color: '#886644',
+   262→    children: [
+   263→      { shape: 'box',  position: [0, 0.12, 0], dimensions: { width: 0.55, height: 0.25, depth: 0.55 }, color: '#886644' },
+   264→      { shape: 'cone', position: [0, 0.35, 0], dimensions: { width: 0.6, height: 0.2, depth: 0.6 }, color: '#664422' },
+   265→    ],
+   266→  },
+   267→  building_archery_range: {
+   268→    id: 'building_archery_range',
+   269→    shape: 'compound',
+   270→    dimensions: { width: 0.55, height: 0.35, depth: 0.65 },
+   271→    color: '#779944',
+   272→    children: [
+   273→      { shape: 'box', position: [0, 0.1, 0], dimensions: { width: 0.5, height: 0.2, depth: 0.6 }, color: '#779944' },
+   274→      { shape: 'box', position: [0, 0.25, -0.25], dimensions: { width: 0.5, height: 0.1, depth: 0.04 }, color: '#557722' },
+   275→    ],
+   276→  },
+   277→  building_library: {
+   278→    id: 'building_library',
+   279→    shape: 'compound',
+   280→    dimensions: { width: 0.45, height: 0.5, depth: 0.45 },
+   281→    color: '#cc9966',
+   282→    children: [
+   283→      { shape: 'box',  position: [0, 0.15, 0], dimensions: { width: 0.4, height: 0.3, depth: 0.4 }, color: '#cc9966' },
+   284→      { shape: 'cone', position: [0, 0.4, 0],  dimensions: { width: 0.45, height: 0.2, depth: 0.45 }, color: '#996633' },
+   285→    ],
+   286→  },
+   287→  building_granary: {
+   288→    id: 'building_granary',
+   289→    shape: 'compound',
+   290→    dimensions: { width: 0.5, height: 0.4, depth: 0.5 },
+   291→    color: '#ccaa55',
+   292→    children: [
+   293→      { shape: 'cylinder', position: [0, 0.15, 0], dimensions: { width: 0.4, height: 0.3, depth: 0.4 }, color: '#ccaa55' },
+   294→      { shape: 'cone',     position: [0, 0.35, 0], dimensions: { width: 0.45, height: 0.15, depth: 0.45 }, color: '#aa8833' },
+   295→    ],
+   296→  },
+   297→  building_market: {
+   298→    id: 'building_market',
+   299→    shape: 'compound',
+   300→    dimensions: { width: 0.55, height: 0.4, depth: 0.55 },
+   301→    color: '#dd8844',
+   302→    children: [
+   303→      { shape: 'box',  position: [0, 0.1, 0], dimensions: { width: 0.5, height: 0.2, depth: 0.5 }, color: '#dd8844' },
+   304→      { shape: 'cone', position: [0, 0.3, 0], dimensions: { width: 0.55, height: 0.2, depth: 0.55 }, color: '#cc6622' },
+   305→    ],
+   306→  },
+   307→  building_workshop: {
+   308→    id: 'building_workshop',
+   309→    shape: 'compound',
+   310→    dimensions: { width: 0.5, height: 0.4, depth: 0.5 },
+   311→    color: '#888888',
+   312→    children: [
+   313→      { shape: 'box', position: [0, 0.12, 0], dimensions: { width: 0.45, height: 0.24, depth: 0.45 }, color: '#888888' },
+   314→      { shape: 'box', position: [0, 0.3, 0],  dimensions: { width: 0.35, height: 0.12, depth: 0.35 }, color: '#777777' },
+   315→    ],
+   316→  },
+   317→  building_blacksmith: {
+   318→    id: 'building_blacksmith',
+   319→    shape: 'compound',
+   320→    dimensions: { width: 0.45, height: 0.4, depth: 0.45 },
+   321→    color: '#666666',
+   322→    children: [
+   323→      { shape: 'box',      position: [0, 0.1, 0],   dimensions: { width: 0.4, height: 0.2, depth: 0.4 }, color: '#666666' },
+   324→      { shape: 'cylinder', position: [0.1, 0.25, 0], dimensions: { width: 0.08, height: 0.15, depth: 0.08 }, color: '#444444' },
+   325→    ],
+   326→  },
+   327→  building_mage_tower: {
+   328→    id: 'building_mage_tower',
+   329→    shape: 'compound',
+   330→    dimensions: { width: 0.35, height: 0.8, depth: 0.35 },
+   331→    color: '#7744aa',
+   332→    emissive: '#110022',
+   333→    children: [
+   334→      { shape: 'cylinder', position: [0, 0.25, 0], dimensions: { width: 0.28, height: 0.5, depth: 0.28 }, color: '#7744aa', emissive: '#110022' },
+   335→      { shape: 'cone',     position: [0, 0.6, 0],  dimensions: { width: 0.35, height: 0.25, depth: 0.35 }, color: '#5522aa' },
+   336→      { shape: 'sphere',   position: [0, 0.75, 0], dimensions: { width: 0.08, height: 0.08, depth: 0.08 }, color: '#cc88ff', emissive: '#330066' },
+   337→    ],
+   338→  },
+   339→  building_walls: {
+   340→    id: 'building_walls',
+   341→    shape: 'box',
+   342→    dimensions: { width: 0.6, height: 0.5, depth: 0.12 },
+   343→    color: '#aaaaaa',
+   344→  },
+   345→  building_watchtower: {
+   346→    id: 'building_watchtower',
+   347→    shape: 'compound',
+   348→    dimensions: { width: 0.3, height: 0.7, depth: 0.3 },
+   349→    color: '#aa9977',
+   350→    children: [
+   351→      { shape: 'cylinder', position: [0, 0.2, 0],  dimensions: { width: 0.18, height: 0.4, depth: 0.18 }, color: '#aa9977' },
+   352→      { shape: 'cylinder', position: [0, 0.5, 0],  dimensions: { width: 0.28, height: 0.1, depth: 0.28 }, color: '#998866' },
+   353→      { shape: 'cone',     position: [0, 0.6, 0],  dimensions: { width: 0.32, height: 0.15, depth: 0.32 }, color: '#776644' },
+   354→    ],
+   355→  },
+   356→  building_temple: {
+   357→    id: 'building_temple',
+   358→    shape: 'compound',
+   359→    dimensions: { width: 0.55, height: 0.55, depth: 0.55 },
+   360→    color: '#eeddcc',
+   361→    emissive: '#221100',
+   362→    children: [
+   363→      { shape: 'box',  position: [0, 0.1, 0], dimensions: { width: 0.5, height: 0.2, depth: 0.5 }, color: '#eeddcc' },
+   364→      { shape: 'cone', position: [0, 0.35, 0], dimensions: { width: 0.55, height: 0.25, depth: 0.55 }, color: '#ddccbb' },
+   365→      { shape: 'sphere', position: [0, 0.5, 0], dimensions: { width: 0.08, height: 0.08, depth: 0.08 }, color: '#ffddaa', emissive: '#332200' },
+   366→    ],
+   367→  },
+   368→  building_harbor: {
+   369→    id: 'building_harbor',
+   370→    shape: 'compound',
+   371→    dimensions: { width: 0.6, height: 0.3, depth: 0.6 },
+   372→    color: '#5588aa',
+   373→    children: [
+   374→      { shape: 'box',      position: [0, 0.08, 0],   dimensions: { width: 0.55, height: 0.15, depth: 0.55 }, color: '#5588aa' },
+   375→      { shape: 'cylinder', position: [0, 0.2, 0],    dimensions: { width: 0.06, height: 0.2, depth: 0.06 }, color: '#8B4513' },
+   376→    ],
+   377→  },
+   378→  building_university: {
+   379→    id: 'building_university',
+   380→    shape: 'compound',
+   381→    dimensions: { width: 0.55, height: 0.55, depth: 0.55 },
+   382→    color: '#bb9977',
+   383→    children: [
+   384→      { shape: 'box',  position: [0, 0.15, 0], dimensions: { width: 0.5, height: 0.3, depth: 0.5 }, color: '#bb9977' },
+   385→      { shape: 'cone', position: [0, 0.4, 0],  dimensions: { width: 0.55, height: 0.2, depth: 0.55 }, color: '#997755' },
+   386→    ],
+   387→  },
+   388→  building_bank: {
+   389→    id: 'building_bank',
+   390→    shape: 'compound',
+   391→    dimensions: { width: 0.5, height: 0.5, depth: 0.5 },
+   392→    color: '#ccaa44',
+   393→    children: [
+   394→      { shape: 'box', position: [0, 0.12, 0], dimensions: { width: 0.45, height: 0.24, depth: 0.45 }, color: '#ccaa44' },
+   395→      { shape: 'box', position: [0, 0.3, 0],  dimensions: { width: 0.35, height: 0.15, depth: 0.35 }, color: '#ddbb55' },
+   396→    ],
+   397→  },
+   398→  building_guild_hall: {
+   399→    id: 'building_guild_hall',
+   400→    shape: 'compound',
+   401→    dimensions: { width: 0.55, height: 0.5, depth: 0.55 },
+   402→    color: '#887766',
+   403→    children: [
+   404→      { shape: 'box',  position: [0, 0.12, 0], dimensions: { width: 0.5, height: 0.24, depth: 0.5 }, color: '#887766' },
+   405→      { shape: 'cone', position: [0, 0.35, 0], dimensions: { width: 0.55, height: 0.2, depth: 0.55 }, color: '#665544' },
+   406→    ],
+   407→  },
+   408→  building_siege_yard: {
+   409→    id: 'building_siege_yard',
+   410→    shape: 'compound',
+   411→    dimensions: { width: 0.6, height: 0.35, depth: 0.6 },
+   412→    color: '#776655',
+   413→    children: [
+   414→      { shape: 'box', position: [0, 0.1, 0], dimensions: { width: 0.55, height: 0.2, depth: 0.55 }, color: '#776655' },
+   415→      { shape: 'box', position: [0, 0.25, 0], dimensions: { width: 0.3, height: 0.1, depth: 0.3 }, color: '#665544' },
+   416→    ],
+   417→  },
+   418→  building_alchemist_lab: {
+   419→    id: 'building_alchemist_lab',
+   420→    shape: 'compound',
+   421→    dimensions: { width: 0.4, height: 0.45, depth: 0.4 },
+   422→    color: '#776688',
+   423→    emissive: '#110011',
+   424→    children: [
+   425→      { shape: 'box',      position: [0, 0.12, 0], dimensions: { width: 0.35, height: 0.24, depth: 0.35 }, color: '#776688' },
+   426→      { shape: 'cone',     position: [0, 0.32, 0], dimensions: { width: 0.4, height: 0.18, depth: 0.4 }, color: '#554466' },
+   427→      { shape: 'sphere',   position: [0, 0.42, 0], dimensions: { width: 0.06, height: 0.06, depth: 0.06 }, color: '#88ff88', emissive: '#003300' },
+   428→    ],
+   429→  },
+   430→  building_astral_observatory: {
+   431→    id: 'building_astral_observatory',
+   432→    shape: 'compound',
+   433→    dimensions: { width: 0.45, height: 0.7, depth: 0.45 },
+   434→    color: '#667799',
+   435→    emissive: '#001122',
+   436→    children: [
+   437→      { shape: 'cylinder', position: [0, 0.2, 0], dimensions: { width: 0.35, height: 0.4, depth: 0.35 }, color: '#667799' },
+   438→      { shape: 'sphere',   position: [0, 0.5, 0], dimensions: { width: 0.3, height: 0.2, depth: 0.3 }, color: '#8899bb' },
+   439→      { shape: 'cylinder', position: [0, 0.65, 0], dimensions: { width: 0.04, height: 0.15, depth: 0.04 }, color: '#aaaaaa' },
+   440→    ],
+   441→  },
+   442→
+   443→  // ===== Wonders =====
+   444→  wonder_sun_obelisk: {
+   445→    id: 'wonder_sun_obelisk',
+   446→    shape: 'compound',
+   447→    dimensions: { width: 0.3, height: 1.0, depth: 0.3 },
+   448→    color: '#ffcc44',
+   449→    emissive: '#332200',
+   450→    children: [
+   451→      { shape: 'box',    position: [0, 0.35, 0], dimensions: { width: 0.2, height: 0.7, depth: 0.2 }, color: '#ffcc44', emissive: '#332200' },
+   452→      { shape: 'cone',   position: [0, 0.8, 0],  dimensions: { width: 0.22, height: 0.2, depth: 0.22 }, color: '#ffdd66' },
+   453→      { shape: 'sphere', position: [0, 0.95, 0], dimensions: { width: 0.1, height: 0.1, depth: 0.1 }, color: '#ffffff', emissive: '#664400' },
+   454→    ],
+   455→  },
+   456→  wonder_world_tree: {
+   457→    id: 'wonder_world_tree',
+   458→    shape: 'compound',
+   459→    dimensions: { width: 0.6, height: 1.2, depth: 0.6 },
+   460→    color: '#33aa33',
+   461→    emissive: '#002200',
+   462→    children: [
+   463→      { shape: 'cylinder', position: [0, 0.3, 0], dimensions: { width: 0.15, height: 0.6, depth: 0.15 }, color: '#8B4513' },
+   464→      { shape: 'sphere',   position: [0, 0.8, 0], dimensions: { width: 0.55, height: 0.5, depth: 0.55 }, color: '#33aa33', emissive: '#002200' },
+   465→      { shape: 'sphere',   position: [0.15, 0.65, 0.1], dimensions: { width: 0.25, height: 0.25, depth: 0.25 }, color: '#44cc44' },
+   466→    ],
+   467→  },
+   468→  wonder_astral_gate: {
+   469→    id: 'wonder_astral_gate',
+   470→    shape: 'compound',
+   471→    dimensions: { width: 0.7, height: 1.0, depth: 0.15 },
+   472→    color: '#7766cc',
+   473→    emissive: '#110033',
+   474→    children: [
+   475→      { shape: 'box',      position: [-0.25, 0.35, 0], dimensions: { width: 0.1, height: 0.7, depth: 0.1 }, color: '#7766cc', emissive: '#110033' },
+   476→      { shape: 'box',      position: [0.25, 0.35, 0],  dimensions: { width: 0.1, height: 0.7, depth: 0.1 }, color: '#7766cc', emissive: '#110033' },
+   477→      { shape: 'box',      position: [0, 0.75, 0],     dimensions: { width: 0.6, height: 0.1, depth: 0.1 }, color: '#8877dd' },
+   478→      { shape: 'sphere',   position: [0, 0.4, 0],      dimensions: { width: 0.2, height: 0.3, depth: 0.05 }, color: '#aa99ff', emissive: '#220066' },
+   479→    ],
+   480→  },
+   481→  wonder_great_foundry: {
+   482→    id: 'wonder_great_foundry',
+   483→    shape: 'compound',
+   484→    dimensions: { width: 0.7, height: 0.65, depth: 0.7 },
+   485→    color: '#cc6633',
+   486→    emissive: '#331100',
+   487→    children: [
+   488→      { shape: 'box',      position: [0, 0.15, 0], dimensions: { width: 0.6, height: 0.3, depth: 0.6 }, color: '#cc6633', emissive: '#331100' },
+   489→      { shape: 'cylinder', position: [0, 0.4, 0],  dimensions: { width: 0.12, height: 0.2, depth: 0.12 }, color: '#444444' },
+   490→      { shape: 'sphere',   position: [0, 0.55, 0], dimensions: { width: 0.08, height: 0.08, depth: 0.08 }, color: '#ff6600', emissive: '#331100' },
+   491→    ],
+   492→  },
+   493→};
+   494→
+   495→// ─── Builder Functions ───────────────────────────────────────────────────────
+   496→
+   497→/** Create a BufferGeometry for a given primitive shape. */
+   498→function createPrimitiveGeometry(
+   499→  shape: 'box' | 'sphere' | 'cylinder' | 'cone',
+   500→  dimensions: { width: number; height: number; depth: number },
+   501→): THREE.BufferGeometry {
+   502→  switch (shape) {
+   503→    case 'box':
+   504→      return new THREE.BoxGeometry(dimensions.width, dimensions.height, dimensions.depth);
+   505→    case 'sphere':
+   506→      return new THREE.SphereGeometry(Math.max(dimensions.width, dimensions.height) / 2, 12, 8);
+   507→    case 'cylinder':
+   508→      return new THREE.CylinderGeometry(
+   509→        dimensions.width / 2,
+   510→        dimensions.depth / 2,
+   511→        dimensions.height,
+   512→        12,
+   513→      );
+   514→    case 'cone':
+   515→      return new THREE.ConeGeometry(
+   516→        Math.max(dimensions.width, dimensions.depth) / 2,
+   517→        dimensions.height,
+   518→        12,
+   519→      );
+   520→    default: {
+   521→      const _exhaustive: never = shape;
+   522→      return new THREE.BoxGeometry(0.1, 0.1, 0.1);
+   523→    }
+   524→  }
+   525→}
+   526→
+   527→/** Build a Three.js geometry from a model definition (top-level shape only). */
+   528→export function buildGeometry(def: ModelDefinition): THREE.BufferGeometry {
+   529→  return createPrimitiveGeometry(def.shape as 'box' | 'sphere' | 'cylinder' | 'cone', def.dimensions);
+   530→}
+   531→
+   532→/** Build a Three.js material from a model definition. */
+   533→export function buildMaterial(def: ModelDefinition): THREE.MeshStandardMaterial {
+   534→  const params: THREE.MeshStandardMaterialParameters = {
+   535→    color: new THREE.Color(def.color),
+   536→    roughness: 0.7,
+   537→    metalness: 0.1,
+   538→    flatShading: true,
+   539→  };
+   540→  if (def.emissive) {
+   541→    params.emissive = new THREE.Color(def.emissive);
+   542→    params.emissiveIntensity = 0.3;
+   543→  }
+   544→  return new THREE.MeshStandardMaterial(params);
+   545→}
+   546→
+   547→/** Build a complete Three.js mesh (or group) from a model definition. */
+   548→export function buildMesh(def: ModelDefinition): THREE.Mesh | THREE.Group {
+   549→  // Simple shape — single mesh
+   550→  if (def.shape !== 'compound' || !def.children || def.children.length === 0) {
+   551→    const geometry = createPrimitiveGeometry(
+   552→      def.shape as 'box' | 'sphere' | 'cylinder' | 'cone',
+   553→      def.dimensions,
+   554→    );
+   555→    const material = buildMaterial(def);
+   556→    return new THREE.Mesh(geometry, material);
+   557→  }
+   558→
+   559→  // Compound — group of child meshes
+   560→  const group = new THREE.Group();
+   561→
+   562→  // Add children
+   563→  for (const child of def.children) {
+   564→    const childGeo = createPrimitiveGeometry(child.shape, child.dimensions);
+   565→    const childMatParams: THREE.MeshStandardMaterialParameters = {
+   566→      color: new THREE.Color(child.color),
+   567→      roughness: 0.7,
+   568→      metalness: 0.1,
+   569→      flatShading: true,
+   570→    };
+   571→    if (child.emissive) {
+   572→      childMatParams.emissive = new THREE.Color(child.emissive);
+   573→      childMatParams.emissiveIntensity = 0.3;
+   574→    }
+   575→    const childMat = new THREE.MeshStandardMaterial(childMatParams);
+   576→    const childMesh = new THREE.Mesh(childGeo, childMat);
+   577→    childMesh.position.set(...child.position);
+   578→    childMesh.castShadow = true;
+   579→    childMesh.receiveShadow = true;
+   580→    group.add(childMesh);
+   581→  }
+   582→
+   583→  return group;
+   584→}
+   585→
+   586→/** Get a model definition by id. Returns undefined if not found. */
+   587→export function getModelDefinition(id: string): ModelDefinition | undefined {
+   588→  return MODEL_REGISTRY[id];
+   589→}
+   590→
+   591→/** Get all model ids in the registry. */
+   592→export function getAllModelIds(): string[] {
+   593→  return Object.keys(MODEL_REGISTRY);
+   594→}
+   595→

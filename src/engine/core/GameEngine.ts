@@ -80,6 +80,17 @@ export class GameEngine {
     return this.state;
   }
 
+  /**
+   * Replace the internal game state with a new one.
+   * Used for save/load: after constructing an engine with a config,
+   * call setState() to restore a previously saved state.
+   * Also updates the event bus turn counter.
+   */
+  setState(state: GameState): void {
+    this.state = state;
+    this.eventBus.setTurn(state.turn);
+  }
+
   /** Access the event bus for subscribing to game events. */
   getEventBus(): EventBus {
     return this.eventBus;
@@ -159,6 +170,8 @@ export class GameEngine {
         return this.validateRecruitUnit(command);
       case 'ResearchTechnology':
         return this.validateResearchTechnology(command);
+      case 'ChangeDiplomacy':
+        return this.validateChangeDiplomacy(command);
       case 'EndTurn':
         return this.validateEndTurn(command);
       case 'HotseatSwitch':
@@ -264,6 +277,22 @@ export class GameEngine {
     return { valid: true };
   }
 
+  private validateChangeDiplomacy(command: import('./CommandQueue').ChangeDiplomacyCommand): ValidationResult {
+    if (command.playerId !== this.state.activePlayerId) {
+      return { valid: false, error: 'Not your turn' };
+    }
+    if (!this.state.players[command.playerId]) {
+      return { valid: false, error: 'Player not found' };
+    }
+    if (!this.state.players[command.targetPlayerId]) {
+      return { valid: false, error: 'Target player not found' };
+    }
+    if (command.playerId === command.targetPlayerId) {
+      return { valid: false, error: 'Cannot change diplomacy with yourself' };
+    }
+    return { valid: true };
+  }
+
   private validateEndTurn(command: import('./CommandQueue').EndTurnCommand): ValidationResult {
     if (command.playerId !== this.state.activePlayerId) {
       return { valid: false, error: 'Not your turn' };
@@ -301,6 +330,8 @@ export class GameEngine {
         return this.applyRecruitUnit(command);
       case 'ResearchTechnology':
         return this.applyResearchTechnology(command);
+      case 'ChangeDiplomacy':
+        return this.applyChangeDiplomacy(command);
       case 'EndTurn':
         return this.applyEndTurn(command);
       case 'HotseatSwitch':
@@ -514,6 +545,26 @@ export class GameEngine {
           researchProgress: 0,
         },
       },
+    };
+  }
+
+  private applyChangeDiplomacy(command: import('./CommandQueue').ChangeDiplomacyCommand): GameState {
+    // DiplomacyMap is indexed by "playerA:playerB" (always sorted alphabetically)
+    const key = [command.playerId, command.targetPlayerId].sort().join(':');
+    const existing = this.state.diplomacy[key];
+
+    const updatedDiplomacy = {
+      ...this.state.diplomacy,
+      [key]: {
+        status: command.newStatus,
+        sinceTurn: this.state.turn,
+        peaceTreatyTurns: command.newStatus === 'peace' ? 10 : (existing?.peaceTreatyTurns ?? 0),
+      },
+    };
+
+    return {
+      ...this.state,
+      diplomacy: updatedDiplomacy,
     };
   }
 

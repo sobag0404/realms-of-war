@@ -1,19 +1,42 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
 import type { EntityData } from '@/engine/core/GameState';
 import type { AttackType } from '@/engine/core/types';
+import { InstancedModelPool } from '@/rendering/instancing/InstancedModelPool';
+import { getModelDefinition } from '@/rendering/assets/ModelRegistry';
 
 /** Get player color from game state */
 function getPlayerColor(gameState: { players: Record<string, { color: string }> }, playerId: string): string {
   return gameState.players[playerId]?.color ?? '#ffffff';
 }
 
-/** Get geometry for unit type */
-function getUnitGeometry(attackType: AttackType): THREE.BufferGeometry {
+/** Get geometry for unit type using ModelRegistry when available, falling back to attack type */
+function getUnitGeometry(typeId: string, attackType: AttackType): THREE.BufferGeometry {
+  // Try to get geometry from ModelRegistry first
+  const modelDef = getModelDefinition(`unit_${typeId}`);
+  if (modelDef) {
+    // Use the top-level shape geometry (not compound children)
+    const { dimensions } = modelDef;
+    switch (modelDef.shape) {
+      case 'box':
+        return new THREE.BoxGeometry(dimensions.width, dimensions.height, dimensions.depth);
+      case 'sphere':
+        return new THREE.SphereGeometry(Math.max(dimensions.width, dimensions.height) / 2, 12, 8);
+      case 'cylinder':
+        return new THREE.CylinderGeometry(dimensions.width / 2, dimensions.depth / 2, dimensions.height, 12);
+      case 'cone':
+        return new THREE.ConeGeometry(Math.max(dimensions.width, dimensions.depth) / 2, dimensions.height, 12);
+      default:
+        // For compound shapes, use cylinder as the base
+        return new THREE.CylinderGeometry(dimensions.width / 2, dimensions.depth / 2, dimensions.height, 12);
+    }
+  }
+
+  // Fallback to attack type-based geometry
   switch (attackType) {
     case 'melee':
       return new THREE.CylinderGeometry(0.25, 0.3, 0.5, 8);
@@ -51,6 +74,41 @@ function HealthBar({ hp, maxHp, position }: { hp: number; maxHp: number; positio
   );
 }
 
+/** Build compound mesh group from ModelRegistry definition */
+function buildCompoundGroup(modelDef: ReturnType<typeof getModelDefinition>): THREE.Group | null {
+  if (!modelDef || modelDef.shape !== 'compound' || !modelDef.children) return null;
+
+  const group = new THREE.Group();
+  for (const child of modelDef.children) {
+    const childGeo = (() => {
+      switch (child.shape) {
+        case 'box': return new THREE.BoxGeometry(child.dimensions.width, child.dimensions.height, child.dimensions.depth);
+        case 'sphere': return new THREE.SphereGeometry(Math.max(child.dimensions.width, child.dimensions.height) / 2, 12, 8);
+        case 'cylinder': return new THREE.CylinderGeometry(child.dimensions.width / 2, child.dimensions.depth / 2, child.dimensions.height, 12);
+        case 'cone': return new THREE.ConeGeometry(Math.max(child.dimensions.width, child.dimensions.depth) / 2, child.dimensions.height, 12);
+        default: return new THREE.BoxGeometry(0.1, 0.1, 0.1);
+      }
+    })();
+    const childMatParams: THREE.MeshStandardMaterialParameters = {
+      color: new THREE.Color(child.color),
+      roughness: 0.7,
+      metalness: 0.1,
+      flatShading: true,
+    };
+    if (child.emissive) {
+      childMatParams.emissive = new THREE.Color(child.emissive);
+      childMatParams.emissiveIntensity = 0.3;
+    }
+    const childMat = new THREE.MeshStandardMaterial(childMatParams);
+    const childMesh = new THREE.Mesh(childGeo, childMat);
+    childMesh.position.set(...child.position);
+    childMesh.castShadow = true;
+    childMesh.receiveShadow = true;
+    group.add(childMesh);
+  }
+  return group;
+}
+
 /** Single unit mesh */
 function UnitMesh({ entity, playerColor, isSelected }: {
   entity: EntityData;
@@ -58,24 +116,33 @@ function UnitMesh({ entity, playerColor, isSelected }: {
   isSelected: boolean;
 }) {
   const [wx, , wz] = hexToWorld(entity.hex);
-  const geometry = useMemo(() => getUnitGeometry(entity.attackType), [entity.attackType]);
+
+  // Try ModelRegistry for full compound model first
+  const modelDef = useMemo(() => getModelDefinition(`unit_${entity.typeId}`), [entity.typeId]);
+  const geometry = useMemo(() => getUnitGeometry(entity.typeId, entity.attackType), [entity.typeId, entity.attackType]);
 
   // Height offset: raise unit above terrain
   const yOffset = 0.4;
 
-  // Make health bar face camera - we'll use billboard-like approach
+  // Build compound mesh group from ModelRegistry if available
+  const compoundGroup = useMemo(() => buildCompoundGroup(modelDef), [modelDef]);
+
   return (
     <group position={[wx, yOffset, wz]}>
-      {/* Unit body */}
-      <mesh geometry={geometry} castShadow>
-        <meshStandardMaterial
-          color={playerColor}
-          roughness={0.6}
-          metalness={0.2}
-          emissive={playerColor}
-          emissiveIntensity={0.1}
-        />
-      </mesh>
+      {/* Unit body — use compound model if available, otherwise single geometry */}
+      {compoundGroup ? (
+        <primitive object={compoundGroup.clone()} castShadow />
+      ) : (
+        <mesh geometry={geometry} castShadow>
+          <meshStandardMaterial
+            color={playerColor}
+            roughness={0.6}
+            metalness={0.2}
+            emissive={playerColor}
+            emissiveIntensity={0.1}
+          />
+        </mesh>
+      )}
 
       {/* Selection ring */}
       {isSelected && (
@@ -107,6 +174,17 @@ export function UnitLayer() {
   if (!gameState) return null;
 
   const entities = Object.values(gameState.entities);
+
+  // TODO: InstancedModelPool integration for performance optimization.
+  // The InstancedModelPool from rendering/instancing/ can be used to batch
+  // units of the same type into a single InstancedMesh draw call. This is
+  // beneficial when there are many units of the same attack type on screen.
+  // Current approach renders each unit individually because:
+  // - Compound models from ModelRegistry can't be instanced as easily
+  // - Health bars and selection rings need per-unit rendering
+  // - The current unit count doesn't justify the added complexity
+  // To activate: add an InstancedUnitLayer component similar to
+  // InstancedBuildingLayer in BuildingLayer.tsx
 
   return (
     <group>

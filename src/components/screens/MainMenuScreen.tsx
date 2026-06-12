@@ -1,25 +1,111 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGameStore } from '@/store/useGameStore';
+import type { GameState } from '@/engine/core/GameState';
+
+// ─── Save Entry ──────────────────────────────────────────────────────────────
+
+interface SaveEntry {
+  id: string;
+  name: string;
+  turn: number;
+  players: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * MainMenuScreen — full-screen overlay shown when mode === 'menu'.
  *
  * Fantasy-themed dark background, game title, menu buttons.
- * All text in Russian.
+ * Load game button now works.
  */
 export function MainMenuScreen() {
   const mode = useGameStore((s) => s.mode);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
+  const loadGame = useGameStore((s) => s.loadGame);
+  const addNotification = useGameStore((s) => s.addNotification);
   const [visible, setVisible] = useState(false);
+  const [showLoadPanel, setShowLoadPanel] = useState(false);
+  const [saves, setSaves] = useState<SaveEntry[]>([]);
+  const [loadingSaves, setLoadingSaves] = useState(false);
 
   useEffect(() => {
     // Trigger fade-in animation on mount
     const timer = setTimeout(() => setVisible(true), 50);
     return () => clearTimeout(timer);
   }, []);
+
+  const fetchSaves = useCallback(async () => {
+    setLoadingSaves(true);
+    try {
+      const res = await fetch('/api/saves');
+      if (res.ok) {
+        const data = await res.json();
+        setSaves(data.saves ?? []);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingSaves(false);
+    }
+  }, []);
+
+  const handleLoadClick = useCallback(() => {
+    setShowLoadPanel(true);
+    fetchSaves();
+  }, [fetchSaves]);
+
+  const handleLoadSave = useCallback(
+    async (saveId: string) => {
+      try {
+        const res = await fetch(`/api/load?id=${saveId}`);
+        if (!res.ok) throw new Error('Load failed');
+        const data = await res.json();
+        const gameState: GameState = JSON.parse(data.data);
+        loadGame(gameState);
+        setShowLoadPanel(false);
+        addNotification({
+          type: 'success',
+          title: 'Загрузка',
+          message: `Игра "${data.name}" загружена (ход ${data.turn})`,
+          duration: 3000,
+        });
+      } catch {
+        addNotification({
+          type: 'error',
+          title: 'Ошибка',
+          message: 'Не удалось загрузить сохранение',
+          duration: 4000,
+        });
+      }
+    },
+    [loadGame, addNotification],
+  );
+
+  const handleDeleteSave = useCallback(
+    async (saveId: string, saveName: string) => {
+      try {
+        const res = await fetch(`/api/load?id=${saveId}`, { method: 'DELETE' });
+        if (res.ok) {
+          setSaves((prev) => prev.filter((s) => s.id !== saveId));
+          addNotification({
+            type: 'info',
+            title: 'Удалено',
+            message: `Сохранение "${saveName}" удалено`,
+            duration: 3000,
+          });
+        }
+      } catch {
+        // Silently fail
+      }
+    },
+    [addNotification],
+  );
 
   if (mode !== 'menu') return null;
 
@@ -75,8 +161,8 @@ export function MainMenuScreen() {
           </Button>
 
           <Button
-            disabled
-            className="h-14 text-lg font-semibold bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50"
+            onClick={handleLoadClick}
+            className="h-14 text-lg font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-all duration-200 hover:scale-[1.02]"
           >
             📂 Загрузить
           </Button>
@@ -89,6 +175,68 @@ export function MainMenuScreen() {
           </Button>
         </div>
       </div>
+
+      {/* Load game panel */}
+      {showLoadPanel && (
+        <div className="absolute inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg mx-4 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+              <h3 className="text-lg font-semibold text-amber-400">Загрузить игру</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-zinc-400 hover:text-white"
+                onClick={() => setShowLoadPanel(false)}
+              >
+                ✕
+              </Button>
+            </div>
+            <ScrollArea className="max-h-96">
+              <div className="p-4 space-y-2">
+                {loadingSaves ? (
+                  <div className="text-zinc-500 text-sm py-8 text-center">
+                    Загрузка...
+                  </div>
+                ) : saves.length === 0 ? (
+                  <div className="text-zinc-500 text-sm py-8 text-center">
+                    Нет сохранений
+                  </div>
+                ) : (
+                  saves.map((save) => (
+                    <Card key={save.id} className="bg-zinc-800/50 border-zinc-700">
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white text-sm font-medium truncate">
+                            {save.name}
+                          </div>
+                          <div className="text-zinc-500 text-xs">
+                            Ход {save.turn} · {new Date(save.updatedAt).toLocaleDateString('ru-RU')}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="bg-amber-700 hover:bg-amber-600 text-white text-xs"
+                          onClick={() => handleLoadSave(save.id)}
+                        >
+                          Загрузить
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-zinc-500 hover:text-red-400 text-xs"
+                          onClick={() => handleDeleteSave(save.id, save.name)}
+                        >
+                          🗑
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
 
       {/* Version number */}
       <div className="absolute bottom-6 text-zinc-600 text-xs tracking-wide">

@@ -41,13 +41,15 @@ const ERA_LABELS: Record<string, string> = {
  * DiplomacyScreen — side panel showing diplomacy overview with other players.
  *
  * Lists all other players with their diplomacy status, score, and era.
- * Diplomacy action buttons are present but disabled (not yet implemented).
+ * Diplomacy action buttons are now functional.
  */
 export function DiplomacyScreen() {
   const openPanel = useGameStore((s) => s.openPanel);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
   const gameState = useGameStore((s) => s.gameState);
   const activePlayerId = useGameStore((s) => s.activePlayerId);
+  const dispatchCommand = useGameStore((s) => s.dispatchCommand);
+  const addNotification = useGameStore((s) => s.addNotification);
 
   // ── Escape key handler ─────────────────────────────────────────────────
   useEffect(() => {
@@ -70,12 +72,34 @@ export function DiplomacyScreen() {
   const getDiplomacyStatus = useCallback(
     (playerId: PlayerId): DiplomacyStatus => {
       if (!gameState) return 'war';
-      // DiplomacyMap is indexed by "playerA:playerB" (sorted alphabetically)
       const key = [activePlayerId, playerId].sort().join(':');
       const entry = gameState.diplomacy[key];
-      return entry?.status ?? 'war'; // Default to war
+      return entry?.status ?? 'war';
     },
     [gameState, activePlayerId],
+  );
+
+  // ── Diplomacy actions ──────────────────────────────────────────────────
+  const handleChangeDiplomacy = useCallback(
+    (targetPlayerId: PlayerId, newStatus: DiplomacyStatus) => {
+      dispatchCommand({
+        type: 'ChangeDiplomacy',
+        playerId: activePlayerId,
+        targetPlayerId,
+        newStatus,
+      });
+
+      const targetName = gameState?.players[targetPlayerId]?.name ?? targetPlayerId;
+      const statusLabel = STATUS_LABELS[newStatus];
+
+      addNotification({
+        type: newStatus === 'war' ? 'warning' : 'success',
+        title: 'Дипломатия',
+        message: `Отношения с ${targetName}: ${statusLabel}`,
+        duration: 4000,
+      });
+    },
+    [dispatchCommand, activePlayerId, gameState, addNotification],
   );
 
   if (openPanel !== 'diplomacy' || !gameState) return null;
@@ -178,8 +202,7 @@ export function DiplomacyScreen() {
                           size="sm"
                           variant="outline"
                           className="flex-1 text-[10px] border-green-800/50 text-green-400 hover:bg-green-900/20"
-                          disabled
-                          title="Ещё не реализовано"
+                          onClick={() => handleChangeDiplomacy(player.id, 'peace')}
                         >
                           Предложить мир
                         </Button>
@@ -189,8 +212,7 @@ export function DiplomacyScreen() {
                             size="sm"
                             variant="outline"
                             className="flex-1 text-[10px] border-red-800/50 text-red-400 hover:bg-red-900/20"
-                            disabled
-                            title="Ещё не реализовано"
+                            onClick={() => handleChangeDiplomacy(player.id, 'war')}
                           >
                             Объявить войну
                           </Button>
@@ -198,8 +220,7 @@ export function DiplomacyScreen() {
                             size="sm"
                             variant="outline"
                             className="flex-1 text-[10px] border-blue-800/50 text-blue-400 hover:bg-blue-900/20"
-                            disabled
-                            title="Ещё не реализовано"
+                            onClick={() => handleChangeDiplomacy(player.id, 'alliance')}
                           >
                             Предложить союз
                           </Button>
@@ -209,18 +230,16 @@ export function DiplomacyScreen() {
                           size="sm"
                           variant="outline"
                           className="flex-1 text-[10px] border-red-800/50 text-red-400 hover:bg-red-900/20"
-                          disabled
-                          title="Ещё не реализовано"
+                          onClick={() => handleChangeDiplomacy(player.id, 'war')}
                         >
-                          Объявить войну
+                          Разорвать союз
                         </Button>
                       ) : (
                         <Button
                           size="sm"
                           variant="outline"
                           className="flex-1 text-[10px] border-red-800/50 text-red-400 hover:bg-red-900/20"
-                          disabled
-                          title="Ещё не реализовано"
+                          onClick={() => handleChangeDiplomacy(player.id, 'war')}
                         >
                           Объявить войну
                         </Button>

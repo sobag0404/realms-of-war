@@ -1,6 +1,7 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three';
 import { SceneRoot } from './SceneRoot';
 
 interface GameCanvasProps {
@@ -10,7 +11,7 @@ interface GameCanvasProps {
 export function GameCanvas({ className }: GameCanvasProps) {
   return (
     <Canvas
-      shadows
+      shadows={{ type: THREE.PCFShadowMap }}
       dpr={[1, 2]}
       gl={{
         antialias: true,

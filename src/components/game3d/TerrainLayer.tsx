@@ -7,6 +7,14 @@ import { TERRAIN_ELEVATION } from '@/data/terrain';
 import { HexMesh } from './HexMesh';
 import { hexToWorld } from '@/engine/hex/coordinates';
 import type { HexCoord, TerrainTypeId } from '@/engine/core/types';
+import { buildTerrainChunks, disposeChunks } from '@/rendering/terrain/buildTerrainChunks';
+import type { TerrainChunk } from '@/rendering/terrain/buildTerrainChunks';
+import { getDefaultFlatHexGeometry, disposeDefaultGeometries } from '@/rendering/terrain/buildHexGeometry';
+import { createMovementRangeMaterial, createAttackRangeMaterial } from '@/rendering/terrain/terrainMaterials';
+
+// ─── Chunked Terrain Threshold ──────────────────────────────────────────────
+// Use chunked rendering when tile count exceeds this threshold
+const CHUNKED_THRESHOLD = 256;
 
 export function TerrainLayer() {
   const gameState = useGameStore((s) => s.gameState);
@@ -22,6 +30,29 @@ export function TerrainLayer() {
     return Object.values(gameState.map.tiles);
   }, [gameState]);
 
+  // Build terrain chunks for large maps using buildTerrainChunks
+  const terrainChunks = useMemo(() => {
+    if (!gameState || tiles.length < CHUNKED_THRESHOLD) return [];
+
+    // Convert game tiles to the format expected by buildTerrainChunks
+    const tileData: Record<string, { terrain: string; coord: { q: number; r: number } }> = {};
+    for (const tile of tiles) {
+      const key = `${tile.coord.q},${tile.coord.r}`;
+      tileData[key] = { terrain: tile.terrain, coord: tile.coord };
+    }
+
+    return buildTerrainChunks(tileData);
+  }, [gameState, tiles]);
+
+  // Dispose chunks when they change
+  useMemo(() => {
+    return () => {
+      if (terrainChunks.length > 0) {
+        disposeChunks(terrainChunks);
+      }
+    };
+  }, [terrainChunks]);
+
   const handleHexClick = useCallback((hex: HexCoord) => {
     selectHex(hex);
   }, [selectHex]);
@@ -36,6 +67,12 @@ export function TerrainLayer() {
 
   return (
     <group>
+      {/* Chunked terrain for large maps */}
+      {terrainChunks.length > 0 && (
+        <ChunkedTerrain chunks={terrainChunks} />
+      )}
+
+      {/* Individual hex meshes for small maps or interaction layer */}
       {tiles.map((tile) => {
         const key = `${tile.coord.q},${tile.coord.r}`;
         const [wx, , wz] = hexToWorld(tile.coord);
@@ -70,8 +107,29 @@ export function TerrainLayer() {
   );
 }
 
+// ─── Chunked Terrain Component ──────────────────────────────────────────────
+// Renders pre-built terrain chunks as merged geometries for performance
+
+function ChunkedTerrain({ chunks }: { chunks: TerrainChunk[] }) {
+  return (
+    <group>
+      {chunks.map((chunk, i) => (
+        <mesh
+          key={`chunk-${chunk.chunkX}-${chunk.chunkZ}-${i}`}
+          geometry={chunk.geometry}
+          material={chunk.material}
+          receiveShadow
+        />
+      ))}
+    </group>
+  );
+}
+
+// ─── Grid Overlay ───────────────────────────────────────────────────────────
+
 /** Grid lines as a single merged line segments object */
 function GridOverlay({ tiles }: { tiles: Array<{ coord: HexCoord; terrain: string }> }) {
+  // Use getDefaultFlatHexGeometry from rendering utils for reference dimensions
   const lineRef = useMemo(() => {
     const points: THREE.Vector3[] = [];
 

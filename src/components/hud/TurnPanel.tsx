@@ -10,7 +10,7 @@
 import { useCallback } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { Button } from '@/components/ui/button';
-import { Loader2, Settings, Menu, RotateCw, FlaskConical, Swords } from 'lucide-react';
+import { Loader2, Settings, Menu, RotateCw, FlaskConical, Swords, Save } from 'lucide-react';
 
 // ─── Phase Labels ─────────────────────────────────────────────────────────────
 
@@ -33,6 +33,8 @@ export function TurnPanel() {
   const isProcessingCommand = useGameStore((s) => s.isProcessingCommand);
   const localPlayerIds = useGameStore((s) => s.localPlayerIds);
   const endTurn = useGameStore((s) => s.endTurn);
+  const saveGame = useGameStore((s) => s.saveGame);
+  const addNotification = useGameStore((s) => s.addNotification);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
   const resetGame = useGameStore((s) => s.resetGame);
 
@@ -55,6 +57,16 @@ export function TurnPanel() {
   const handleDiplomacy = useCallback(() => {
     setOpenPanel('diplomacy');
   }, [setOpenPanel]);
+
+  const handleSave = useCallback(async () => {
+    const success = await saveGame();
+    addNotification({
+      type: success ? 'success' : 'error',
+      title: success ? 'Сохранено' : 'Ошибка',
+      message: success ? 'Игра сохранена' : 'Не удалось сохранить игру',
+      duration: 3000,
+    });
+  }, [saveGame, addNotification]);
 
   if (!gameState) return null;
 
@@ -126,6 +138,18 @@ export function TurnPanel() {
             title="Дипломатия"
           >
             <Swords className="h-4 w-4" />
+          </Button>
+
+          {/* Save button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-black/50 backdrop-blur-sm text-white/60 hover:text-amber-400 hover:bg-amber-900/20 transition-colors"
+            onClick={handleSave}
+            aria-label="Save game"
+            title="Сохранить"
+          >
+            <Save className="h-4 w-4" />
           </Button>
 
           {/* Settings button */}

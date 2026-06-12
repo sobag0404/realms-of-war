@@ -17,6 +17,8 @@ import type { GameCommand } from '@/engine/core/CommandQueue';
 import type { PlayerId, GameMode } from '@/engine/core/types';
 import { GameEngine, EngineError } from '@/engine/core/GameEngine';
 import { generateMap } from '@/engine/mapgen/generateMap';
+import { createDefaultConfig } from '@/engine/core/GameConfig';
+import { getWorkerManager } from '@/workers/workerManager';
 
 // ─── Slice Interface ──────────────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ export interface SessionSlice {
   // Actions
   startNewGame: (config: GameConfig) => void;
   loadGame: (state: GameState) => void;
+  saveGame: (name?: string) => Promise<boolean>;
   dispatchCommand: (command: GameCommand) => void;
   endTurn: () => void;
   resetGame: () => void;
@@ -75,44 +78,93 @@ export const createSessionSlice: StateCreator<
       // 1. Create a new GameEngine with the config
       const engine = new GameEngine(config);
 
-      // 2. Generate the map using mapgen
-      const mapResult = generateMap({
-        width: config.map.radius * 2,
-        height: Math.floor(config.map.radius * 1.5),
-        seed: config.seed,
-        playerCount: config.players.length,
-      });
+      // Mark as processing while map generates asynchronously
+      set({ isProcessingCommand: true }, false, 'session/startNewGame/begin');
 
-      // 3. Merge the generated map into the engine state
-      const initialState = engine.getState();
-      const stateWithMap: GameState = {
-        ...initialState,
-        map: mapResult.mapData,
-      };
+      // 2. Determine map generation parameters
+      const mapGenWidth = config.map.radius * 2;
+      const mapGenHeight = Math.floor(config.map.radius * 1.5);
+      const mapGenSeed = config.seed;
+      const mapGenPlayers = config.players.length;
 
-      // 4. Determine mode from config
+      // Determine mode & local players (these don't depend on map)
       const mode: GameMode = config.mode;
-
-      // 5. Determine local player IDs (non-AI players)
       const localPlayerIds = config.players
         .filter((p) => !p.isAI)
         .map((p) => p.id);
 
-      // 6. Update the store
-      set(
-        {
-          engine,
-          gameState: stateWithMap,
-          snapshotVersion: 1,
-          mode,
-          activePlayerId: initialState.activePlayerId,
-          localPlayerIds,
-          isProcessingCommand: false,
-          lastError: null,
-        },
-        false,
-        'session/startNewGame',
-      );
+      // 3. Use mapgen worker (async) with sync fallback.
+      //    requestMapgen internally falls back to synchronous generateMap()
+      //    if the worker fails or is unavailable.
+      const workerManager = getWorkerManager();
+      const initialState = engine.getState();
+
+      workerManager
+        .requestMapgen(mapGenWidth, mapGenHeight, mapGenSeed, mapGenPlayers)
+        .then((result) => {
+          // Merge generated map into engine state
+          const stateWithMap: GameState = {
+            ...initialState,
+            map: result.mapData as GameState['map'],
+          };
+
+          set(
+            {
+              engine,
+              gameState: stateWithMap,
+              snapshotVersion: 1,
+              mode,
+              activePlayerId: initialState.activePlayerId,
+              localPlayerIds,
+              isProcessingCommand: false,
+              lastError: null,
+            },
+            false,
+            'session/startNewGame',
+          );
+        })
+        .catch(() => {
+          // Worker + fallback both failed — use synchronous generateMap directly
+          try {
+            const mapResult = generateMap({
+              width: mapGenWidth,
+              height: mapGenHeight,
+              seed: mapGenSeed,
+              playerCount: mapGenPlayers,
+            });
+
+            const stateWithMap: GameState = {
+              ...initialState,
+              map: mapResult.mapData,
+            };
+
+            set(
+              {
+                engine,
+                gameState: stateWithMap,
+                snapshotVersion: 1,
+                mode,
+                activePlayerId: initialState.activePlayerId,
+                localPlayerIds,
+                isProcessingCommand: false,
+                lastError: null,
+              },
+              false,
+              'session/startNewGame/fallback',
+            );
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'Failed to start game';
+            set(
+              {
+                lastError: { message, code: ERROR_CODES.ENGINE_ERROR },
+                isProcessingCommand: false,
+              },
+              false,
+              'session/startNewGameError',
+            );
+          }
+        });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to start game';
@@ -128,19 +180,89 @@ export const createSessionSlice: StateCreator<
   },
 
   loadGame: (state: GameState) => {
-    set(
-      {
-        engine: null, // Engine would need to be reconstructed for loaded games
-        gameState: state,
-        snapshotVersion: get().snapshotVersion + 1,
-        activePlayerId: state.activePlayerId,
-        mode: 'single', // Default to single when loading
-        isProcessingCommand: false,
-        lastError: null,
-      },
-      false,
-      'session/loadGame',
-    );
+    try {
+      // Reconstruct the engine from the loaded state
+      const config = createDefaultConfig({
+        version: state.version,
+        seed: state.seed,
+        players: Object.values(state.players).map((p, i) => ({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          isAI: p.isAI,
+          slot: i,
+        })),
+        map: {
+          radius: state.map.radius,
+          type: 'continents',
+          waterLevel: 0.3,
+          mountainDensity: 0.1,
+          forestDensity: 0.2,
+          resourceAbundance: 0.5,
+          riftPortals: 3,
+        },
+      });
+
+      const engine = new GameEngine(config);
+      engine.setState(state);
+
+      const localPlayerIds = Object.values(state.players)
+        .filter((p) => !p.isAI)
+        .map((p) => p.id);
+
+      set(
+        {
+          engine,
+          gameState: state,
+          snapshotVersion: get().snapshotVersion + 1,
+          activePlayerId: state.activePlayerId,
+          mode: 'single',
+          localPlayerIds,
+          isProcessingCommand: false,
+          lastError: null,
+        },
+        false,
+        'session/loadGame',
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load game';
+      set(
+        {
+          lastError: { message, code: ERROR_CODES.ENGINE_ERROR },
+        },
+        false,
+        'session/loadGameError',
+      );
+    }
+  },
+
+  saveGame: async (name?: string) => {
+    const { gameState } = get();
+    if (!gameState) return false;
+
+    try {
+      const saveName = name ?? `Автосохранение — Ход ${gameState.turn}`;
+      const playerNames = Object.values(gameState.players)
+        .map((p) => p.name)
+        .join(', ');
+
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: saveName,
+          turn: gameState.turn,
+          players: playerNames,
+          data: JSON.stringify(gameState),
+          checksum: '',
+        }),
+      });
+
+      return res.ok;
+    } catch {
+      return false;
+    }
   },
 
   dispatchCommand: (command: GameCommand) => {
