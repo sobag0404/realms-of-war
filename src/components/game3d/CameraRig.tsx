@@ -4,10 +4,12 @@ import { useRef, useEffect, useCallback } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
+import { CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM } from '@/config/camera';
+import { hexToWorld } from '@/engine/hex/coordinates';
 
 /** Camera zoom limits */
-const MIN_ZOOM = 4;
-const MAX_ZOOM = 28;
+const MIN_ZOOM = CAMERA_MIN_ZOOM;
+const MAX_ZOOM = CAMERA_MAX_ZOOM;
 
 /** Edge scroll zone in pixels */
 const EDGE_ZONE = 20;
@@ -28,7 +30,7 @@ export function CameraRig() {
   const lastMouse = useRef<{ x: number; y: number } | null>(null);
   const isRotating = useRef(false);
   const keysDown = useRef<Set<string>>(new Set());
-  const mousePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const mousePos = useRef<{ x: number; y: number } | null>(null);
 
   const setCameraTarget = useGameStore((s) => s.setCameraTarget);
   const setCameraZoom = useGameStore((s) => s.setCameraZoom);
@@ -47,24 +49,33 @@ export function CameraRig() {
     const tiles = Object.values(gameState.map.tiles);
     if (tiles.length === 0) return;
 
-    let minQ = Infinity, maxQ = -Infinity, minR = Infinity, maxR = -Infinity;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const tile of tiles) {
-      if (tile.coord.q < minQ) minQ = tile.coord.q;
-      if (tile.coord.q > maxQ) maxQ = tile.coord.q;
-      if (tile.coord.r < minR) minR = tile.coord.r;
-      if (tile.coord.r > maxR) maxR = tile.coord.r;
+      const [x, , z] = hexToWorld(tile.coord);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
     }
 
-    // Convert to world coords (approximate)
     const sqrt3 = Math.sqrt(3);
     const padWorld = MAP_PADDING * sqrt3;
     mapBounds.current = {
-      minX: minQ * sqrt3 - padWorld,
-      maxX: maxQ * sqrt3 + padWorld,
-      minZ: minR * 1.5 - padWorld,
-      maxZ: maxR * 1.5 + padWorld,
+      minX: minX - padWorld,
+      maxX: maxX + padWorld,
+      minZ: minZ - padWorld,
+      maxZ: maxZ + padWorld,
     };
   }, [gameState]);
+
+  const clampCameraTarget = useCallback((target: [number, number, number]): [number, number, number] => {
+    const bounds = mapBounds.current;
+    return [
+      Math.max(bounds.minX, Math.min(bounds.maxX, target[0])),
+      0,
+      Math.max(bounds.minZ, Math.min(bounds.maxZ, target[2])),
+    ];
+  }, []);
 
   // Keyboard events
   useEffect(() => {
@@ -113,11 +124,11 @@ export function CameraRig() {
       const worldDx = (-dx * Math.cos(yawRad) + dy * Math.sin(yawRad)) * panScale;
       const worldDz = (dx * Math.sin(yawRad) + dy * Math.cos(yawRad)) * panScale;
 
-      setCameraTarget([
+      setCameraTarget(clampCameraTarget([
         cameraTarget[0] + worldDx,
         0,
         cameraTarget[2] + worldDz,
-      ]);
+      ]));
     }
 
     if (isRotating.current && lastMouse.current) {
@@ -131,12 +142,13 @@ export function CameraRig() {
         lastMouse.current = { x: e.clientX, y: e.clientY };
       }
     }
-  }, [cameraRotation, cameraZoom, cameraTarget, setCameraTarget, setCameraRotation]);
+  }, [cameraRotation, cameraZoom, cameraTarget, setCameraTarget, setCameraRotation, clampCameraTarget]);
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false;
     isRotating.current = false;
     lastMouse.current = null;
+    mousePos.current = null;
   }, []);
 
   // Wheel zoom
@@ -147,6 +159,10 @@ export function CameraRig() {
     setCameraZoom(newZoom);
   }, [cameraZoom, setCameraZoom]);
 
+  const handleContextMenu = useCallback((e: Event) => {
+    e.preventDefault();
+  }, []);
+
   useEffect(() => {
     const canvas = gl.domElement;
     if (!canvas) return;
@@ -156,7 +172,7 @@ export function CameraRig() {
     canvas.addEventListener('pointerup', handlePointerUp);
     canvas.addEventListener('pointerleave', handlePointerUp);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       canvas.removeEventListener('pointerdown', handlePointerDown);
@@ -164,8 +180,9 @@ export function CameraRig() {
       canvas.removeEventListener('pointerup', handlePointerUp);
       canvas.removeEventListener('pointerleave', handlePointerUp);
       canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [gl.domElement, handlePointerDown, handlePointerMove, handlePointerUp, handleWheel]);
+  }, [gl.domElement, handlePointerDown, handlePointerMove, handlePointerUp, handleWheel, handleContextMenu]);
 
   // Frame update: apply camera position using imperative ref
   useFrame(({ camera }, delta) => {
@@ -188,40 +205,54 @@ export function CameraRig() {
     if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
     if (keys.has('d') || keys.has('arrowright')) dx += 1;
 
+    let frameTarget = cameraTarget;
+    let targetWasUpdated = false;
+
     if (dx !== 0 || dz !== 0) {
       // Rotate input by camera yaw
       const worldDx = dx * Math.cos(yawRad) - dz * Math.sin(yawRad);
       const worldDz = dx * Math.sin(yawRad) + dz * Math.cos(yawRad);
       const len = Math.sqrt(worldDx * worldDx + worldDz * worldDz);
-      const newTarget = [
+      const newTarget = clampCameraTarget([
         cameraTarget[0] + (worldDx / len) * panSpeed,
         0,
         cameraTarget[2] + (worldDz / len) * panSpeed,
-      ] as [number, number, number];
+      ] as [number, number, number]);
+      frameTarget = newTarget;
+      targetWasUpdated = true;
       setCameraTarget(newTarget);
     }
 
     // Edge scroll
-    const mx = mousePos.current.x;
-    const my = mousePos.current.y;
-    const edgeDx = mx < EDGE_ZONE ? -1 : mx > window.innerWidth - EDGE_ZONE ? 1 : 0;
-    const edgeDz = my < EDGE_ZONE ? -1 : my > window.innerHeight - EDGE_ZONE ? 1 : 0;
+    const currentMouse = mousePos.current;
+    const edgeDx = currentMouse
+      ? currentMouse.x < EDGE_ZONE ? -1 : currentMouse.x > window.innerWidth - EDGE_ZONE ? 1 : 0
+      : 0;
+    const edgeDz = currentMouse
+      ? currentMouse.y < EDGE_ZONE ? -1 : currentMouse.y > window.innerHeight - EDGE_ZONE ? 1 : 0
+      : 0;
 
     if (edgeDx !== 0 || edgeDz !== 0) {
       const edgeSpeed = BASE_PAN_SPEED * delta / zoomFactor * 0.5;
       const worldDx = edgeDx * Math.cos(yawRad) - edgeDz * Math.sin(yawRad);
       const worldDz = edgeDx * Math.sin(yawRad) + edgeDz * Math.cos(yawRad);
-      setCameraTarget([
-        cameraTarget[0] + worldDx * edgeSpeed,
+      const newTarget = clampCameraTarget([
+        frameTarget[0] + worldDx * edgeSpeed,
         0,
-        cameraTarget[2] + worldDz * edgeSpeed,
+        frameTarget[2] + worldDz * edgeSpeed,
       ]);
+      frameTarget = newTarget;
+      targetWasUpdated = true;
+      setCameraTarget(newTarget);
     }
 
     // Clamp target to map bounds
-    const bounds = mapBounds.current;
-    const tx = Math.max(bounds.minX, Math.min(bounds.maxX, cameraTarget[0]));
-    const tz = Math.max(bounds.minZ, Math.min(bounds.maxZ, cameraTarget[2]));
+    const clampedTarget = clampCameraTarget(frameTarget);
+    if (!targetWasUpdated && (clampedTarget[0] !== cameraTarget[0] || clampedTarget[2] !== cameraTarget[2])) {
+      setCameraTarget(clampedTarget);
+    }
+    const tx = clampedTarget[0];
+    const tz = clampedTarget[2];
 
     // Compute camera position from target, yaw, pitch
     const pitchRad = (cameraPitch * Math.PI) / 180;

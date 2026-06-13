@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,6 +61,9 @@ export function NewGameScreen() {
   const openPanel = useGameStore((s) => s.openPanel);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
   const startNewGame = useGameStore((s) => s.startNewGame);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // ── Local config state ─────────────────────────────────────────────────
   const [mapSizeIndex, setMapSizeIndex] = useState(1); // Medium
@@ -74,13 +77,55 @@ export function NewGameScreen() {
   ]);
 
   // ── Escape key handler ─────────────────────────────────────────────────
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpenPanel('none');
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+  const closePanel = useCallback(() => {
+    setOpenPanel('none');
   }, [setOpenPanel]);
+
+  useEffect(() => {
+    if (openPanel !== 'newGame') return;
+
+    previousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closePanel();
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled') && element.offsetParent !== null);
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [openPanel, closePanel]);
 
   // ── Update player count and resize players array ───────────────────────
   const handlePlayerCountChange = useCallback((count: number) => {
@@ -156,29 +201,37 @@ export function NewGameScreen() {
       },
     });
     startNewGame(config);
-    setOpenPanel('none');
-  }, [gameMode, difficulty, players, mapSizeIndex, mapType, startNewGame, setOpenPanel]);
+    closePanel();
+  }, [gameMode, difficulty, players, mapSizeIndex, mapType, startNewGame, closePanel]);
 
   if (openPanel !== 'newGame') return null;
 
   return (
-    <div className="absolute top-0 right-0 bottom-0 z-50 w-full sm:w-[400px] bg-black/85 backdrop-blur-md border-l border-amber-900/30 flex flex-col">
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="New game setup"
+      className="absolute top-0 right-0 bottom-0 z-50 flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-l border-amber-900/30 bg-black/85 backdrop-blur-md sm:w-[400px]"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
         <h2 className="text-lg font-semibold text-amber-400">Новая игра</h2>
         <Button
+          ref={closeButtonRef}
           variant="ghost"
           size="icon"
           className="text-zinc-400 hover:text-white"
-          onClick={() => setOpenPanel('none')}
+          onClick={closePanel}
+          aria-label="Close new game setup"
         >
           ✕
         </Button>
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-5">
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-4 p-4">
           {/* Map Size */}
           <div className="space-y-2">
             <Label className="text-zinc-300 text-sm">Размер карты</Label>
@@ -231,6 +284,7 @@ export function NewGameScreen() {
                       : 'border-zinc-700 text-zinc-400 hover:text-white'
                   }
                   onClick={() => handlePlayerCountChange(count)}
+                  aria-pressed={playerCount === count}
                 >
                   {count}
                 </Button>
@@ -288,6 +342,7 @@ export function NewGameScreen() {
                   <div className="flex gap-1.5">
                     {PLAYER_COLORS.slice(0, 6).map((color) => (
                       <button
+                        type="button"
                         key={color}
                         className={`w-5 h-5 rounded-full border-2 transition-transform ${
                           player.color === color
@@ -296,6 +351,8 @@ export function NewGameScreen() {
                         }`}
                         style={{ backgroundColor: color }}
                         onClick={() => handlePlayerColorChange(index, color)}
+                        aria-label={`Use ${color} for player ${index + 1}`}
+                        aria-pressed={player.color === color}
                       />
                     ))}
                   </div>
@@ -333,7 +390,7 @@ export function NewGameScreen() {
       </ScrollArea>
 
       {/* Footer with start button */}
-      <div className="p-4 border-t border-zinc-800">
+      <div className="shrink-0 border-t border-zinc-800 bg-black/80 p-4">
         <Button
           onClick={handleStartGame}
           className="w-full h-12 text-lg font-semibold bg-amber-700 hover:bg-amber-600 text-white shadow-lg shadow-amber-900/30"
