@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 const MAX_SAVE_BYTES = 2_000_000;
 
@@ -15,4 +15,9 @@ export const SavePayloadSchema = z.object({
 
 export const SaveIdSchema = z.object({
   id: z.string().min(1).max(100),
+});
+
+export const SavesQuerySchema = z.object({
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(20).default(20),
 });

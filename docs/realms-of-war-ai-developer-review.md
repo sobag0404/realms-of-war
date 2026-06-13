@@ -615,9 +615,7 @@ DATABASE_URL="file:./dev.db"
 # Optional: disable telemetry in local/dev environments
 NEXT_TELEMETRY_DISABLED=1
 
-# Future auth variables, uncomment when auth is implemented
-# NEXTAUTH_URL="http://localhost:3000"
-# NEXTAUTH_SECRET="change-me-in-production"
+# Future auth variables should be documented only when auth is implemented.
 ```
 
 ### Критерии приёмки

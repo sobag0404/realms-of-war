@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { SavesQuerySchema } from '@/lib/saveSchemas';
 
+// Local-alpha owner scope. Public multi-user deployments must replace this
+// with session/user ownership before exposing server-side saves.
 const OWNER_ID = 'local';
-const MAX_LIMIT = 20;
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const offset = Math.max(0, Number(searchParams.get('offset') ?? 0));
-    const limit = Math.min(
-      MAX_LIMIT,
-      Math.max(1, Number(searchParams.get('limit') ?? MAX_LIMIT)),
-    );
+    const query = SavesQuerySchema.safeParse({
+      offset: searchParams.get('offset') ?? undefined,
+      limit: searchParams.get('limit') ?? undefined,
+    });
+
+    if (!query.success) {
+      return NextResponse.json(
+        { error: 'Invalid query parameters', details: query.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const { offset, limit } = query.data;
 
     const saves = await db.saveGame.findMany({
       where: { ownerId: OWNER_ID },

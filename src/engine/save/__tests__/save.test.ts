@@ -158,7 +158,7 @@ describe('validateSave', () => {
   });
 
   it('rejects save missing timestamp', () => {
-    const save = makeValidSaveFile() as Record<string, unknown>;
+    const save = makeValidSaveFile() as unknown as Record<string, unknown>;
     delete save.timestamp;
     const result = validateSave(save);
     expect(result.valid).toBe(false);
@@ -166,7 +166,7 @@ describe('validateSave', () => {
   });
 
   it('rejects save missing name', () => {
-    const save = makeValidSaveFile() as Record<string, unknown>;
+    const save = makeValidSaveFile() as unknown as Record<string, unknown>;
     delete save.name;
     const result = validateSave(save);
     expect(result.valid).toBe(false);
@@ -174,7 +174,7 @@ describe('validateSave', () => {
   });
 
   it('rejects save with missing gameState', () => {
-    const save = makeValidSaveFile() as Record<string, unknown>;
+    const save = makeValidSaveFile() as unknown as Record<string, unknown>;
     delete save.gameState;
     const result = validateSave(save);
     expect(result.valid).toBe(false);
@@ -182,7 +182,7 @@ describe('validateSave', () => {
   });
 
   it('rejects save with missing rngState', () => {
-    const save = makeValidSaveFile() as Record<string, unknown>;
+    const save = makeValidSaveFile() as unknown as Record<string, unknown>;
     delete save.rngState;
     const result = validateSave(save);
     expect(result.valid).toBe(false);
@@ -223,7 +223,7 @@ describe('loadGame', () => {
   });
 
   it('throws if save has no gameState', () => {
-    const save = makeValidSaveFile() as Record<string, unknown>;
+    const save = makeValidSaveFile() as unknown as Record<string, unknown>;
     delete save.gameState;
     expect(() => loadGame(save as unknown as SaveFile)).toThrow(/no gameState/);
   });

@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getWorkerManager } from '@/workers/workerManager';
 import type { WorkerManager } from '@/workers/workerManager';
 
@@ -19,13 +19,5 @@ import type { WorkerManager } from '@/workers/workerManager';
 
 export function useWorkerManager(): WorkerManager {
   const [manager] = useState<WorkerManager>(() => getWorkerManager());
-
-  // Cleanup on unmount: terminate all workers
-  useEffect(() => {
-    return () => {
-      manager.terminateAll();
-    };
-  }, [manager]);
-
   return manager;
 }

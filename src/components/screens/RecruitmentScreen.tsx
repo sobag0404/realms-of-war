@@ -227,7 +227,7 @@ export function RecruitmentScreen() {
                   const canRecruit = affordable && !queueBlocked;
 
                   // Calculate production turns
-                  const productionCost = Object.values(unit.cost).reduce(
+                  const productionCost = Object.values(unit.cost).reduce<number>(
                     (sum, v) => sum + (v ?? 0),
                     0,
                   ) / 2;

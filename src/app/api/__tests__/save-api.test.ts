@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
-import { SavePayloadSchema, SaveIdSchema } from '@/lib/saveSchemas';
+import { SavePayloadSchema, SaveIdSchema, SavesQuerySchema } from '@/lib/saveSchemas';
 import { calculateChecksum } from '@/engine/save/saveGame';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -32,6 +32,7 @@ vi.mock('@/lib/saveService', () => ({
 
 // Import route handler AFTER mocks are set up
 import { POST } from '@/app/api/save/route';
+import { GET as GET_SAVES } from '@/app/api/saves/route';
 import { db } from '@/lib/db';
 import { loadSaveFile } from '@/lib/saveService';
 
@@ -236,6 +237,25 @@ describe('SaveIdSchema', () => {
   });
 });
 
+describe('SavesQuerySchema', () => {
+  it('uses default pagination values', () => {
+    const result = SavesQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ offset: 0, limit: 20 });
+  });
+
+  it('coerces valid pagination query strings', () => {
+    const result = SavesQuerySchema.safeParse({ offset: '5', limit: '10' });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ offset: 5, limit: 10 });
+  });
+
+  it('rejects invalid pagination query strings', () => {
+    const result = SavesQuerySchema.safeParse({ offset: 'abc', limit: '10' });
+    expect(result.success).toBe(false);
+  });
+});
+
 // ─── Route Handler Tests ────────────────────────────────────────────────────
 
 describe('POST /api/save route handler', () => {
@@ -332,5 +352,37 @@ describe('POST /api/save route handler', () => {
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/invalid save format/i);
     expect(db.saveGame.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/saves route handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(db.saveGame.findMany).mockResolvedValue([] as any);
+  });
+
+  it('lists saves with default pagination', async () => {
+    const request = new NextRequest('http://localhost:3000/api/saves');
+    const response = await GET_SAVES(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.saves).toEqual([]);
+    expect(db.saveGame.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 0,
+        take: 20,
+      }),
+    );
+  });
+
+  it('rejects invalid limit with 400', async () => {
+    const request = new NextRequest('http://localhost:3000/api/saves?limit=abc');
+    const response = await GET_SAVES(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/invalid query/i);
+    expect(db.saveGame.findMany).not.toHaveBeenCalled();
   });
 });

@@ -14,13 +14,14 @@ A hex-based strategy game built with Next.js 16, Three.js, and a custom determin
 
 ## Requirements
 
-- [Bun](https://bun.sh/) >= 1.0
-- Node.js >= 18 (for compatibility with some tooling)
+- [Bun](https://bun.sh/) 1.3.x (`packageManager` is pinned to `bun@1.3.14`)
+- Node.js >= 20.9 for the Next.js/Prisma/Vitest toolchain
 
 ## Installation
 
 ```bash
 bun install
+bun run db:generate
 ```
 
 ## Environment
@@ -39,6 +40,8 @@ Push the Prisma schema to create/migrate the SQLite database:
 bun run db:push
 ```
 
+The default local database URL is `file:./dev.db`.
+
 ## Development
 
 Start the development server:
@@ -54,6 +57,8 @@ The app runs on `http://localhost:3000` by default.
 ```bash
 bun run build
 ```
+
+The build uses Next.js standalone output and does not require extra copy steps.
 
 ## Test
 
@@ -119,6 +124,7 @@ docs/                   # Design specs and security review
 
 - **Alpha software**: This project is in early development. Expect bugs and incomplete features.
 - **No authentication**: All save data is associated with a hardcoded `"local"` owner. Multi-user access control is not implemented.
+- **Local-alpha saves**: Server-side saves are intentionally scoped to a local alpha owner abstraction. Do not expose the save API as a public multi-user service until auth/session ownership is added.
 - **No multiplayer**: Only single-player and hotseat modes are supported. Online multiplayer does not exist yet.
 - **No i18n runtime**: Localization strings exist for Russian and English, but the language switching system is not fully wired.
 - **Worker fallbacks**: Web Workers fall back to synchronous execution when threading is unavailable, which may cause UI jank on large maps.
@@ -132,5 +138,6 @@ Key points:
 - Save API endpoints validate input with Zod and enforce body size limits (2 MB).
 - Save data is owner-scoped; without auth, all saves use the `"local"` owner.
 - No secrets or credentials are stored in the repository.
+- Dependency audit is tracked in [`docs/dependency-audit.md`](docs/dependency-audit.md). Current direct unused packages were removed and remaining vulnerable transitives are handled with package overrides.
 - Worker messages include `requestId` for correct concurrent request handling.
 - The game engine uses deterministic RNG for reproducible game states.

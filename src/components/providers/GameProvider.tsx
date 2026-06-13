@@ -20,6 +20,7 @@ import { useGameStore } from '@/store/useGameStore';
 import { AiSystem } from '@/engine/ecs/systems/AiSystem';
 import { getWorkerManager } from '@/workers/workerManager';
 import type { GameEventType } from '@/engine/core/EventBus';
+import type { GameCommand } from '@/engine/core/CommandQueue';
 
 // ─── Event to Notification Mapping ────────────────────────────────────────────
 
@@ -68,14 +69,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     workerManager
       .requestAiTurn(gameState, activePlayerId, 'normal')
       .then((result) => {
-        const commands = result.commands as Array<{ type: string; [key: string]: unknown }>;
+        const commands = result.commands as GameCommand[];
 
         // Dispatch each command sequentially
         // Skip EndTurn — we'll call endTurn() separately for cleaner state updates
         for (const command of commands) {
           if (command.type === 'EndTurn') continue;
           try {
-            dispatchCommand(command as Parameters<typeof dispatchCommand>[0]);
+            dispatchCommand(command);
           } catch {
             // Skip invalid AI commands silently
           }
