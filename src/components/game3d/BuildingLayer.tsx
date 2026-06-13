@@ -34,9 +34,20 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
 
   return (
     <group position={[wx, yOffset, wz]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.035, 0]} receiveShadow>
+        <cylinderGeometry args={[0.72, 0.8, 0.08, 6]} />
+        <meshStandardMaterial color="#7a6a4e" roughness={0.92} metalness={0.02} flatShading />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.07, 0]}>
+        <circleGeometry args={[0.86, 32]} />
+        <meshBasicMaterial color="#030507" transparent opacity={0.24} depthWrite={false} />
+      </mesh>
+
       {/* City building — use ModelRegistry if available, otherwise fallback */}
       {modelGroup ? (
-        <primitive object={modelGroup.clone()} castShadow />
+        <group scale={[1 + city.level * 0.08, 1 + city.level * 0.08, 1 + city.level * 0.08]}>
+          <primitive object={modelGroup.clone()} castShadow />
+        </group>
       ) : (
         <>
           {/* Fallback: City base (main building) */}
@@ -63,19 +74,27 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
       {city.wallHp > 0 && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
           <ringGeometry args={[0.5, 0.55, 6]} />
-          <meshBasicMaterial color="#c0a060" transparent opacity={0.6} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ead08a" transparent opacity={0.72} side={THREE.DoubleSide} />
         </mesh>
       )}
 
       {/* Territory border ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <ringGeometry args={[0.6, 0.65, 6]} />
+        <ringGeometry args={[0.64, 0.71, 6]} />
         <meshBasicMaterial
           color={playerColor}
           transparent
-          opacity={0.4}
+          opacity={0.62}
           side={THREE.DoubleSide}
         />
+      </mesh>
+      <mesh position={[-0.38, 0.48, 0.18]} castShadow>
+        <cylinderGeometry args={[0.018, 0.018, 0.62, 6]} />
+        <meshStandardMaterial color="#2d2118" roughness={0.72} />
+      </mesh>
+      <mesh position={[-0.3, 0.68, 0.18]} rotation={[0, 0, 0.18]} castShadow>
+        <coneGeometry args={[0.15, 0.22, 3]} />
+        <meshStandardMaterial color={playerColor} roughness={0.58} metalness={0.04} />
       </mesh>
     </group>
   );

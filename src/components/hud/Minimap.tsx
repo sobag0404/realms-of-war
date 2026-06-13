@@ -262,7 +262,7 @@ export function Minimap() {
 
   return (
     <div className="absolute bottom-3 right-2 sm:bottom-4 sm:right-4 z-20 pointer-events-auto">
-      <div className="rounded-lg border border-white/15 overflow-hidden bg-black/50 backdrop-blur-sm shadow-lg">
+      <div className="overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md">
         <canvas
           ref={canvasRef}
           width={CANVAS_SIZE}
@@ -298,7 +298,7 @@ function drawViewportOverlay(
   const offsetX = (size - mapPixelW * scale) / 2;
   const offsetY = (size - mapPixelH * scale) / 2;
 
-  const viewSizeFraction = Math.max(0.1, cameraZoom / 28);
+  const viewSizeFraction = Math.max(0.08, Math.min(0.42, 4 / Math.max(1, cameraZoom)));
   const viewW = size * viewSizeFraction;
   const viewH = size * viewSizeFraction;
 

@@ -5,7 +5,7 @@
 // for better draw call performance on large maps.
 
 import * as THREE from 'three';
-import { hexToWorld, HEX_RADIUS } from '@/engine/hex/coordinates';
+import { hexToWorld } from '@/engine/hex/coordinates';
 import { TERRAIN_COLORS, TERRAIN_ELEVATION } from '@/data/terrain';
 import type { TerrainTypeId } from '@/engine/core/types';
 
@@ -40,6 +40,52 @@ const HEX_EXTRUSION_HEIGHT = 0.15;
 
 /** Slight inset for hex gaps (0.95 × radius) */
 const HEX_RENDER_RADIUS = 0.95;
+
+const TERRAIN_TONE: Record<TerrainTypeId, {
+  hue: number;
+  saturation: number;
+  lightness: number;
+  sideShade: number;
+}> = {
+  plains: { hue: -0.012, saturation: 0.06, lightness: 0.08, sideShade: 0.72 },
+  forest: { hue: 0.01, saturation: 0.08, lightness: 0.07, sideShade: 0.58 },
+  mountain: { hue: -0.02, saturation: -0.12, lightness: 0.1, sideShade: 0.62 },
+  water: { hue: -0.012, saturation: 0.1, lightness: 0.08, sideShade: 0.68 },
+  desert: { hue: 0.018, saturation: -0.04, lightness: 0.1, sideShade: 0.74 },
+  swamp: { hue: -0.02, saturation: -0.08, lightness: 0.06, sideShade: 0.56 },
+  hills: { hue: 0.012, saturation: -0.02, lightness: 0.08, sideShade: 0.66 },
+  ruins: { hue: -0.01, saturation: -0.16, lightness: 0.08, sideShade: 0.64 },
+};
+
+function hash01(q: number, r: number, salt: number): number {
+  const x = Math.sin(q * 127.1 + r * 311.7 + salt * 74.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function getTerrainVertexColor(
+  terrain: TerrainTypeId,
+  q: number,
+  r: number,
+  vertexIndex: number,
+  normalY: number,
+): THREE.Color {
+  const base = new THREE.Color(TERRAIN_COLORS[terrain] ?? '#555555');
+  const tone = TERRAIN_TONE[terrain];
+  const hsl = { h: 0, s: 0, l: 0 };
+  base.getHSL(hsl);
+
+  const tileNoise = hash01(q, r, 1) - 0.5;
+  const vertexNoise = hash01(q, r, vertexIndex + 7) - 0.5;
+  const isTop = normalY > 0.5;
+  const sideShade = isTop ? 1 : tone.sideShade;
+  const centerGlow = vertexIndex === 0 ? 0.035 : 0;
+
+  return new THREE.Color().setHSL(
+    THREE.MathUtils.euclideanModulo(hsl.h + tone.hue * tileNoise, 1),
+    THREE.MathUtils.clamp(hsl.s + tone.saturation * tileNoise, 0.05, 0.95),
+    THREE.MathUtils.clamp((hsl.l + tone.lightness * vertexNoise + centerGlow) * sideShade, 0.08, 0.86),
+  );
+}
 
 // ─── Chunk Key Helpers ───────────────────────────────────────────────────────
 
@@ -149,7 +195,7 @@ function buildHexData(
   // Fan triangles (center = baseIndex, corners = baseIndex+1..+6)
   for (let i = 0; i < 6; i++) {
     const next = (i + 1) % 6;
-    indices.push(baseIndex, baseIndex + 1 + i, baseIndex + 1 + next);
+    indices.push(baseIndex, baseIndex + 1 + next, baseIndex + 1 + i);
   }
 
   let vi = baseIndex + 7; // 1 center + 6 corners
@@ -252,12 +298,17 @@ export function buildTerrainChunks(
       allUvs.push(...hexData.uvs);
       allIndices.push(...hexData.indices);
 
-      // Vertex colors based on terrain type
-      const color = new THREE.Color(
-        TERRAIN_COLORS[tile.terrain as TerrainTypeId] ?? '#555555',
-      );
+      // Vertex colors add deterministic biome variation and darker side faces.
+      const terrain = tile.terrain as TerrainTypeId;
       const vertexCount = hexData.vertexCount;
       for (let v = 0; v < vertexCount; v++) {
+        const color = getTerrainVertexColor(
+          terrain,
+          tile.coord.q,
+          tile.coord.r,
+          v,
+          hexData.normals[v * 3 + 1] ?? 1,
+        );
         allColors.push(color.r, color.g, color.b);
       }
 
@@ -277,8 +328,8 @@ export function buildTerrainChunks(
     // Chunk material uses vertex colors
     const material = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.85,
-      metalness: 0.05,
+      roughness: 0.9,
+      metalness: 0.03,
       flatShading: true,
     });
 

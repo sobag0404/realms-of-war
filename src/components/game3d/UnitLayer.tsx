@@ -54,20 +54,53 @@ function getUnitGeometry(typeId: string, attackType: AttackType): THREE.BufferGe
 function HealthBar({ hp, maxHp, position }: { hp: number; maxHp: number; position: [number, number, number] }) {
   const healthRatio = hp / maxHp;
   const barColor = healthRatio > 0.6 ? '#2ecc71' : healthRatio > 0.3 ? '#f39c12' : '#e74c3c';
-  const barWidth = 0.6;
-  const barHeight = 0.06;
+  const barWidth = 0.5;
+  const barHeight = 0.045;
 
   return (
     <group position={position}>
       {/* Background */}
+      <mesh position={[0, 0, -0.002]}>
+        <planeGeometry args={[barWidth + 0.08, barHeight + 0.045]} />
+        <meshBasicMaterial color="#071018" transparent opacity={0.82} side={THREE.DoubleSide} />
+      </mesh>
       <mesh position={[0, 0, 0]}>
         <planeGeometry args={[barWidth, barHeight]} />
-        <meshBasicMaterial color="#333333" transparent opacity={0.8} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#18202a" transparent opacity={0.92} side={THREE.DoubleSide} />
       </mesh>
       {/* Health fill */}
       <mesh position={[(healthRatio - 1) * barWidth / 2, 0, 0.001]}>
         <planeGeometry args={[barWidth * healthRatio, barHeight]} />
         <meshBasicMaterial color={barColor} transparent opacity={0.9} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+function UnitBaseMarker({ playerColor, isSelected }: { playerColor: string; isSelected: boolean }) {
+  return (
+    <group position={[0, -0.32, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.012, 0]}>
+        <circleGeometry args={[0.44, 32]} />
+        <meshBasicMaterial color="#030507" transparent opacity={0.34} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.36, 0.47, 32]} />
+        <meshBasicMaterial
+          color={isSelected ? '#ffd84d' : playerColor}
+          transparent
+          opacity={isSelected ? 0.92 : 0.68}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh position={[0.24, 0.42, 0.03]} castShadow>
+        <cylinderGeometry args={[0.018, 0.018, 0.54, 6]} />
+        <meshStandardMaterial color="#2d2118" roughness={0.72} />
+      </mesh>
+      <mesh position={[0.3, 0.58, 0.03]} rotation={[0, 0, -0.18]} castShadow>
+        <coneGeometry args={[0.13, 0.18, 3]} />
+        <meshStandardMaterial color={playerColor} roughness={0.58} metalness={0.04} />
       </mesh>
     </group>
   );
@@ -128,9 +161,13 @@ function UnitMesh({ entity, playerColor, isSelected }: {
 
   return (
     <group position={[wx, yOffset, wz]}>
+      <UnitBaseMarker playerColor={playerColor} isSelected={isSelected} />
+
       {/* Unit body — use compound model if available, otherwise single geometry */}
       {compoundGroup ? (
-        <primitive object={compoundGroup.clone()} castShadow />
+        <group scale={[1.08, 1.08, 1.08]}>
+          <primitive object={compoundGroup.clone()} castShadow />
+        </group>
       ) : (
         <mesh geometry={geometry} castShadow>
           <meshStandardMaterial
@@ -160,7 +197,7 @@ function UnitMesh({ entity, playerColor, isSelected }: {
       <HealthBar
         hp={entity.hp}
         maxHp={entity.maxHp}
-        position={[0, 0.5, 0]}
+        position={[0, 0.72, 0]}
       />
     </group>
   );

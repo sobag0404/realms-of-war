@@ -248,7 +248,7 @@ function GridOverlay({ tiles }: { tiles: Array<{ coord: HexCoord; terrain: strin
 
   return (
     <lineSegments geometry={lineRef}>
-      <lineBasicMaterial color="#000000" transparent opacity={0.12} />
+      <lineBasicMaterial color="#1d160e" transparent opacity={0.16} />
     </lineSegments>
   );
 }

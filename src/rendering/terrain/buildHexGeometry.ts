@@ -71,7 +71,7 @@ export function buildHexGeometry(
   options?: Partial<HexGeometryOptions>,
 ): THREE.BufferGeometry {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const { radius, height, includeTop, includeSides, segments } = opts;
+  const { radius, height, includeTop, includeSides } = opts;
 
   const corners = hexCorners(radius);
   const positions: number[] = [];
@@ -105,7 +105,7 @@ export function buildHexGeometry(
     // Triangles (winding: CCW from top view = front face)
     for (let i = 0; i < 6; i++) {
       const next = (i + 1) % 6;
-      indices.push(0, 1 + i, 1 + next);
+      indices.push(0, 1 + next, 1 + i);
     }
 
     vertexIndex = 7; // 1 center + 6 corners
@@ -201,7 +201,7 @@ export function buildFlatHexGeometry(radius: number = HEX_RADIUS): THREE.BufferG
   // Fan triangles
   for (let i = 0; i < 6; i++) {
     const next = (i + 1) % 6;
-    indices.push(0, 1 + i, 1 + next);
+    indices.push(0, 1 + next, 1 + i);
   }
 
   const geometry = new THREE.BufferGeometry();
