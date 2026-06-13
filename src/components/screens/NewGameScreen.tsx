@@ -162,7 +162,7 @@ export function NewGameScreen() {
   if (openPanel !== 'newGame') return null;
 
   return (
-    <div className="absolute top-0 right-0 bottom-0 z-50 w-full sm:w-[400px] bg-black/85 backdrop-blur-md border-l border-amber-900/30 flex flex-col">
+    <div className="absolute top-0 right-0 bottom-0 z-50 flex h-dvh max-h-dvh w-full flex-col overflow-hidden border-l border-amber-900/30 bg-black/85 backdrop-blur-md sm:w-[400px]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
         <h2 className="text-lg font-semibold text-amber-400">Новая игра</h2>
@@ -177,8 +177,8 @@ export function NewGameScreen() {
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-5">
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-4 p-4">
           {/* Map Size */}
           <div className="space-y-2">
             <Label className="text-zinc-300 text-sm">Размер карты</Label>
@@ -333,7 +333,7 @@ export function NewGameScreen() {
       </ScrollArea>
 
       {/* Footer with start button */}
-      <div className="p-4 border-t border-zinc-800">
+      <div className="shrink-0 border-t border-zinc-800 bg-black/80 p-4">
         <Button
           onClick={handleStartGame}
           className="w-full h-12 text-lg font-semibold bg-amber-700 hover:bg-amber-600 text-white shadow-lg shadow-amber-900/30"

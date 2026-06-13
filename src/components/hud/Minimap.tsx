@@ -39,10 +39,15 @@ export function Minimap() {
 
   // Track mobile vs desktop display size
   const [displaySize, setDisplaySize] = useState(200);
+  const [isCompact, setIsCompact] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   useEffect(() => {
     const check = () => {
-      setDisplaySize(window.innerWidth < 640 ? 150 : 200);
+      const compact = window.innerWidth < 640;
+      setIsCompact(compact);
+      setDisplaySize(compact ? 116 : 200);
+      setIsExpanded((current) => (compact ? false : current));
     };
     check();
     window.addEventListener('resize', check);
@@ -260,9 +265,34 @@ export function Minimap() {
 
   if (!gameState) return null;
 
+  if (isCompact && !isExpanded) {
+    return (
+      <div className="absolute bottom-3 right-2 z-20 pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="h-10 rounded-lg border border-amber-200/20 bg-slate-950/75 px-3 text-xs font-semibold uppercase tracking-wide text-amber-100 shadow-2xl shadow-black/40 backdrop-blur-md"
+          aria-label="Open minimap"
+        >
+          Map
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute bottom-3 right-2 sm:bottom-4 sm:right-4 z-20 pointer-events-auto">
-      <div className="overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md">
+      <div className="relative overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md">
+        {isCompact && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="absolute right-1 top-1 z-10 h-6 w-6 rounded-md border border-white/10 bg-black/50 text-xs text-white/80"
+            aria-label="Collapse minimap"
+          >
+            x
+          </button>
+        )}
         <canvas
           ref={canvasRef}
           width={CANVAS_SIZE}

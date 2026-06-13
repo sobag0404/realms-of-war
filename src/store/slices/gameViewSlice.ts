@@ -13,6 +13,13 @@ import type { StateCreator } from 'zustand';
 import type { GameStore } from '../useGameStore';
 import type { HexCoord, EntityId } from '@/engine/core/types';
 import { hexToWorld } from '@/engine/hex/coordinates';
+import {
+  CAMERA_DEFAULT_PITCH,
+  CAMERA_DEFAULT_ROTATION,
+  CAMERA_DEFAULT_ZOOM,
+  CAMERA_MAX_ZOOM,
+  CAMERA_MIN_ZOOM,
+} from '@/config/camera';
 
 // ─── Slice Interface ──────────────────────────────────────────────────────────
 
@@ -45,11 +52,11 @@ export interface GameViewSlice {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MIN_ZOOM = 4;
-const MAX_ZOOM = 28;
-const DEFAULT_ZOOM = 11.5;
-const DEFAULT_ROTATION = 45; // degrees
-const DEFAULT_PITCH = 58; // degrees
+const MIN_ZOOM = CAMERA_MIN_ZOOM;
+const MAX_ZOOM = CAMERA_MAX_ZOOM;
+const DEFAULT_ZOOM = CAMERA_DEFAULT_ZOOM;
+const DEFAULT_ROTATION = CAMERA_DEFAULT_ROTATION; // degrees
+const DEFAULT_PITCH = CAMERA_DEFAULT_PITCH; // degrees
 
 // ─── Slice Creator ────────────────────────────────────────────────────────────
 
