@@ -16,7 +16,7 @@ import { createSelectionMaterial, createHoverMaterial } from '@/rendering/terrai
 const CHUNKED_THRESHOLD = 256;
 
 export function TerrainLayer() {
-  const gameState = useGameStore((s) => s.gameState);
+  const mapTiles = useGameStore((s) => s.gameState?.map.tiles);
   const showGrid = useGameStore((s) => s.showGrid);
   const selectedHex = useGameStore((s) => s.selectedHex);
   const hoveredHex = useGameStore((s) => s.hoveredHex);
@@ -25,13 +25,13 @@ export function TerrainLayer() {
 
   // Build tile list from game state
   const tiles = useMemo(() => {
-    if (!gameState) return [];
-    return Object.values(gameState.map.tiles);
-  }, [gameState]);
+    if (!mapTiles) return [];
+    return Object.values(mapTiles);
+  }, [mapTiles]);
 
   // Build terrain chunks for large maps using buildTerrainChunks
   const terrainChunks = useMemo(() => {
-    if (!gameState || tiles.length < CHUNKED_THRESHOLD) return [];
+    if (!mapTiles || tiles.length < CHUNKED_THRESHOLD) return [];
 
     // Convert game tiles to the format expected by buildTerrainChunks
     const tileData: Record<string, { terrain: string; coord: { q: number; r: number } }> = {};
@@ -41,7 +41,7 @@ export function TerrainLayer() {
     }
 
     return buildTerrainChunks(tileData);
-  }, [gameState, tiles]);
+  }, [mapTiles, tiles]);
 
   // Dispose chunks when they change — use useEffect for proper cleanup
   useEffect(() => {
@@ -60,7 +60,7 @@ export function TerrainLayer() {
     setHoveredHex(hex);
   }, [setHoveredHex]);
 
-  if (!gameState || tiles.length === 0) {
+  if (!mapTiles || tiles.length === 0) {
     return null;
   }
 

@@ -166,7 +166,7 @@ function UnitMesh({ entity, playerColor, isSelected }: {
       {/* Unit body — use compound model if available, otherwise single geometry */}
       {compoundGroup ? (
         <group scale={[1.08, 1.08, 1.08]}>
-          <primitive object={compoundGroup.clone()} castShadow />
+          <primitive object={compoundGroup} castShadow />
         </group>
       ) : (
         <mesh geometry={geometry} castShadow>

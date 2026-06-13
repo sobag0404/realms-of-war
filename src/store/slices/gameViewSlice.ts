@@ -71,7 +71,7 @@ export const createGameViewSlice: StateCreator<
   showGrid: true,
   showYields: false,
   showThreat: false,
-  showFog: false,
+  showFog: true,
 
   // ── Actions ──────────────────────────────────────────────────────────────
 

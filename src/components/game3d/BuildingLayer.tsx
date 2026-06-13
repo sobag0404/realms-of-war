@@ -34,7 +34,7 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
 
   return (
     <group position={[wx, yOffset, wz]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.035, 0]} receiveShadow>
+      <mesh position={[0, -0.035, 0]} receiveShadow>
         <cylinderGeometry args={[0.72, 0.8, 0.08, 6]} />
         <meshStandardMaterial color="#7a6a4e" roughness={0.92} metalness={0.02} flatShading />
       </mesh>
@@ -46,7 +46,7 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
       {/* City building — use ModelRegistry if available, otherwise fallback */}
       {modelGroup ? (
         <group scale={[1 + city.level * 0.08, 1 + city.level * 0.08, 1 + city.level * 0.08]}>
-          <primitive object={modelGroup.clone()} castShadow />
+          <primitive object={modelGroup} castShadow />
         </group>
       ) : (
         <>
