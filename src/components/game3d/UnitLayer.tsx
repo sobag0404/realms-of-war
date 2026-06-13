@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
 import type { EntityData } from '@/engine/core/GameState';
 import type { AttackType } from '@/engine/core/types';
-import { InstancedModelPool } from '@/rendering/instancing/InstancedModelPool';
 import { getModelDefinition } from '@/rendering/assets/ModelRegistry';
 
 /** Get player color from game state */

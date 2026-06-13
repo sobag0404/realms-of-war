@@ -14,9 +14,6 @@ import { hexKey } from '../core/types';
 /** Minimum turns a peace treaty must last before it can be broken. */
 const PEACE_TREATY_MINIMUM_TURNS = 10;
 
-/** Vassal gold tribute rate (30% of income). */
-const VASSAL_TRIBUTE_RATE = 0.30;
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Create a sorted key for two players (alphabetical order for consistency). */
@@ -174,7 +171,6 @@ export function setDiplomacyStatus(
   if (playerA === playerB) return state;
 
   const key = diplomacyKey(playerA, playerB);
-  const currentEntry = state.diplomacy[key];
 
   const newEntry: DiplomacyEntry = {
     status,

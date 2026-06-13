@@ -37,6 +37,7 @@ import { GET as GET_LOAD, DELETE as DELETE_LOAD } from '@/app/api/load/route';
 import { GET as GET_SAVES } from '@/app/api/saves/route';
 import { db } from '@/lib/db';
 import { loadSaveFile } from '@/lib/saveService';
+import { resolveSaveAccess } from '@/lib/saveAccess';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -168,7 +169,24 @@ function createLoadRequest(id?: string, method = 'GET'): NextRequest {
   return new NextRequest(`http://localhost:3000/api/load${query}`, { method });
 }
 
+function expectNoSaveGameDbCalls() {
+  expect(db.saveGame.create).not.toHaveBeenCalled();
+  expect(db.saveGame.findFirst).not.toHaveBeenCalled();
+  expect(db.saveGame.findMany).not.toHaveBeenCalled();
+  expect(db.saveGame.deleteMany).not.toHaveBeenCalled();
+}
+
+function setNodeEnv(value: string | undefined) {
+  const env = process.env as Record<string, string | undefined>;
+  if (value === undefined) {
+    delete env.NODE_ENV;
+  } else {
+    env.NODE_ENV = value;
+  }
+}
+
 const originalServerSavesMode = process.env.REALMS_SERVER_SAVES;
+const originalNodeEnv = process.env.NODE_ENV;
 
 beforeEach(() => {
   delete process.env.REALMS_SERVER_SAVES;
@@ -180,6 +198,8 @@ afterEach(() => {
   } else {
     process.env.REALMS_SERVER_SAVES = originalServerSavesMode;
   }
+
+  setNodeEnv(originalNodeEnv);
 });
 
 // ─── Schema Tests ───────────────────────────────────────────────────────────
@@ -282,6 +302,28 @@ describe('SavesQuerySchema', () => {
 });
 
 // ─── Route Handler Tests ────────────────────────────────────────────────────
+
+describe('resolveSaveAccess', () => {
+  it('disables server saves by default in production', () => {
+    delete process.env.REALMS_SERVER_SAVES;
+    setNodeEnv('production');
+
+    expect(resolveSaveAccess()).toMatchObject({
+      enabled: false,
+      status: 403,
+    });
+  });
+
+  it('enables local-alpha server saves when explicitly opted in', () => {
+    setNodeEnv('production');
+    process.env.REALMS_SERVER_SAVES = 'local-alpha';
+
+    expect(resolveSaveAccess()).toEqual({
+      enabled: true,
+      ownerId: 'local',
+    });
+  });
+});
 
 describe('POST /api/save route handler', () => {
   beforeEach(() => {
@@ -390,7 +432,7 @@ describe('POST /api/save route handler', () => {
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/server-side saves are disabled/i);
     expect(loadSaveFile).not.toHaveBeenCalled();
-    expect(db.saveGame.create).not.toHaveBeenCalled();
+    expectNoSaveGameDbCalls();
   });
 });
 
@@ -446,7 +488,8 @@ describe('GET /api/saves route handler', () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/server-side saves are disabled/i);
-    expect(db.saveGame.findMany).not.toHaveBeenCalled();
+    expect(loadSaveFile).not.toHaveBeenCalled();
+    expectNoSaveGameDbCalls();
   });
 });
 
@@ -509,7 +552,8 @@ describe('GET /api/load route handler', () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/server-side saves are disabled/i);
-    expect(db.saveGame.findFirst).not.toHaveBeenCalled();
+    expect(loadSaveFile).not.toHaveBeenCalled();
+    expectNoSaveGameDbCalls();
   });
 });
 
@@ -562,6 +606,7 @@ describe('DELETE /api/load route handler', () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/server-side saves are disabled/i);
-    expect(db.saveGame.deleteMany).not.toHaveBeenCalled();
+    expect(loadSaveFile).not.toHaveBeenCalled();
+    expectNoSaveGameDbCalls();
   });
 });

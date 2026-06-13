@@ -32,5 +32,15 @@ with server saves, opt in explicitly:
 REALMS_SERVER_SAVES=local-alpha bun run start
 ```
 
+CI runs the automated standalone smoke after `bun run build`:
+
+```bash
+bun run smoke
+```
+
+The smoke starts production standalone twice on loopback: first to verify save
+APIs return `403` by default, then with `REALMS_SERVER_SAVES=local-alpha` to
+verify `/` and `/api/saves` return `200`.
+
 For public exposure, keep Caddy/Next bound to loopback or add real auth/session
 ownership before enabling persistent server saves for multiple users.

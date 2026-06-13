@@ -13,8 +13,6 @@ import { useGameStore } from '@/store/useGameStore';
 import { MinimapRenderer } from '@/rendering/minimap/minimapRenderer';
 import type { MinimapState } from '@/rendering/minimap/minimapRenderer';
 import { TERRAIN_TYPES } from '@/data/terrain';
-import type { TerrainTypeId } from '@/data/terrain';
-import type { HexCoord } from '@/engine/core/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

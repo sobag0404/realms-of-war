@@ -21,10 +21,10 @@
  * - Hills/Mountain terrain bonus: +1
  */
 
-import type { PlayerId, HexCoord, ResourceId } from '../../core/types';
+import type { PlayerId, HexCoord } from '../../core/types';
 import type { GameState, EntityData, Visibility } from '../../core/GameState';
 import type { EventBus } from '../../core/EventBus';
-import { hexKey, hexDistance, hexRing } from '../../core/types';
+import { hexKey, hexRing } from '../../core/types';
 import { TERRAIN_TYPES } from '../../../data/terrain';
 
 // ─── Vision Range Constants ────────────────────────────────────────────────────

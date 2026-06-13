@@ -4,9 +4,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
-import { TERRAIN_ELEVATION } from '@/data/terrain';
 import { hexToWorld } from '@/engine/hex/coordinates';
-import type { TerrainTypeId } from '@/engine/core/types';
 
 /** Create a hexagonal plane for water tiles */
 function createHexGeometry(radius: number): THREE.BufferGeometry {

@@ -12,19 +12,15 @@
  * - Otherwise → research or expand
  */
 
-import type { PlayerId, HexCoord, ResourceId, ResourceYield } from '../../core/types';
+import type { PlayerId, HexCoord } from '../../core/types';
 import type { GameState, EntityData } from '../../core/GameState';
 import type { GameCommand, MoveUnitCommand, AttackCommand, FoundCityCommand, BuildBuildingCommand, RecruitUnitCommand, ResearchTechnologyCommand, EndTurnCommand } from '../../core/CommandQueue';
 import type { EventBus } from '../../core/EventBus';
 import { hexKey, hexDistance, hexRing, HEX_DIRECTIONS } from '../../core/types';
-import { getReachableHexes } from '../../rules/movementRules';
-import { canAttack } from '../../rules/combatRules';
 import { canFoundCity } from '../../rules/cityRules';
 import { getAvailableBuildings } from '../../rules/cityRules';
-import { getRecruitableUnits, getRecruitmentCost } from '../../rules/recruitmentRules';
-import { getAvailableTechs, canResearch } from '../../rules/researchRules';
-import { BUILDINGS } from '../../../data/buildings';
-import { UNIT_TYPES } from '../../../data/units';
+import { getRecruitableUnits } from '../../rules/recruitmentRules';
+import { getAvailableTechs } from '../../rules/researchRules';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,7 +48,7 @@ export class AiSystem {
   static generateTurn(
     state: GameState,
     playerId: PlayerId,
-    eventBus: EventBus,
+    _eventBus: EventBus,
   ): GameCommand[] {
     const player = state.players[playerId];
     if (!player || !player.isAlive) return [];
@@ -64,8 +60,6 @@ export class AiSystem {
     const sorted = [...priorities].sort((a, b) => b.weight - a.weight);
 
     // Track what we've done this turn
-    let hasMovedUnits = false;
-    let hasAttacked = false;
     let hasBuilt = false;
     let hasResearched = false;
     let hasRecruited = false;
@@ -94,7 +88,6 @@ export class AiSystem {
                   path: [settler.hex, bestHex],
                 };
                 commands.push(moveCmd);
-                hasMovedUnits = true;
               }
 
               // Found city if settler is at the location
@@ -144,7 +137,6 @@ export class AiSystem {
                 targetCityId: null,
               };
               commands.push(attackCmd);
-              hasAttacked = true;
             } else if (closestEnemy && !unit.hasMoved) {
               // Move toward enemy
               const moveCmd: MoveUnitCommand = {
@@ -154,7 +146,6 @@ export class AiSystem {
                 path: [unit.hex, closestEnemy.hex],
               };
               commands.push(moveCmd);
-              hasMovedUnits = true;
             }
           }
 
@@ -266,7 +257,6 @@ export class AiSystem {
                   path: [unit.hex, city.hex],
                 };
                 commands.push(moveCmd);
-                hasMovedUnits = true;
               }
             }
           }

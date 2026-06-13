@@ -8,8 +8,8 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useGameStore } from '@/store/useGameStore';
-import { UNIT_TYPES, PLAYER_UNIT_IDS } from '@/data/units';
-import { canRecruitUnit, getRecruitableUnits, getRecruitmentCost } from '@/engine/rules/recruitmentRules';
+import { UNIT_TYPES } from '@/data/units';
+import { getRecruitableUnits } from '@/engine/rules/recruitmentRules';
 import type { UnitType, UnitTypeId } from '@/data/units';
 import type { ResourceId } from '@/engine/core/types';
 
@@ -49,14 +49,6 @@ function canAfford(
 }
 
 // ─── Era order for sorting ────────────────────────────────────────────────────
-
-const ERA_ORDER = [
-  'primitives',
-  'earlyCiv',
-  'medieval',
-  'renaissance',
-  'rift',
-] as const;
 
 const ERA_LABELS: Record<string, string> = {
   primitives: 'Примитивы',

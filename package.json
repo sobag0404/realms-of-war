@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "smoke": "bun scripts/smoke.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:push": "bun scripts/db-push.ts",

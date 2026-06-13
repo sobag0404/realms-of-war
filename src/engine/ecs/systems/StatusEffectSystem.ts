@@ -12,7 +12,6 @@
 import type { EntityId, PlayerId } from '../../core/types';
 import type { GameState, EntityData } from '../../core/GameState';
 import type { EventBus } from '../../core/EventBus';
-import { hexKey } from '../../core/types';
 
 // ─── Effect Definitions ────────────────────────────────────────────────────────
 
@@ -69,7 +68,7 @@ const EFFECT_DEFINITIONS: Record<string, EffectDefinition> = {
     name: 'Stunned',
     defaultDuration: 1,
     isPositive: false,
-    onTurnStart: (entity) => ({
+    onTurnStart: (_entity) => ({
       movementPoints: 0,
       hasActed: true,
     }),
@@ -127,7 +126,7 @@ export class StatusEffectSystem {
   static processEffects(
     state: GameState,
     playerId: PlayerId,
-    eventBus: EventBus,
+    _eventBus: EventBus,
   ): GameState {
     const newEntities = { ...state.entities };
     let changed = false;
@@ -199,7 +198,7 @@ export class StatusEffectSystem {
     state: GameState,
     entityId: EntityId,
     effectId: string,
-    eventBus: EventBus,
+    _eventBus: EventBus,
   ): GameState {
     const entity = state.entities[entityId];
     if (!entity) return state;
@@ -252,7 +251,7 @@ export class StatusEffectSystem {
    */
   static removeExpiredEffects(
     state: GameState,
-    eventBus: EventBus,
+    _eventBus: EventBus,
   ): GameState {
     const newEntities = { ...state.entities };
     let changed = false;

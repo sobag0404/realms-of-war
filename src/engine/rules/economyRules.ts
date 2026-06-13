@@ -6,11 +6,10 @@
  */
 
 import type { CityId, EntityId, HexCoord, PlayerId, ResourceId, ResourceYield } from '../core/types';
-import type { GameState, CityState, EntityData, HexTile } from '../core/GameState';
+import type { GameState, HexTile } from '../core/GameState';
 import { hexKey } from '../core/types';
 import { TERRAIN_TYPES } from '../../data/terrain';
 import { BUILDINGS } from '../../data/buildings';
-import { RESOURCES } from '../../data/resources';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,15 +41,6 @@ function subtractYields(a: ResourceYield, b: ResourceYield): ResourceYield {
   return result;
 }
 
-/** Scale a ResourceYield by a multiplier. */
-function scaleYield(yield_: ResourceYield, multiplier: number): ResourceYield {
-  const result: ResourceYield = {};
-  for (const key of Object.keys(yield_) as ResourceId[]) {
-    result[key] = Math.floor((yield_[key] ?? 0) * multiplier);
-  }
-  return result;
-}
-
 // ─── Hex Yield ────────────────────────────────────────────────────────────────
 
 /**
@@ -70,7 +60,7 @@ function scaleYield(yield_: ResourceYield, multiplier: number): ResourceYield {
 export function getHexYield(
   state: GameState,
   hex: HexCoord,
-  cityId: CityId | null,
+  _cityId: CityId | null,
 ): ResourceYield {
   const tile = getHexTile(state, hex);
   if (!tile) return {};
