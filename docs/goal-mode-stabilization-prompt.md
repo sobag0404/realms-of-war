@@ -39,8 +39,8 @@ GitHub: `https://github.com/sobag0404/realms-of-war`
 
 - `bun install --frozen-lockfile` — проходит.
 - `bun x prisma generate` при `DATABASE_URL=file:./dev.db` — проходит.
-- `bun run lint` — проходит с 144 warnings.
-- `bun run typecheck` — проходил после исключения examples/mini-services из root typecheck и исправления TS ошибок.
+- `bun run lint` — проходит с 143 warnings.
+- `bun run typecheck` — проходит после исключения examples/mini-services из root typecheck, исправления TS ошибок и снятия `@ts-nocheck` с ai/mapgen/simulation workers.
 - `bun run test` — проходил: 100 tests pass.
 - `bun run build` — проходил.
 
@@ -106,10 +106,15 @@ GitHub: `https://github.com/sobag0404/realms-of-war`
    - `src/workers/ai.worker.ts`
    - `src/workers/mapgen.worker.ts`
    - `src/workers/simulation.worker.ts`
+   - Статус: выполнено, воркеры изолированы module scope через `export {}` и проходят typecheck.
 2. Усилить path traversal защиту в `mini-services/game-server/index.ts`: после `resolve()` проверять, что путь остался внутри `PUBLIC_DIR`.
+   - Статус: выполнено через `relative(PUBLIC_DIR, filePath)` boundary check.
 3. Исправить `useWorkerManager.ts`: один consumer не должен `terminateAll()` singleton workers для всех.
+   - Статус: выполнено, hook больше не завершает singleton на unmount.
 4. Решить user-visible no-op actions в `UnitPanel.tsx`: `Wake` и `Wait` либо реализовать, либо скрыть/disabled с понятным состоянием.
+   - Статус: выполнено, no-op кнопки скрыты до появления реальных команд.
 5. `GameEngine.processQueue()` не должен молча пропускать invalid commands: логировать dev diagnostics или возвращать errors.
+   - Статус: выполнено, invalid queued commands логируются через `console.warn`.
 
 ## Ограничения
 

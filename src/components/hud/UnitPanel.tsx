@@ -84,16 +84,6 @@ export function UnitPanel({ entity }: UnitPanelProps) {
     });
   }, [dispatchCommand, activePlayerId, isOwnedByActive, entity.id]);
 
-  const handleWake = useCallback(() => {
-    if (!isOwnedByActive) return;
-    // Would dispatch wake command
-  }, [isOwnedByActive]);
-
-  const handleWait = useCallback(() => {
-    if (!isOwnedByActive) return;
-    // Would dispatch wait command
-  }, [isOwnedByActive]);
-
   return (
     <div className="space-y-2">
       {/* Header: Unit name + owner */}
@@ -208,36 +198,17 @@ export function UnitPanel({ entity }: UnitPanelProps) {
       )}
 
       {/* Action buttons */}
-      {isOwnedByActive && (
+      {isOwnedByActive && !isFortified && (
         <>
           <Separator className="bg-white/10" />
           <div className="flex gap-1.5">
-            {isFortified ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7 text-xs flex-1"
-                onClick={handleWake}
-              >
-                Wake
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7 text-xs flex-1"
-                onClick={handleFortify}
-              >
-                Fortify
-              </Button>
-            )}
             <Button
               size="sm"
-              variant="ghost"
-              className="h-7 text-xs flex-1 text-white/60 hover:text-white"
-              onClick={handleWait}
+              variant="secondary"
+              className="h-7 text-xs flex-1"
+              onClick={handleFortify}
             >
-              Wait
+              Fortify
             </Button>
           </div>
         </>

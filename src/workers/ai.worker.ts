@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Web Worker for AI turn generation.
  *
@@ -79,6 +78,10 @@ interface AiPriority {
 
 type GameState = any;
 
+function recordValues<T = any>(value: Record<string, T> | null | undefined): T[] {
+  return Object.values(value ?? {});
+}
+
 // ─── Priority Evaluation ───────────────────────────────────────────────────────
 
 function evaluatePriorities(state: GameState, playerId: string, difficulty: string): AiPriority[] {
@@ -87,10 +90,10 @@ function evaluatePriorities(state: GameState, playerId: string, difficulty: stri
 
   const modifiers = DIFFICULTY_MODIFIERS[difficulty] ?? DIFFICULTY_MODIFIERS.normal;
 
-  const playerCities = Object.values(state.cities || {}).filter(
+  const playerCities = recordValues(state.cities).filter(
     (c: any) => c.ownerId === playerId,
   );
-  const playerUnits = Object.values(state.entities || {}).filter(
+  const playerUnits = recordValues(state.entities).filter(
     (e: any) => e.ownerId === playerId,
   );
   const gold = player.resources?.gold ?? 0;
@@ -112,7 +115,7 @@ function evaluatePriorities(state: GameState, playerId: string, difficulty: stri
   // Military: Enemy nearby or few units
   let enemyNearby = false;
   for (const city of playerCities) {
-    const nearby = Object.values(state.entities || {}).filter(
+    const nearby = recordValues(state.entities).filter(
       (e: any) => e.ownerId !== playerId && hexDistance(e.hex, city.hex) <= 5,
     );
     if (nearby.length > 0) { enemyNearby = true; break; }
@@ -132,7 +135,7 @@ function evaluatePriorities(state: GameState, playerId: string, difficulty: stri
   // Defend: Cities are threatened
   let threatenedCities = 0;
   for (const city of playerCities) {
-    const nearby = Object.values(state.entities || {}).filter(
+    const nearby = recordValues(state.entities).filter(
       (e: any) => e.ownerId !== playerId && hexDistance(e.hex, city.hex) <= 3,
     );
     if (nearby.length > 0) threatenedCities++;
@@ -157,10 +160,10 @@ function generateTurn(state: GameState, playerId: string, difficulty: string): u
   let hasResearched = false;
   let hasRecruited = false;
 
-  const playerUnits = Object.values(state.entities || {}).filter(
+  const playerUnits = recordValues(state.entities).filter(
     (e: any) => e.ownerId === playerId,
   );
-  const playerCities = Object.values(state.cities || {}).filter(
+  const playerCities = recordValues(state.cities).filter(
     (c: any) => c.ownerId === playerId,
   );
 
@@ -201,7 +204,7 @@ function generateTurn(state: GameState, playerId: string, difficulty: string): u
         const combatUnits = playerUnits.filter((u: any) => !u.hasActed && u.typeId !== 'settler' && u.typeId !== 'worker');
 
         for (const unit of combatUnits) {
-          const enemies = Object.values(state.entities || {}).filter((e: any) =>
+          const enemies = recordValues(state.entities).filter((e: any) =>
             e.ownerId !== playerId && e.hp > 0,
           );
 
@@ -289,7 +292,7 @@ function generateTurn(state: GameState, playerId: string, difficulty: string): u
       case 'defend': {
         // Move idle units toward threatened cities
         for (const city of playerCities) {
-          const nearbyEnemies = Object.values(state.entities || {}).filter((e: any) =>
+          const nearbyEnemies = recordValues(state.entities).filter((e: any) =>
             e.ownerId !== playerId && hexDistance(e.hex, city.hex) <= 4,
           );
           if (nearbyEnemies.length === 0) continue;
@@ -335,7 +338,7 @@ function findBestCityLocation(
   let bestHex: { q: number; r: number } | null = null;
   let bestScore = -1;
 
-  const playerCities = Object.values(state.cities || {}).filter(
+  const playerCities = recordValues(state.cities).filter(
     (c: any) => c.ownerId === playerId,
   );
 
@@ -351,7 +354,7 @@ function findBestCityLocation(
         if (terrain === 'mountain' || terrain === 'water') continue;
 
         // Must not have an existing city
-        const existingCity = Object.values(state.cities || {}).some((c: any) =>
+        const existingCity = recordValues(state.cities).some((c: any) =>
           c.hex.q === hex.q && c.hex.r === hex.r,
         );
         if (existingCity) continue;
@@ -428,3 +431,5 @@ self.onmessage = function (e: MessageEvent) {
     });
   }
 };
+
+export {};

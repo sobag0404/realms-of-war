@@ -181,7 +181,7 @@ export class GameEngine {
 
   /**
    * Process all queued commands in FIFO order.
-   * Stops processing if any command is invalid (skips it with a warning).
+   * Skips invalid commands after surfacing a diagnostic warning.
    * Returns the final game state after all valid commands are applied.
    */
   processQueue(): GameState {
@@ -191,7 +191,10 @@ export class GameEngine {
 
       const validation = this.validateCommand(command);
       if (!validation.valid) {
-        // Skip invalid commands silently — in production we'd log this
+        console.warn(
+          `[GameEngine] Skipping invalid queued command "${command.type}": ${validation.error ?? 'unknown error'}`,
+          command,
+        );
         continue;
       }
       this.state = this.applyCommand(command);

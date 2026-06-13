@@ -298,10 +298,10 @@
 - [x] Settings: schema validation для localStorage значений (Zod SettingsSchema)
 - [x] GameEngine: dispatch добавляет command в executedCommands log
 - [x] GameEngine: getCommandLog() + restoreCommandLog() для save/load
-- [ ] GameEngine: processQueue не skip invalid commands silently
+- [x] GameEngine: processQueue не skip invalid commands silently
 - [ ] GameProvider: log/report AI invalid commands в dev mode
 - [x] GitHub Actions CI (install, Prisma generate, typecheck, lint, test, build)
-- [ ] Mini-service: усиленная path traversal защита (path.resolve + startsWith)
+- [x] Mini-service: усиленная path traversal защита (path.resolve + boundary check)
 
 ### 15.4. Ревью 2 — P0 (2026-06-12, второй ревьюер)
 
@@ -326,6 +326,9 @@
 - [x] .gitignore: исправлена склеенная строка, tool-results/ убран из git
 - [x] Hardcoded scripts: start-game.sh, watchdog.sh используют относительные пути
 - [x] localStorage settings validation: Zod SettingsSchema
+- [x] Worker typing: убран @ts-nocheck из ai.worker.ts, mapgen.worker.ts, simulation.worker.ts
+- [x] WorkerManager cleanup: useWorkerManager не завершает singleton workers на unmount consumer
+- [x] UnitPanel: скрыты no-op Wake/Wait действия
 
 ---
 

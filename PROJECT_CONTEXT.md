@@ -48,9 +48,9 @@
 
 > Последнее обновление: 2026-06-13 (Goal Mode: quality gates stabilization)
 
-### ⚠️ ТЕКУЩИЙ ПРИОРИТЕТ: доработка по результатам второго ревью
+### ✅ ТЕКУЩИЙ СТАТУС: стабилизация по ревью закрыта
 
-**Второй ревьюер (2026-06-12):** Оценка выше первого (Overall 6/10 вместо 4/10), но есть новые P0/P1 проблемы.
+**Второй ревьюер (2026-06-12):** Оценка выше первого (Overall 6/10 вместо 4/10). P0/P1 и целевой P2 cleanup для quality gates закрыты.
 
 Приоритетный порядок работ:
 1. ✅ **Save/Load flow** (P0) — исправлено: MainMenuScreen → loadSaveFile()
@@ -64,7 +64,11 @@
 9. ✅ **Scripts** (P2) — убраны hardcoded пути
 10. ✅ **Settings validation** (P2) — Zod-схема для localStorage
 11. ✅ **CI pipeline** — GitHub Actions добавлен (`.github/workflows/ci.yml`)
-12. 🔲 **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker
+12. ✅ **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker типизируются без `@ts-nocheck`
+13. ✅ **Mini-service path traversal** — resolved path проверяется внутри `PUBLIC_DIR`
+14. ✅ **WorkerManager singleton lifetime** — `useWorkerManager` больше не вызывает `terminateAll()` на unmount consumer
+15. ✅ **UnitPanel no-op actions** — фантомные `Wake`/`Wait` кнопки скрыты до появления реальных команд
+16. ✅ **GameEngine.processQueue diagnostics** — invalid queued commands логируются через dev warning
 
 ### Результаты ревью 1 (2026-06-12, первый ревьюер)
 
@@ -121,11 +125,15 @@
 - [x] **.gitignore сломан** — исправлена склеенная строка, tool-results/ убран из git
 - [x] **Hardcoded scripts** — start-game.sh, watchdog.sh используют относительные пути
 - [x] **localStorage settings без validation** — Zod-схема SettingsSchema
+- [x] **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker компилируются без `@ts-nocheck`
+- [x] **Mini-service path traversal** — `mini-services/game-server/index.ts` проверяет resolved path внутри `PUBLIC_DIR`
+- [x] **WorkerManager singleton cleanup** — hook не завершает общий singleton при unmount одного consumer
+- [x] **UnitPanel Wake/Wait no-op** — несуществующие действия скрыты из UI
+- [x] **GameEngine processQueue silent skip** — invalid queued commands больше не пропускаются без диагностики
 
 ### Оставшиеся задачи
 
 - [x] **CI pipeline** — GitHub Actions запускает install, Prisma generate, typecheck, lint, test, build
-- [ ] **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker
 - [ ] **Auth/ownership модель** — для публичного деплоя (пока local-only mode)
 - [ ] **Rate limiting** — для Save API
 - [ ] **E2E тесты** — Playwright smoke test
@@ -305,4 +313,5 @@ realms-of-war/
 | 2026-06-12 | **Security cleanup:** Удалены screenshots из git, убран PAT из remote URL |
 | 2026-06-12 | **Ревью:** Добавлено техническое ревью в docs/, обновлён GDD §16, PROJECT_CONTEXT, CHECKLIST |
 | 2026-06-12 | **Ревью 2:** Добавлено второе ревью, исправлены все P0/P1/P2: save/load flow, build.sh, checksum, body size, command log, move validation, API tests, worker typing, .gitignore, scripts, settings validation |
-| 2026-06-13 | **Goal Mode stabilization:** добавлены `.env.example`, GitHub Actions CI, packageManager/Node engines, кроссплатформенные npm scripts, исправлены typecheck/test/build blockers, добавлена Zod-валидация `/api/saves` pagination |
+| 2026-06-13 | **Goal Mode stabilization:** добавлены `.env.example`, GitHub Actions CI, packageManager/Node engines, кроссплатформенные npm scripts, исправлены typecheck/test/build blockers, добавлена Zod-валидация `/api/saves` pagination, закрыт P2 cleanup из ревью (workers без `@ts-nocheck`, mini-service path boundary, WorkerManager cleanup, UnitPanel no-op actions, processQueue diagnostics) |
+| 2026-06-13 | **Финальный gate:** `bun install --frozen-lockfile`, `bun x prisma generate`, `bun run typecheck`, `bun run lint`, `bun run test`, `bun run build` проходят; lint остаётся с warnings без errors |

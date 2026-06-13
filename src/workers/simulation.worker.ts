@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Web Worker for game turn simulation.
  *
@@ -71,6 +70,10 @@ function simNextCityId(state: SimState): string {
 
 type SimState = any;
 type SimCommand = any;
+
+function recordValues<T = any>(value: Record<string, T> | null | undefined): T[] {
+  return Object.values(value ?? {});
+}
 
 // ─── Command Application ──────────────────────────────────────────────────────
 
@@ -180,7 +183,7 @@ function applyCommand(state: SimState, command: SimCommand): unknown[] {
         }
 
         // Check no existing city on this hex
-        const existingCity = Object.values(state.cities || {}).some((c: any) =>
+        const existingCity = recordValues(state.cities).some((c: any) =>
           c.hex.q === hex.q && c.hex.r === hex.r,
         );
         if (existingCity) {
@@ -220,7 +223,7 @@ function applyCommand(state: SimState, command: SimCommand): unknown[] {
         });
 
         // Consume settler if present
-        const settler = Object.values(state.entities || {}).find((e: any) =>
+        const settler = recordValues(state.entities).find((e: any) =>
           e.ownerId === command.playerId && e.typeId === 'settler' &&
           e.hex.q === hex.q && e.hex.r === hex.r,
         );
@@ -343,7 +346,7 @@ function applyCommand(state: SimState, command: SimCommand): unknown[] {
         }
 
         // Reset unit movement for this player
-        for (const entity of Object.values(state.entities || {}) as any[]) {
+        for (const entity of recordValues(state.entities)) {
           if (entity.ownerId === command.playerId) {
             entity.movementPoints = entity.maxMovement;
             entity.hasMoved = false;
@@ -427,3 +430,5 @@ self.onmessage = function (e: MessageEvent) {
     });
   }
 };
+
+export {};

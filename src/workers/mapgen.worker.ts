@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Web Worker for map generation.
  *
@@ -436,3 +435,5 @@ self.onmessage = function (e: MessageEvent) {
     });
   }
 };
+
+export {};
