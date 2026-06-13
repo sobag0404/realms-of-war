@@ -3,21 +3,26 @@
 export function LightingRig() {
   return (
     <>
-      <ambientLight color="#9fb1c8" intensity={0.45} />
+      <ambientLight color="#c7d7ee" intensity={0.52} />
       <directionalLight
-        color="#fff1d2"
-        intensity={2.2}
-        position={[20, 35, 15]}
+        color="#ffe4ad"
+        intensity={2.85}
+        position={[18, 34, 14]}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={80}
-        shadow-camera-left={-20}
-        shadow-camera-right={20}
-        shadow-camera-top={20}
-        shadow-camera-bottom={-20}
+        shadow-mapSize-width={3072}
+        shadow-mapSize-height={3072}
+        shadow-camera-far={95}
+        shadow-camera-left={-28}
+        shadow-camera-right={28}
+        shadow-camera-top={28}
+        shadow-camera-bottom={-28}
       />
-      <hemisphereLight args={['#a7c8ff', '#6a573f', 0.7]} />
+      <directionalLight
+        color="#85b7ff"
+        intensity={0.58}
+        position={[-18, 18, -22]}
+      />
+      <hemisphereLight args={['#c4ddff', '#7a654e', 0.95]} />
     </>
   );
 }

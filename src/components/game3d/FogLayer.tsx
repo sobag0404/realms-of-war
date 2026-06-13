@@ -27,6 +27,20 @@ export function FogLayer() {
   const activePlayerId = useGameStore((s) => s.activePlayerId);
 
   const geometry = useMemo(() => createHexPlane(0.96), []);
+  const hiddenMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#0b1420',
+    transparent: true,
+    opacity: 0.74,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
+  const exploredMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#22303a',
+    transparent: true,
+    opacity: 0.34,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
 
   // Compute visibility for each tile
   const fogTiles = useMemo(() => {
@@ -63,13 +77,7 @@ export function FogLayer() {
             rotation={[-Math.PI / 2, 0, 0]}
             position={[wx, 0.5, wz]}
           >
-            <meshBasicMaterial
-              color={isHidden ? '#111111' : '#333333'}
-              transparent
-              opacity={isHidden ? 0.92 : 0.55}
-              side={THREE.DoubleSide}
-              depthWrite={false}
-            />
+            <primitive object={isHidden ? hiddenMaterial : exploredMaterial} attach="material" />
           </mesh>
         );
       })}

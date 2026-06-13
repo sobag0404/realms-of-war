@@ -6,7 +6,7 @@
 // with a shared material cache for performance.
 
 import * as THREE from 'three';
-import { TERRAIN_COLORS, TERRAIN_ELEVATION } from '@/data/terrain';
+import { TERRAIN_COLORS } from '@/data/terrain';
 import type { TerrainTypeId } from '@/engine/core/types';
 
 // ─── Material Cache ──────────────────────────────────────────────────────────
@@ -17,6 +17,34 @@ export const materialCache: Map<string, THREE.Material> = new Map();
 /** Cache key helper for terrain materials */
 function terrainCacheKey(terrain: TerrainTypeId, variant: string): string {
   return `terrain:${terrain}:${variant}`;
+}
+
+const TERRAIN_MATERIAL_TUNING: Record<TerrainTypeId, {
+  roughness: number;
+  metalness: number;
+  saturation: number;
+  lightness: number;
+}> = {
+  plains: { roughness: 0.92, metalness: 0.02, saturation: 1.08, lightness: 1.06 },
+  forest: { roughness: 0.96, metalness: 0.01, saturation: 1.12, lightness: 0.88 },
+  mountain: { roughness: 0.82, metalness: 0.08, saturation: 0.78, lightness: 1.08 },
+  water: { roughness: 0.34, metalness: 0.06, saturation: 1.2, lightness: 1.08 },
+  desert: { roughness: 0.98, metalness: 0.0, saturation: 0.95, lightness: 1.1 },
+  swamp: { roughness: 0.96, metalness: 0.01, saturation: 0.82, lightness: 0.82 },
+  hills: { roughness: 0.9, metalness: 0.03, saturation: 0.96, lightness: 0.96 },
+  ruins: { roughness: 0.88, metalness: 0.04, saturation: 0.58, lightness: 1.0 },
+};
+
+function tunedTerrainColor(terrain: TerrainTypeId): THREE.Color {
+  const tuning = TERRAIN_MATERIAL_TUNING[terrain];
+  const color = new THREE.Color(TERRAIN_COLORS[terrain] ?? '#555555');
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  return new THREE.Color().setHSL(
+    hsl.h,
+    Math.min(1, hsl.s * tuning.saturation),
+    Math.min(1, hsl.l * tuning.lightness),
+  );
 }
 
 // ─── Standard Terrain Material ───────────────────────────────────────────────
@@ -32,11 +60,11 @@ export function createTerrainMaterial(terrain: TerrainTypeId): THREE.MeshStandar
   const cached = materialCache.get(key);
   if (cached) return cached as THREE.MeshStandardMaterial;
 
-  const color = TERRAIN_COLORS[terrain] ?? '#555555';
+  const tuning = TERRAIN_MATERIAL_TUNING[terrain];
   const material = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color),
-    roughness: 0.85,
-    metalness: 0.05,
+    color: tunedTerrainColor(terrain),
+    roughness: tuning.roughness,
+    metalness: tuning.metalness,
     flatShading: true,
   });
 
@@ -59,8 +87,8 @@ export function createInstancedTerrainMaterial(): THREE.MeshStandardMaterial {
   if (cached) return cached as THREE.MeshStandardMaterial;
 
   const material = new THREE.MeshStandardMaterial({
-    roughness: 0.85,
-    metalness: 0.05,
+    roughness: 0.9,
+    metalness: 0.03,
     flatShading: true,
     // Color will be provided per-instance via instanceColor
     vertexColors: false,

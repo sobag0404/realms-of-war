@@ -47,9 +47,9 @@ export interface GameViewSlice {
 
 const MIN_ZOOM = 4;
 const MAX_ZOOM = 28;
-const DEFAULT_ZOOM = 12;
+const DEFAULT_ZOOM = 11.5;
 const DEFAULT_ROTATION = 45; // degrees
-const DEFAULT_PITCH = 55; // degrees
+const DEFAULT_PITCH = 58; // degrees
 
 // ─── Slice Creator ────────────────────────────────────────────────────────────
 

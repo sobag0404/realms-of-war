@@ -22,6 +22,7 @@ import type { PlayerId, GameMode } from '@/engine/core/types';
 import { GameEngine, EngineError } from '@/engine/core/GameEngine';
 import { generateMap } from '@/engine/mapgen/generateMap';
 import { createDefaultConfig } from '@/engine/core/GameConfig';
+import { hexToWorld } from '@/engine/hex/coordinates';
 import { getWorkerManager } from '@/workers/workerManager';
 import { populateStartingPositions } from '@/engine/core/startPositions';
 import type { SaveFile } from '@/engine/save/saveGame';
@@ -125,6 +126,16 @@ export const createSessionSlice: StateCreator<
           }));
       };
 
+      const getInitialCameraTarget = (
+        positions: Array<{ playerId: PlayerId; hex: { q: number; r: number } }>,
+      ): [number, number, number] | undefined => {
+        const focusHex = (
+          positions.find((pos) => localPlayerIds.includes(pos.playerId)) ??
+          positions[0]
+        )?.hex;
+        return focusHex ? hexToWorld(focusHex) : undefined;
+      };
+
       workerManager
         .requestMapgen(mapGenWidth, mapGenHeight, mapGenSeed, mapGenPlayers)
         .then((result) => {
@@ -136,6 +147,7 @@ export const createSessionSlice: StateCreator<
 
           // Populate starting units and cities at the generated starting positions
           const positions = buildStartingPositions(result.startingPositions);
+          const cameraTarget = getInitialCameraTarget(positions);
           if (positions.length > 0) {
             stateWithMap = populateStartingPositions(stateWithMap, positions);
           }
@@ -151,6 +163,7 @@ export const createSessionSlice: StateCreator<
               mode,
               activePlayerId: initialState.activePlayerId,
               localPlayerIds,
+              ...(cameraTarget ? { cameraTarget } : {}),
               isProcessingCommand: false,
               lastError: null,
             },
@@ -175,6 +188,7 @@ export const createSessionSlice: StateCreator<
 
             // Populate starting units and cities
             const positions = buildStartingPositions(mapResult.startingPositions);
+            const cameraTarget = getInitialCameraTarget(positions);
             if (positions.length > 0) {
               stateWithMap = populateStartingPositions(stateWithMap, positions);
             }
@@ -190,6 +204,7 @@ export const createSessionSlice: StateCreator<
                 mode,
                 activePlayerId: initialState.activePlayerId,
                 localPlayerIds,
+                ...(cameraTarget ? { cameraTarget } : {}),
                 isProcessingCommand: false,
                 lastError: null,
               },

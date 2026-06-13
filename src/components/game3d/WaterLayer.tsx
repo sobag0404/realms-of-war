@@ -34,6 +34,36 @@ export function WaterLayer() {
 
   // Shared geometry
   const geometry = useMemo(() => createHexGeometry(0.95), []);
+  const depthGeometry = useMemo(() => createHexGeometry(0.88), []);
+  const shorelineGeometry = useMemo(() => new THREE.RingGeometry(0.84, 0.97, 6), []);
+  const waterMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
+    color: '#2c8fc1',
+    emissive: '#06344b',
+    emissiveIntensity: 0.12,
+    transparent: true,
+    opacity: 0.78,
+    roughness: 0.22,
+    metalness: 0.08,
+    transmission: 0.08,
+    thickness: 0.18,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.28,
+    side: THREE.DoubleSide,
+  }), []);
+  const depthMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#0d3f5f',
+    transparent: true,
+    opacity: 0.42,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
+  const shorelineMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#b9ecff',
+    transparent: true,
+    opacity: 0.22,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
 
   // Animate wave effect
   useFrame(({ clock }) => {
@@ -41,7 +71,7 @@ export function WaterLayer() {
     const t = clock.getElapsedTime();
     groupRef.current.children.forEach((child, i) => {
       // Gentle wave: each tile slightly different phase
-      child.position.y = -0.16 + Math.sin(t * 1.5 + i * 0.5) * 0.015;
+      child.position.y = -0.17 + Math.sin(t * 1.15 + i * 0.47) * 0.018;
     });
   });
 
@@ -52,21 +82,32 @@ export function WaterLayer() {
       {waterTiles.map((tile) => {
         const [wx, , wz] = hexToWorld(tile.coord);
         return (
-          <mesh
+          <group
             key={`${tile.coord.q},${tile.coord.r}`}
-            geometry={geometry}
-            rotation={[-Math.PI / 2, 0, 0]}
             position={[wx, -0.16, wz]}
           >
-            <meshStandardMaterial
-              color="#2b79a3"
-              transparent
-              opacity={0.75}
-              roughness={0.3}
-              metalness={0.2}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
+            <mesh
+              geometry={depthGeometry}
+              rotation={[-Math.PI / 2, 0, 0]}
+              position={[0, -0.025, 0]}
+            >
+              <primitive object={depthMaterial} attach="material" />
+            </mesh>
+            <mesh
+              geometry={geometry}
+              rotation={[-Math.PI / 2, 0, 0]}
+              receiveShadow
+            >
+              <primitive object={waterMaterial} attach="material" />
+            </mesh>
+            <mesh
+              geometry={shorelineGeometry}
+              rotation={[-Math.PI / 2, 0, 0]}
+              position={[0, 0.01, 0]}
+            >
+              <primitive object={shorelineMaterial} attach="material" />
+            </mesh>
+          </group>
         );
       })}
     </group>
