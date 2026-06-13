@@ -14,13 +14,13 @@ A hex-based strategy game built with Next.js 16, Three.js, and a custom determin
 
 ## Requirements
 
-- [Bun](https://bun.sh/) >= 1.0
-- Node.js >= 18 (for compatibility with some tooling)
+- [Bun](https://bun.sh/) 1.3.14 or newer
+- Node.js >= 20.9 (required by Next.js 16 and Vitest 4 tooling)
 
 ## Installation
 
 ```bash
-bun install
+bun install --frozen-lockfile
 ```
 
 ## Environment

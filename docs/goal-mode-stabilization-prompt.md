@@ -40,9 +40,9 @@ GitHub: `https://github.com/sobag0404/realms-of-war`
 - `bun install --frozen-lockfile` — проходит.
 - `bun x prisma generate` при `DATABASE_URL=file:./dev.db` — проходит.
 - `bun run lint` — проходит с 144 warnings.
-- `bun run typecheck` — падает.
-- `bun run test` — падает: 77 tests pass, `src/app/api/__tests__/save-api.test.ts` падает на импорте `z.object`.
-- `bun run build` — компилирует Next, затем падает на typecheck из-за `examples/websocket/*`.
+- `bun run typecheck` — проходил после исключения examples/mini-services из root typecheck и исправления TS ошибок.
+- `bun run test` — проходил: 100 tests pass.
+- `bun run build` — проходил.
 
 ## Главная цель
 
@@ -63,16 +63,15 @@ GitHub: `https://github.com/sobag0404/realms-of-war`
 
 1. В рабочей папке сейчас нет `.git`. Нужно либо клонировать настоящий приватный repo `sobag0404/realms-of-war`, либо инициализировать git, подключить remote и аккуратно запушить текущий проект.
 2. Не использовать токен, засвеченный в чате, в командах или файлах. Для push использовать безопасную локальную авторизацию `gh auth login --with-token` или переменную окружения, заданную вне чата.
-3. Добавить `.github/workflows/ci.yml`, который запускает Bun install, Prisma generate, typecheck, lint, tests, build.
+3. `.github/workflows/ci.yml` добавлен; поддерживать его зелёным при дальнейших изменениях.
 
 ### P1 — зеленые проверки
 
-0. Закрепить контракт toolchain.
+0. Контракт toolchain закреплён, поддерживать его актуальным.
    - Добавить `packageManager: "bun@1.3.14"` или актуальный проверенный Bun.
    - Добавить `engines.node: ">=20.9"` или Node 22/24, потому README сейчас говорит Node >=18, но Next 16/Vitest 4 требуют Node 20+.
    - Обновить README под фактические требования.
-1. Исправить `bun run typecheck`.
-   Текущие ошибки:
+1. `bun run typecheck` был исправлен. Если снова падает, начинать с этих зон:
    - `examples/websocket/frontend.tsx`: нет `socket.io-client`.
    - `examples/websocket/server.ts`: нет `socket.io`.
    - `mini-services/game-server/index.ts`: `import.meta.dir`, `Bun` types.
@@ -80,22 +79,17 @@ GitHub: `https://github.com/sobag0404/realms-of-war`
    - `src/components/providers/GameProvider.tsx`: unsafe cast в `GameCommand`.
    - `src/components/screens/RecruitmentScreen.tsx`: possible undefined.
    - `src/engine/save/__tests__/save.test.ts`: cast `SaveFile` -> `Record<string, unknown>`.
-2. Исправить `bun run test`.
-   - API test suite падает до выполнения тестов на `z.object`.
-   - После фикса добавить/сохранить покрытие для invalid checksum, oversized body, invalid query.
-3. Исправить `bun run build`.
-   - Не тащить demo examples в production typecheck/build или добавить корректные зависимости/типизацию.
-   - Сделать build script кроссплатформенным: убрать `cp -r` и inline `NODE_ENV=...` или заменить Node/Bun scripts.
-   - Сузить root `tsconfig` до приложения/тестов или исключить `examples/**` и `mini-services/**`; для mini-services сделать отдельный `tsconfig` с `types: ["bun-types"]`.
+2. `bun run test` был исправлен; сохранять покрытие для invalid checksum, oversized body и invalid `/api/saves` query.
+3. `bun run build` был исправлен; root `tsconfig` не должен снова тащить demo examples/mini-services в production typecheck.
 
 ### P1 — docs/env/API
 
-1. Добавить `.env.example` с безопасным минимумом:
+1. `.env.example` добавлен с безопасным минимумом:
    - `DATABASE_URL="file:./dev.db"`
    - `NEXT_TELEMETRY_DISABLED=1`
    - комментарий, что production secrets не коммитятся.
-2. Исправить `.gitignore`: сейчас `.env*` игнорирует `.env.example`; добавить `!.env.example`.
-3. Добавить Zod schema для `/api/saves?offset&limit`, чтобы `abc`, `NaN`, отрицательные значения и слишком большие limit возвращали 400, а не 500.
+2. `.gitignore` разрешает `.env.example`; не ломать это исключение.
+3. Zod schema для `/api/saves?offset&limit` добавлена; invalid query должен возвращать 400, а не 500.
 4. Save API сейчас использует общий `ownerId = "local"`. Для тестовой local alpha это допустимо, но публичный VPS деплой нельзя делать без решения:
    - либо local-only guard для server saves,
    - либо auth/session owner model,

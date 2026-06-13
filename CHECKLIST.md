@@ -18,6 +18,7 @@
 
 - [x] Next.js 16 + TypeScript проект
 - [x] GitHub репозиторий (приватный)
+- [x] GitHub Actions CI (`.github/workflows/ci.yml`)
 - [x] GDD — полная спецификация (`docs/realms-of-war-design-spec.md`)
 - [x] PROJECT_CONTEXT.md — контекст проекта
 - [x] CHECKLIST.md — этот файл
@@ -269,7 +270,7 @@
 ### 15.2. P1 — Серьёзные
 
 - [x] Добавить Vitest + typecheck script
-- [x] Написать engine unit tests (77 тестов: hex, movement, combat, city, research, save/load)
+- [x] Написать engine/API unit tests (100 тестов: hex, movement, combat, city, research, save/load, save API)
 - [x] Ввести SaveService — единый путь save/load через engine SaveFile format
 - [x] Save: checksum не пустой, load проверяет checksum
 - [x] Save: сохранять gameConfig, commandLog, rngState
@@ -299,7 +300,7 @@
 - [x] GameEngine: getCommandLog() + restoreCommandLog() для save/load
 - [ ] GameEngine: processQueue не skip invalid commands silently
 - [ ] GameProvider: log/report AI invalid commands в dev mode
-- [ ] GitHub Actions CI (не удалось запушить — PAT без workflow scope)
+- [x] GitHub Actions CI (install, Prisma generate, typecheck, lint, test, build)
 - [ ] Mini-service: усиленная path traversal защита (path.resolve + startsWith)
 
 ### 15.4. Ревью 2 — P0 (2026-06-12, второй ревьюер)
@@ -317,7 +318,7 @@
 - [x] Body size protection: Content-Length + raw text guard до JSON.parse
 - [x] Command log: executedCommands в GameEngine.dispatch()
 - [x] MoveUnit path validation: validateMovementPath() в movementRules
-- [x] API tests: 19 тестов для save/load schemas и routes
+- [x] API tests: save/load schemas и routes, включая invalid `/api/saves` pagination
 - [x] Worker typing: убран @ts-nocheck из pathfinding.worker.ts
 
 ### 15.6. Ревью 2 — P2
@@ -367,7 +368,7 @@ Save consistency   ████████████████████ 
 Детерминизм        ████████████████████ 100%  (idGenerator, GameRng, нет Math.random/Date.now)
 Worker protocol    ████████████████████ 100%  (requestId roundtrip, no FIFO)
 ESLint/TS strict   ██████████████████░░  90%  (critical rules ON, no ignoreBuildErrors, pathfinding typed)
-Документация       ████████████████████ 100%  (README + .env.example + review docs)
+Документация       ████████████████████ 100%  (README + .env.example + review docs + CI)
 Movement validation████████████████████ 100%  (validateMovementPath)
 ────────────────────────────────────────────
 Инженерная         ███████████████████░  95%  (41/43)

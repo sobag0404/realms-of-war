@@ -228,7 +228,7 @@ export function RecruitmentScreen() {
 
                   // Calculate production turns
                   const productionCost = Object.values(unit.cost).reduce(
-                    (sum, v) => sum + (v ?? 0),
+                    (sum: number, v) => sum + (v ?? 0),
                     0,
                   ) / 2;
                   const turnsToProduce =

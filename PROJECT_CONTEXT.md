@@ -46,7 +46,7 @@
 
 ## Текущее состояние проекта
 
-> Последнее обновление: 2026-06-12 (Пост-ревью 2: стабилизация)
+> Последнее обновление: 2026-06-13 (Goal Mode: quality gates stabilization)
 
 ### ⚠️ ТЕКУЩИЙ ПРИОРИТЕТ: доработка по результатам второго ревью
 
@@ -58,12 +58,12 @@
 3. ✅ **API Security** (P1) — исправлено: checksum, body size, server-side validation
 4. ✅ **Command log** (P1) — исправлено: executedCommands в GameEngine
 5. ✅ **Movement validation** (P1) — исправлено: validateMovementPath()
-6. ✅ **Tests** (P1) — 96 тестов (19 новых API тестов)
+6. ✅ **Tests** (P1) — 100 тестов (API pagination validation добавлена)
 7. ✅ **Worker typing** (P1) — pathfinding.worker.ts без @ts-nocheck
 8. ✅ **.gitignore** (P2) — исправлено, tool-results/ убран из git
 9. ✅ **Scripts** (P2) — убраны hardcoded пути
 10. ✅ **Settings validation** (P2) — Zod-схема для localStorage
-11. 🔲 **CI pipeline** — GitHub Actions (требует PAT с workflow scope)
+11. ✅ **CI pipeline** — GitHub Actions добавлен (`.github/workflows/ci.yml`)
 12. 🔲 **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker
 
 ### Результаты ревью 1 (2026-06-12, первый ревьюер)
@@ -113,6 +113,7 @@
 - [x] **Command log не записывает dispatch** — executedCommands + getCommandLog() + restoreCommandLog()
 - [x] **MoveUnit path validation** — validateMovementPath() в movementRules
 - [x] **API tests** — 19 новых тестов для save/load schemas и routes
+- [x] **/api/saves pagination validation** — invalid offset/limit возвращает 400
 - [x] **@ts-nocheck в pathfinding.worker** — убран, добавлены типы
 
 ### P2 из ревью 2 — исправлены ✅
@@ -123,7 +124,7 @@
 
 ### Оставшиеся задачи
 
-- [ ] **CI pipeline** — GitHub Actions (требует PAT с workflow scope)
+- [x] **CI pipeline** — GitHub Actions запускает install, Prisma generate, typecheck, lint, test, build
 - [ ] **Остальные workers @ts-nocheck** — ai.worker, mapgen.worker, simulation.worker
 - [ ] **Auth/ownership модель** — для публичного деплоя (пока local-only mode)
 - [ ] **Rate limiting** — для Save API
@@ -304,3 +305,4 @@ realms-of-war/
 | 2026-06-12 | **Security cleanup:** Удалены screenshots из git, убран PAT из remote URL |
 | 2026-06-12 | **Ревью:** Добавлено техническое ревью в docs/, обновлён GDD §16, PROJECT_CONTEXT, CHECKLIST |
 | 2026-06-12 | **Ревью 2:** Добавлено второе ревью, исправлены все P0/P1/P2: save/load flow, build.sh, checksum, body size, command log, move validation, API tests, worker typing, .gitignore, scripts, settings validation |
+| 2026-06-13 | **Goal Mode stabilization:** добавлены `.env.example`, GitHub Actions CI, packageManager/Node engines, кроссплатформенные npm scripts, исправлены typecheck/test/build blockers, добавлена Zod-валидация `/api/saves` pagination |
