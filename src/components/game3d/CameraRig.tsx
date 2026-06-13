@@ -68,6 +68,15 @@ export function CameraRig() {
     };
   }, [gameState]);
 
+  const clampCameraTarget = useCallback((target: [number, number, number]): [number, number, number] => {
+    const bounds = mapBounds.current;
+    return [
+      Math.max(bounds.minX, Math.min(bounds.maxX, target[0])),
+      0,
+      Math.max(bounds.minZ, Math.min(bounds.maxZ, target[2])),
+    ];
+  }, []);
+
   // Keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,11 +124,11 @@ export function CameraRig() {
       const worldDx = (-dx * Math.cos(yawRad) + dy * Math.sin(yawRad)) * panScale;
       const worldDz = (dx * Math.sin(yawRad) + dy * Math.cos(yawRad)) * panScale;
 
-      setCameraTarget([
+      setCameraTarget(clampCameraTarget([
         cameraTarget[0] + worldDx,
         0,
         cameraTarget[2] + worldDz,
-      ]);
+      ]));
     }
 
     if (isRotating.current && lastMouse.current) {
@@ -133,7 +142,7 @@ export function CameraRig() {
         lastMouse.current = { x: e.clientX, y: e.clientY };
       }
     }
-  }, [cameraRotation, cameraZoom, cameraTarget, setCameraTarget, setCameraRotation]);
+  }, [cameraRotation, cameraZoom, cameraTarget, setCameraTarget, setCameraRotation, clampCameraTarget]);
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false;
@@ -150,6 +159,10 @@ export function CameraRig() {
     setCameraZoom(newZoom);
   }, [cameraZoom, setCameraZoom]);
 
+  const handleContextMenu = useCallback((e: Event) => {
+    e.preventDefault();
+  }, []);
+
   useEffect(() => {
     const canvas = gl.domElement;
     if (!canvas) return;
@@ -159,7 +172,7 @@ export function CameraRig() {
     canvas.addEventListener('pointerup', handlePointerUp);
     canvas.addEventListener('pointerleave', handlePointerUp);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       canvas.removeEventListener('pointerdown', handlePointerDown);
@@ -167,8 +180,9 @@ export function CameraRig() {
       canvas.removeEventListener('pointerup', handlePointerUp);
       canvas.removeEventListener('pointerleave', handlePointerUp);
       canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [gl.domElement, handlePointerDown, handlePointerMove, handlePointerUp, handleWheel]);
+  }, [gl.domElement, handlePointerDown, handlePointerMove, handlePointerUp, handleWheel, handleContextMenu]);
 
   // Frame update: apply camera position using imperative ref
   useFrame(({ camera }, delta) => {
@@ -191,16 +205,21 @@ export function CameraRig() {
     if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
     if (keys.has('d') || keys.has('arrowright')) dx += 1;
 
+    let frameTarget = cameraTarget;
+    let targetWasUpdated = false;
+
     if (dx !== 0 || dz !== 0) {
       // Rotate input by camera yaw
       const worldDx = dx * Math.cos(yawRad) - dz * Math.sin(yawRad);
       const worldDz = dx * Math.sin(yawRad) + dz * Math.cos(yawRad);
       const len = Math.sqrt(worldDx * worldDx + worldDz * worldDz);
-      const newTarget = [
+      const newTarget = clampCameraTarget([
         cameraTarget[0] + (worldDx / len) * panSpeed,
         0,
         cameraTarget[2] + (worldDz / len) * panSpeed,
-      ] as [number, number, number];
+      ] as [number, number, number]);
+      frameTarget = newTarget;
+      targetWasUpdated = true;
       setCameraTarget(newTarget);
     }
 
@@ -217,17 +236,23 @@ export function CameraRig() {
       const edgeSpeed = BASE_PAN_SPEED * delta / zoomFactor * 0.5;
       const worldDx = edgeDx * Math.cos(yawRad) - edgeDz * Math.sin(yawRad);
       const worldDz = edgeDx * Math.sin(yawRad) + edgeDz * Math.cos(yawRad);
-      setCameraTarget([
-        cameraTarget[0] + worldDx * edgeSpeed,
+      const newTarget = clampCameraTarget([
+        frameTarget[0] + worldDx * edgeSpeed,
         0,
-        cameraTarget[2] + worldDz * edgeSpeed,
+        frameTarget[2] + worldDz * edgeSpeed,
       ]);
+      frameTarget = newTarget;
+      targetWasUpdated = true;
+      setCameraTarget(newTarget);
     }
 
     // Clamp target to map bounds
-    const bounds = mapBounds.current;
-    const tx = Math.max(bounds.minX, Math.min(bounds.maxX, cameraTarget[0]));
-    const tz = Math.max(bounds.minZ, Math.min(bounds.maxZ, cameraTarget[2]));
+    const clampedTarget = clampCameraTarget(frameTarget);
+    if (!targetWasUpdated && (clampedTarget[0] !== cameraTarget[0] || clampedTarget[2] !== cameraTarget[2])) {
+      setCameraTarget(clampedTarget);
+    }
+    const tx = clampedTarget[0];
+    const tz = clampedTarget[2];
 
     // Compute camera position from target, yaw, pitch
     const pitchRad = (cameraPitch * Math.PI) / 180;

@@ -7,7 +7,7 @@
 
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { Button } from '@/components/ui/button';
 import { Loader2, Settings, Menu, RotateCw, FlaskConical, Swords, Save } from 'lucide-react';
@@ -37,6 +37,7 @@ export function TurnPanel() {
   const addNotification = useGameStore((s) => s.addNotification);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
   const resetGame = useGameStore((s) => s.resetGame);
+  const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
 
   const handleEndTurn = useCallback(() => {
     endTurn();
@@ -52,14 +53,17 @@ export function TurnPanel() {
 
   const handleTechTree = useCallback(() => {
     setOpenPanel('techTree');
+    setIsMobileActionsOpen(false);
   }, [setOpenPanel]);
 
   const handleDiplomacy = useCallback(() => {
     setOpenPanel('diplomacy');
+    setIsMobileActionsOpen(false);
   }, [setOpenPanel]);
 
   const handleSave = useCallback(async () => {
     const success = await saveGame();
+    setIsMobileActionsOpen(false);
     addNotification({
       type: success ? 'success' : 'error',
       title: success ? 'Сохранено' : 'Ошибка',
@@ -164,6 +168,19 @@ export function TurnPanel() {
             <Settings className="h-4 w-4" />
           </Button>
 
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:hidden"
+            onClick={() => setIsMobileActionsOpen((open) => !open)}
+            aria-label="More actions"
+            aria-expanded={isMobileActionsOpen}
+            aria-controls="mobile-turn-actions"
+            title="Дополнительно"
+          >
+            <Swords className="h-4 w-4" />
+          </Button>
+
           {/* End Turn button */}
           <Button
             onClick={handleEndTurn}
@@ -186,6 +203,41 @@ export function TurnPanel() {
             )}
           </Button>
         </div>
+
+        {isMobileActionsOpen && (
+          <div
+            id="mobile-turn-actions"
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-950/75 p-1.5 shadow-xl shadow-black/25 backdrop-blur-md sm:hidden"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-md text-white/75 hover:bg-amber-900/25 hover:text-amber-300"
+              onClick={handleTechTree}
+              aria-label="Technology tree"
+            >
+              <FlaskConical className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-md text-white/75 hover:bg-emerald-900/25 hover:text-emerald-300"
+              onClick={handleDiplomacy}
+              aria-label="Diplomacy"
+            >
+              <Swords className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-md text-white/75 hover:bg-amber-900/25 hover:text-amber-300"
+              onClick={handleSave}
+              aria-label="Save game"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

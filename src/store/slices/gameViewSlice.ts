@@ -25,9 +25,9 @@ import {
 
 export interface GameViewSlice {
   cameraTarget: [number, number, number]; // Vector3Tuple
-  cameraZoom: number; // 4-28, default 12
+  cameraZoom: number; // 8-56, default 30
   cameraRotation: number; // degrees, default 45
-  cameraPitch: number; // degrees, default 55
+  cameraPitch: number; // degrees, default 58
   isDraggingCamera: boolean;
   hoveredHex: HexCoord | null;
   hoveredEntityId: EntityId | null;
