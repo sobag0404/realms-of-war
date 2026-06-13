@@ -1,4 +1,4 @@
-:81 {
+{$REALMS_SITE_BIND:127.0.0.1:81} {
         encode zstd gzip
 
         header {

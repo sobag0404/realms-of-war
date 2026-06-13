@@ -5,12 +5,11 @@
  * All functions are side-effect free and return new state rather than mutating.
  */
 
-import type { CityId, EntityId, HexCoord, PlayerId, ResourceYield } from '../core/types';
+import type { EntityId, HexCoord, PlayerId } from '../core/types';
 import type { GameState, EntityData, HexTile } from '../core/GameState';
-import { hexKey, hexDistance, hexNeighbor, HEX_DIRECTIONS } from '../core/types';
+import { hexKey, hexDistance } from '../core/types';
 import { findPath, findReachable } from '../hex/pathfinding';
 import { TERRAIN_TYPES } from '../../data/terrain';
-import { UNIT_TYPES } from '../../data/units';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,12 +39,6 @@ function getHexTile(state: GameState, hex: HexCoord): HexTile | null {
 /** Get an entity by ID. */
 function getEntity(state: GameState, entityId: EntityId): EntityData | null {
   return state.entities[entityId] ?? null;
-}
-
-/** Check if a hex is occupied by any entity. */
-function isHexOccupied(state: GameState, hex: HexCoord): boolean {
-  const key = hexKey(hex);
-  return Object.values(state.entities).some((e) => hexKey(e.hex) === key);
 }
 
 /** Get the entity occupying a hex, if any. */

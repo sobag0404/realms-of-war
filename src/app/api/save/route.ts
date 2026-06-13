@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { SavePayloadSchema } from '@/lib/saveSchemas';
 import { calculateChecksum } from '@/engine/save/saveGame';
 import { loadSaveFile } from '@/lib/saveService';
+import { resolveSaveAccess } from '@/lib/saveAccess';
 
 const MAX_REQUEST_BYTES = 2_200_000; // slightly above MAX_SAVE_BYTES for JSON overhead
 
@@ -10,6 +11,11 @@ export async function POST(request: NextRequest) {
   try {
     // Pre-parse body size guard — check BEFORE JSON.parse to avoid
     // allocating memory for oversized payloads.
+    const access = resolveSaveAccess();
+    if (!access.enabled) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+
     const contentLength = request.headers.get('content-length');
     if (contentLength && Number(contentLength) > MAX_REQUEST_BYTES) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
@@ -57,8 +63,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ownerId = 'local';
-
     const save = await db.saveGame.create({
       data: {
         name,
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
         players,
         data,
         checksum,
-        ownerId,
+        ownerId: access.ownerId,
         version: version ?? 1,
       },
     });

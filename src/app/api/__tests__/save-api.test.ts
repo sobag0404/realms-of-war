@@ -6,10 +6,11 @@
  * and the saveService module.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { SavePayloadSchema, SaveIdSchema, SavesQuerySchema } from '@/lib/saveSchemas';
 import { calculateChecksum } from '@/engine/save/saveGame';
+import type { SaveFile } from '@/engine/save/saveGame';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ vi.mock('@/lib/saveService', () => ({
 
 // Import route handler AFTER mocks are set up
 import { POST } from '@/app/api/save/route';
+import { GET as GET_LOAD, DELETE as DELETE_LOAD } from '@/app/api/load/route';
 import { GET as GET_SAVES } from '@/app/api/saves/route';
 import { db } from '@/lib/db';
 import { loadSaveFile } from '@/lib/saveService';
@@ -119,6 +121,10 @@ function makeValidSaveData(): string {
   });
 }
 
+function makeValidSaveFile(): SaveFile {
+  return JSON.parse(makeValidSaveData()) as SaveFile;
+}
+
 /** Build a valid save payload object */
 function makeValidPayload() {
   const data = makeValidSaveData();
@@ -156,6 +162,25 @@ function createRawRequest(rawBody: string, method = 'POST'): NextRequest {
     body: rawBody,
   });
 }
+
+function createLoadRequest(id?: string, method = 'GET'): NextRequest {
+  const query = id === undefined ? '' : `?id=${encodeURIComponent(id)}`;
+  return new NextRequest(`http://localhost:3000/api/load${query}`, { method });
+}
+
+const originalServerSavesMode = process.env.REALMS_SERVER_SAVES;
+
+beforeEach(() => {
+  delete process.env.REALMS_SERVER_SAVES;
+});
+
+afterEach(() => {
+  if (originalServerSavesMode === undefined) {
+    delete process.env.REALMS_SERVER_SAVES;
+  } else {
+    process.env.REALMS_SERVER_SAVES = originalServerSavesMode;
+  }
+});
 
 // ─── Schema Tests ───────────────────────────────────────────────────────────
 
@@ -261,16 +286,17 @@ describe('SavesQuerySchema', () => {
 describe('POST /api/save route handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.REALMS_SERVER_SAVES;
     // Default: loadSaveFile succeeds
     vi.mocked(loadSaveFile).mockReturnValue({
       success: true,
-      saveFile: {} as any,
+      saveFile: makeValidSaveFile(),
     });
     // Default: db.create succeeds
     vi.mocked(db.saveGame.create).mockResolvedValue({
       id: 'save-1',
       name: 'Test Save',
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof db.saveGame.create>>);
   });
 
   it('accepts a valid save with correct checksum', async () => {
@@ -353,12 +379,27 @@ describe('POST /api/save route handler', () => {
     expect(body.error).toMatch(/invalid save format/i);
     expect(db.saveGame.create).not.toHaveBeenCalled();
   });
+
+  it('rejects POST when server saves are disabled', async () => {
+    process.env.REALMS_SERVER_SAVES = 'disabled';
+
+    const request = createRequest(makeValidPayload());
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/server-side saves are disabled/i);
+    expect(loadSaveFile).not.toHaveBeenCalled();
+    expect(db.saveGame.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/saves route handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(db.saveGame.findMany).mockResolvedValue([] as any);
+    vi.mocked(db.saveGame.findMany).mockResolvedValue(
+      [] as unknown as Awaited<ReturnType<typeof db.saveGame.findMany>>,
+    );
   });
 
   it('lists saves with default pagination', async () => {
@@ -384,5 +425,143 @@ describe('GET /api/saves route handler', () => {
     expect(response.status).toBe(400);
     expect(body.error).toMatch(/invalid query/i);
     expect(db.saveGame.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects negative offset with 400', async () => {
+    const request = new NextRequest('http://localhost:3000/api/saves?offset=-1');
+    const response = await GET_SAVES(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/invalid query/i);
+    expect(db.saveGame.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects list when server saves are disabled', async () => {
+    process.env.REALMS_SERVER_SAVES = 'disabled';
+
+    const request = new NextRequest('http://localhost:3000/api/saves');
+    const response = await GET_SAVES(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/server-side saves are disabled/i);
+    expect(db.saveGame.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/load route handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('loads a save by id', async () => {
+    const payload = makeValidPayload();
+    vi.mocked(db.saveGame.findFirst).mockResolvedValue({
+      id: 'save-1',
+      name: payload.name,
+      turn: payload.turn,
+      players: payload.players,
+      data: payload.data,
+      checksum: payload.checksum,
+      ownerId: 'local',
+      version: 1,
+      createdAt: new Date('2026-06-13T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-13T00:00:00.000Z'),
+    } as unknown as Awaited<ReturnType<typeof db.saveGame.findFirst>>);
+
+    const response = await GET_LOAD(createLoadRequest('save-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.id).toBe('save-1');
+    expect(body.data).toBe(payload.data);
+    expect(body.checksum).toBe(payload.checksum);
+    expect(db.saveGame.findFirst).toHaveBeenCalledWith({
+      where: { id: 'save-1', ownerId: 'local' },
+    });
+  });
+
+  it('rejects missing id with 400', async () => {
+    const response = await GET_LOAD(createLoadRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/invalid request/i);
+    expect(db.saveGame.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when save id is not found', async () => {
+    vi.mocked(db.saveGame.findFirst).mockResolvedValue(null);
+
+    const response = await GET_LOAD(createLoadRequest('missing-save'));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toMatch(/not found/i);
+  });
+
+  it('rejects load when server saves are disabled', async () => {
+    process.env.REALMS_SERVER_SAVES = 'disabled';
+
+    const response = await GET_LOAD(createLoadRequest('save-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/server-side saves are disabled/i);
+    expect(db.saveGame.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /api/load route handler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('deletes a save by id', async () => {
+    vi.mocked(db.saveGame.deleteMany).mockResolvedValue(
+      { count: 1 } as Awaited<ReturnType<typeof db.saveGame.deleteMany>>,
+    );
+
+    const response = await DELETE_LOAD(createLoadRequest('save-1', 'DELETE'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(db.saveGame.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'save-1', ownerId: 'local' },
+    });
+  });
+
+  it('rejects missing id with 400', async () => {
+    const response = await DELETE_LOAD(createLoadRequest(undefined, 'DELETE'));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/invalid request/i);
+    expect(db.saveGame.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when delete matches no saves', async () => {
+    vi.mocked(db.saveGame.deleteMany).mockResolvedValue(
+      { count: 0 } as Awaited<ReturnType<typeof db.saveGame.deleteMany>>,
+    );
+
+    const response = await DELETE_LOAD(createLoadRequest('missing-save', 'DELETE'));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toMatch(/not found/i);
+  });
+
+  it('rejects delete when server saves are disabled', async () => {
+    process.env.REALMS_SERVER_SAVES = 'disabled';
+
+    const response = await DELETE_LOAD(createLoadRequest('save-1', 'DELETE'));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/server-side saves are disabled/i);
+    expect(db.saveGame.deleteMany).not.toHaveBeenCalled();
   });
 });

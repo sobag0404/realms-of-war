@@ -16,19 +16,6 @@
 
 // ─── Inline Hex Math ──────────────────────────────────────────────────────────
 
-function hexDistance(
-  a: { q: number; r: number },
-  b: { q: number; r: number },
-): number {
-  const ax = a.q;
-  const az = a.r;
-  const ay = -ax - az;
-  const bx = b.q;
-  const bz = b.r;
-  const by = -bx - bz;
-  return (Math.abs(ax - bx) + Math.abs(ay - by) + Math.abs(az - bz)) / 2;
-}
-
 // ─── Terrain Costs ─────────────────────────────────────────────────────────────
 
 const TERRAIN_COSTS: Record<string, number> = {

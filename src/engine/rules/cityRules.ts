@@ -6,12 +6,11 @@
  * All functions are side-effect free and return new state rather than mutating.
  */
 
-import type { BuildingTypeId, CityId, EraId, HexCoord, PlayerId, ResourceId, ResourceYield, TechId } from '../core/types';
-import type { GameState, CityState, HexTile, ProductionItem } from '../core/GameState';
-import { hexKey, hexDistance, hexRing, HEX_DIRECTIONS } from '../core/types';
+import type { BuildingTypeId, CityId, HexCoord, PlayerId, ResourceId, ResourceYield, TechId } from '../core/types';
+import type { GameState, CityState, HexTile } from '../core/GameState';
+import { hexKey, hexRing } from '../core/types';
 import { TERRAIN_TYPES } from '../../data/terrain';
 import { BUILDINGS } from '../../data/buildings';
-import { TECHNOLOGIES } from '../../data/technologies';
 import { nextCityId } from '../core/idGenerator';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -21,9 +20,6 @@ const BASE_CITY_HP = 100;
 
 /** City HP per level. */
 const CITY_HP_PER_LEVEL = 25;
-
-/** Base wall HP (if walls are built). */
-const BASE_WALL_HP = 50;
 
 /** City HP regeneration rate per turn (10%). */
 const CITY_HP_REGEN_RATE = 0.10;
@@ -52,17 +48,6 @@ function getHexTile(state: GameState, hex: HexCoord): HexTile | null {
 }
 
 
-
-/** Check if a player has a specific tech. */
-function hasTech(state: GameState, playerId: PlayerId, techId: TechId): boolean {
-  const player = state.players[playerId];
-  return player ? player.techs.includes(techId) : false;
-}
-
-/** Check if a city has a specific building. */
-function hasBuilding(city: CityState, buildingId: BuildingTypeId): boolean {
-  return city.buildings.includes(buildingId);
-}
 
 /** Add two ResourceYields together. */
 function addYields(a: ResourceYield, b: ResourceYield): ResourceYield {

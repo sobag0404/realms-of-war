@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { SaveIdSchema } from '@/lib/saveSchemas';
-
-const OWNER_ID = 'local';
+import { resolveSaveAccess } from '@/lib/saveAccess';
 
 export async function GET(request: NextRequest) {
   try {
+    const access = resolveSaveAccess();
+    if (!access.enabled) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -19,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     const save = await db.saveGame.findFirst({
-      where: { id: parsed.data.id, ownerId: OWNER_ID },
+      where: { id: parsed.data.id, ownerId: access.ownerId },
     });
 
     if (!save) {
@@ -51,6 +55,11 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const access = resolveSaveAccess();
+    if (!access.enabled) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -64,7 +73,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const result = await db.saveGame.deleteMany({
-      where: { id: parsed.data.id, ownerId: OWNER_ID },
+      where: { id: parsed.data.id, ownerId: access.ownerId },
     });
 
     if (result.count === 0) {

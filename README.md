@@ -32,6 +32,14 @@ Copy the example environment file and adjust values as needed:
 cp .env.example .env
 ```
 
+Server-side save APIs are a local-alpha feature. In development and tests they
+are enabled by default. In production they are disabled unless explicitly opted
+in with:
+
+```bash
+REALMS_SERVER_SAVES=local-alpha
+```
+
 ## Database
 
 Push the Prisma schema to create/migrate the SQLite database:
@@ -59,6 +67,13 @@ bun run build
 ```
 
 The build uses Next.js standalone output and does not require extra copy steps.
+
+The VPS packaging scripts live in `.zscripts/`. The default release package is
+the Next.js app only; `mini-services/` are prototype services and are excluded
+unless `INCLUDE_MINI_SERVICES=1` is set explicitly.
+
+By default `Caddyfile` binds to `127.0.0.1:81`. Set `REALMS_SITE_BIND` to a real
+hostname only after the deployment boundary and save API policy are intentional.
 
 ## Test
 
@@ -124,7 +139,7 @@ docs/                   # Design specs and security review
 
 - **Alpha software**: This project is in early development. Expect bugs and incomplete features.
 - **No authentication**: All save data is associated with a hardcoded `"local"` owner. Multi-user access control is not implemented.
-- **Local-alpha saves**: Server-side saves are intentionally scoped to a local alpha owner abstraction. Do not expose the save API as a public multi-user service until auth/session ownership is added.
+- **Local-alpha saves**: Server-side saves are intentionally scoped to a local alpha owner abstraction and disabled by default in production. Do not expose the save API as a public multi-user service until auth/session ownership is added.
 - **No multiplayer**: Only single-player and hotseat modes are supported. Online multiplayer does not exist yet.
 - **No i18n runtime**: Localization strings exist for Russian and English, but the language switching system is not fully wired.
 - **Worker fallbacks**: Web Workers fall back to synchronous execution when threading is unavailable, which may cause UI jank on large maps.
@@ -136,8 +151,10 @@ For a full security audit, see [`docs/realms-of-war-ai-dev-review.md`](docs/real
 Key points:
 
 - Save API endpoints validate input with Zod and enforce body size limits (2 MB).
-- Save data is owner-scoped; without auth, all saves use the `"local"` owner.
+- Save data is owner-scoped; without auth, all saves use the `"local"` owner, and production must opt in with `REALMS_SERVER_SAVES=local-alpha`.
 - No secrets or credentials are stored in the repository.
 - Dependency audit is tracked in [`docs/dependency-audit.md`](docs/dependency-audit.md). Current direct unused packages were removed and remaining vulnerable transitives are handled with package overrides.
 - Worker messages include `requestId` for correct concurrent request handling.
 - The game engine uses deterministic RNG for reproducible game states.
+
+Manual smoke coverage is tracked in [`docs/smoke-checklist.md`](docs/smoke-checklist.md).
