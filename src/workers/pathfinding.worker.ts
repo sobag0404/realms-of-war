@@ -308,7 +308,7 @@ self.onmessage = function (e: MessageEvent<PathfindingRequest>) {
       // Run reachable hex computation
       const reachable = findReachable(tiles, from, movementPoints);
 
-      const response = {
+      const response: PathfindingResponse = {
         type: 'findPathResult' as const,
         requestId,
         path,
@@ -316,20 +316,22 @@ self.onmessage = function (e: MessageEvent<PathfindingRequest>) {
       };
       self.postMessage(response);
     } else {
-      self.postMessage({
+      const response: ErrorResponse = {
         type: 'error',
         requestId,
         requestType: request.type,
         message: `Unknown request type: ${request.type}`,
-      });
+      };
+      self.postMessage(response);
     }
   } catch (err) {
-    self.postMessage({
+    const response: ErrorResponse = {
       type: 'error',
       requestId,
       requestType: request.type ?? 'unknown',
       message: err instanceof Error ? err.message : String(err),
-    });
+    };
+    self.postMessage(response);
   }
 };
 

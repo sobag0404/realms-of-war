@@ -9,8 +9,8 @@
  * Apply functions return a new immutable GameState with the command's effects.
  */
 
-import type { GameState, EntityData, HexTile } from './GameState';
-import type { HexCoord, PlayerId, ResourceId, ResourceYield } from './types';
+import type { GameState, HexTile } from './GameState';
+import type { ResourceId, ResourceYield } from './types';
 import type { EventBus } from './EventBus';
 import type {
   FortifyUnitCommand,

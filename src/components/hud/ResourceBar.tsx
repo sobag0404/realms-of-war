@@ -62,7 +62,7 @@ export function ResourceBar() {
     const player = gameState.players[activePlayerId];
     if (!player) return {};
 
-    const breakdown: Record<ResourceId, { cityNames: string[]; cityYields: Record<string, number> }> = {};
+    const breakdown: Partial<Record<ResourceId, { cityNames: string[]; cityYields: Record<string, number> }>> = {};
 
     // Initialize all resource keys
     for (const res of RESOURCE_DISPLAYS) {

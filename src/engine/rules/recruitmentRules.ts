@@ -7,9 +7,8 @@
 
 import type { BuildingTypeId, CityId, EntityId, HexCoord, PlayerId, ResourceId, ResourceYield, TechId, UnitTypeId } from '../core/types';
 import type { GameState, EntityData, CityState, ProductionItem } from '../core/GameState';
-import { hexKey, hexDistance, HEX_DIRECTIONS } from '../core/types';
+import { hexKey, HEX_DIRECTIONS } from '../core/types';
 import { UNIT_TYPES, PLAYER_UNIT_IDS } from '../../data/units';
-import { BUILDINGS } from '../../data/buildings';
 import { nextEntityId } from '../core/idGenerator';
 
 // ─── Constants ────────────────────────────────────────────────────────────────

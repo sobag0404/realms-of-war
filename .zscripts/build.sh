@@ -17,7 +17,7 @@ if [ ! -d "$NEXTJS_PROJECT_DIR" ]; then
     exit 1
 fi
 
-echo "Starting build of Next.js app and mini-services..."
+echo "Starting release build of Next.js app..."
 echo "Project directory: $NEXTJS_PROJECT_DIR"
 
 # Switch to Next.js project directory
@@ -38,18 +38,21 @@ bun install
 echo "Building Next.js app..."
 bun run build
 
-# Build mini-services
-# Check if mini-services directory exists
-if [ -d "$NEXTJS_PROJECT_DIR/mini-services" ]; then
+# Build mini-services only when explicitly requested.
+INCLUDE_MINI_SERVICES="${INCLUDE_MINI_SERVICES:-0}"
+if [ "$INCLUDE_MINI_SERVICES" = "1" ] && [ -d "$NEXTJS_PROJECT_DIR/mini-services" ]; then
     echo "Building mini-services..."
     # Use scripts from the .zscripts directory
-    sh "$SCRIPT_DIR/mini-services-install.sh"
-    sh "$SCRIPT_DIR/mini-services-build.sh"
+    MINI_SERVICES_ROOT="$NEXTJS_PROJECT_DIR/mini-services" sh "$SCRIPT_DIR/mini-services-install.sh"
+    MINI_SERVICES_ROOT="$NEXTJS_PROJECT_DIR/mini-services" MINI_SERVICES_DIST_DIR="$BUILD_DIR/mini-services-dist" sh "$SCRIPT_DIR/mini-services-build.sh"
 
     # Copy mini-services start script to build directory
     echo "  - Copying mini-services-start.sh to $BUILD_DIR"
     cp "$SCRIPT_DIR/mini-services-start.sh" "$BUILD_DIR/mini-services-start.sh"
     chmod +x "$BUILD_DIR/mini-services-start.sh"
+elif [ -d "$NEXTJS_PROJECT_DIR/mini-services" ]; then
+    echo "Mini-services are prototype-only and excluded from this release build."
+    echo "Set INCLUDE_MINI_SERVICES=1 to package them explicitly."
 else
     echo "No mini-services directory found, skipping"
 fi

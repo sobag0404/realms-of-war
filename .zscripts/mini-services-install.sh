@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# 配置项
-ROOT_DIR="/home/z/my-project/mini-services"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="${MINI_SERVICES_ROOT:-$PROJECT_DIR/mini-services}"
 
 main() {
     echo "🚀 开始批量安装依赖..."
@@ -9,7 +10,7 @@ main() {
     # 检查 rootdir 是否存在
     if [ ! -d "$ROOT_DIR" ]; then
         echo "ℹ️  目录 $ROOT_DIR 不存在，跳过安装"
-        return
+        return 0
     fi
     
     # 统计变量

@@ -35,10 +35,6 @@ import type {
   ChangeDiplomacyCommand,
   EndTurnCommand,
   HotseatSwitchCommand,
-  FortifyUnitCommand,
-  BuildImprovementCommand,
-  SellResourceCommand,
-  BuyResourceCommand,
 } from './CommandQueue';
 import { EventBus } from './EventBus';
 
@@ -47,10 +43,7 @@ import { EventBus } from './EventBus';
 import { MovementSystem } from '../ecs/systems/MovementSystem';
 import { CombatSystem } from '../ecs/systems/CombatSystem';
 import { CitySystem } from '../ecs/systems/CitySystem';
-import { EconomySystem } from '../ecs/systems/EconomySystem';
 import { ResearchSystem } from '../ecs/systems/ResearchSystem';
-import { VisionSystem } from '../ecs/systems/VisionSystem';
-import { StatusEffectSystem } from '../ecs/systems/StatusEffectSystem';
 import { TurnSystem } from '../ecs/systems/TurnSystem';
 
 // ─── Rules imports (validation only) ───────────────────────────────────────────

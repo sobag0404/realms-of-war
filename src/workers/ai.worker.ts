@@ -44,17 +44,6 @@ function hexDistance(
 
 // ─── Terrain Costs ─────────────────────────────────────────────────────────────
 
-const TERRAIN_COSTS: Record<string, number> = {
-  plains: 1,
-  forest: 2,
-  mountain: 0,
-  water: 0,
-  desert: 2,
-  swamp: 3,
-  hills: 2,
-  ruins: 1,
-};
-
 // ─── Difficulty Modifiers ──────────────────────────────────────────────────────
 
 const DIFFICULTY_MODIFIERS: Record<string, {

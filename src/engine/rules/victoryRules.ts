@@ -5,9 +5,9 @@
  * All functions are side-effect free and return new state rather than mutating.
  */
 
-import type { PlayerId, VictoryCondition } from '../core/types';
-import type { GameState, PlayerState } from '../core/GameState';
-import { TECHNOLOGIES, getTechsByBranch } from '../../data/technologies';
+import type { PlayerId } from '../core/types';
+import type { GameState } from '../core/GameState';
+import { getTechsByBranch } from '../../data/technologies';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,9 +37,8 @@ const ECONOMIC_STRATEGIC_TARGET = 500;
 /** Cultural: build 3 wonders. */
 const CULTURAL_WONDER_COUNT = 3;
 
-/** Rift: control 3 rift portals simultaneously for 5 consecutive turns. */
+/** Rift: control 3 rift portals simultaneously. */
 const RIFT_PORTAL_COUNT = 3;
-const RIFT_CONSECUTIVE_TURNS = 5;
 
 // ─── Check Victory ───────────────────────────────────────────────────────────
 

@@ -19,6 +19,19 @@
 
 // ─── Seeded Noise (Perlin-style) ──────────────────────────────────────────────
 
+type GeneratedTile = {
+  coord: { q: number; r: number };
+  terrain: string;
+  resource: string | null;
+  yield: Record<string, number>;
+  hasRoad: boolean;
+  hasFort: boolean;
+  owningCityId: string | null;
+  improvement: string | null;
+  hasRiftPortal: boolean;
+  riftPortalOwner: string | null;
+};
+
 /** Permutation table size. */
 const PERM_SIZE = 256;
 
@@ -283,7 +296,7 @@ function generateMap(width: number, height: number, seed: number, playerCount: n
   }
 
   // Build tiles
-  const tiles: Record<string, any> = {};
+  const tiles: Record<string, GeneratedTile> = {};
   const terrainIds: string[] = [];
 
   for (let r = 0; r < height; r++) {
@@ -326,7 +339,7 @@ function generateMap(width: number, height: number, seed: number, playerCount: n
     const q = tileIdx % width;
     const r = Math.floor(tileIdx / width);
     const key = `${q},${r}`;
-    const tile = tiles[key] as any;
+    const tile = tiles[key];
     if (tile) {
       tile.terrain = 'ruins';
     }
@@ -345,7 +358,7 @@ function generateMap(width: number, height: number, seed: number, playerCount: n
       for (let dr = -2; dr <= 2; dr++) {
         for (let dq = -2; dq <= 2; dq++) {
           const checkKey = `${q + dq},${r + dr}`;
-          const checkTile = tiles[checkKey] as any;
+          const checkTile = tiles[checkKey];
           if (checkTile && checkTile.terrain !== 'water' && checkTile.terrain !== 'mountain') {
             positions.push({ q: q + dq, r: r + dr });
           }

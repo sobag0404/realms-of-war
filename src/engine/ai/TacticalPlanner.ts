@@ -30,7 +30,6 @@ import { getAvailableBuildings } from '../rules/cityRules';
 import { getRecruitableUnits } from '../rules/recruitmentRules';
 import { getAvailableTechs } from '../rules/researchRules';
 import { canAttack } from '../rules/combatRules';
-import { getReachableHexes } from '../rules/movementRules';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -740,7 +739,7 @@ export class TacticalPlanner {
     state: GameState,
     playerId: PlayerId,
     _assessment: StrategicAssessment,
-    influenceMap: InfluenceMap,
+    _influenceMap: InfluenceMap,
   ): TacticalPlan {
     const commands: GameCommand[] = [];
 

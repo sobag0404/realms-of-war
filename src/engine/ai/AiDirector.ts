@@ -23,7 +23,7 @@ import type { EventBus } from '../core/EventBus';
 import type { GameRng } from '../core/GameRng';
 import { AiSystem } from '../ecs/systems/AiSystem';
 import { StrategicPlanner } from './StrategicPlanner';
-import type { StrategicGoal, StrategicAssessment } from './StrategicPlanner';
+import type { StrategicAssessment } from './StrategicPlanner';
 import { TacticalPlanner } from './TacticalPlanner';
 import { InfluenceMap } from './InfluenceMap';
 import { AiMemory } from './AiMemory';

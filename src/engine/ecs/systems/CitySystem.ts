@@ -6,7 +6,7 @@
  */
 
 import type { BuildingTypeId, PlayerId, ResourceId, ResourceYield } from '../../core/types';
-import type { GameState, CityState, EntityData } from '../../core/GameState';
+import type { GameState, CityState } from '../../core/GameState';
 import type { FoundCityCommand, BuildBuildingCommand } from '../../core/CommandQueue';
 import type { EventBus } from '../../core/EventBus';
 import {
@@ -16,12 +16,7 @@ import {
   getAvailableBuildings as rulesGetAvailableBuildings,
   calculateCityYield,
 } from '../../rules/cityRules';
-import {
-  canRecruitUnit,
-  getRecruitableUnits,
-  startRecruitment,
-  processRecruitment,
-} from '../../rules/recruitmentRules';
+import { getRecruitableUnits, processRecruitment } from '../../rules/recruitmentRules';
 import { hexKey } from '../../core/types';
 import { BUILDINGS } from '../../../data/buildings';
 
@@ -185,7 +180,7 @@ export class CitySystem {
   static buildBuilding(
     state: GameState,
     command: BuildBuildingCommand,
-    eventBus: EventBus,
+    _eventBus: EventBus,
   ): GameState {
     const city = state.cities[command.cityId];
     if (!city) return state;

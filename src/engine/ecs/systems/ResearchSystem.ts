@@ -6,7 +6,7 @@
  * and emits TechnologyCompleted events.
  */
 
-import type { PlayerId, ResourceId } from '../../core/types';
+import type { PlayerId } from '../../core/types';
 import type { GameState } from '../../core/GameState';
 import type { EventBus } from '../../core/EventBus';
 import {
@@ -69,7 +69,7 @@ export class ResearchSystem {
     state: GameState,
     playerId: PlayerId,
     techId: string,
-    eventBus: EventBus,
+    _eventBus: EventBus,
   ): GameState {
     const player = state.players[playerId];
     if (!player || !player.isAlive) return state;

@@ -9,15 +9,14 @@
  */
 
 import type { CityId, EntityId, HexCoord } from '../../core/types';
-import type { GameState, EntityData } from '../../core/GameState';
+import type { GameState } from '../../core/GameState';
 import type { AttackCommand } from '../../core/CommandQueue';
 import type { EventBus } from '../../core/EventBus';
 import {
   canAttack as rulesCanAttack,
-  calculateCombat,
   applyCombat,
 } from '../../rules/combatRules';
-import { hexKey, hexDistance } from '../../core/types';
+import { hexDistance } from '../../core/types';
 
 export class CombatSystem {
   /**

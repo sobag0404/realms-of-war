@@ -1,9 +1,14 @@
 // Lightweight static file server for Realms of War
 // Serves the prototype HTML game directly
-import { resolve } from 'path';
+import { isAbsolute, relative, resolve } from 'path';
 
 const PORT = 3000;
 const PUBLIC_DIR = resolve(import.meta.dir, '../../public');
+
+function isInsidePublicDir(filePath: string): boolean {
+  const relativePath = relative(PUBLIC_DIR, filePath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -16,7 +21,7 @@ const MIME_TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
-const server = Bun.serve({
+Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
@@ -27,12 +32,12 @@ const server = Bun.serve({
       path = '/prototype/index.html';
     }
 
-    // Security: prevent directory traversal
-    if (path.includes('..')) {
+    const filePath = resolve(PUBLIC_DIR, path.slice(1));
+
+    // Security: enforce the resolved file stays inside PUBLIC_DIR.
+    if (!isInsidePublicDir(filePath)) {
       return new Response('Forbidden', { status: 403 });
     }
-
-    const filePath = resolve(PUBLIC_DIR, path.slice(1));
 
     try {
       const file = Bun.file(filePath);
@@ -55,7 +60,7 @@ const server = Bun.serve({
           'Cache-Control': 'no-cache',
         },
       });
-    } catch (err) {
+    } catch {
       return new Response('Internal Server Error', { status: 500 });
     }
   },

@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
-import type { HexCoord } from '@/engine/core/types';
 
 /** Create hex plane geometry for fog overlay */
 function createHexPlane(radius: number): THREE.BufferGeometry {

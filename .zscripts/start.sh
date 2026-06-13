@@ -64,7 +64,7 @@ if [ -f "./next-service-dist/server.js" ]; then
     # 设置环境变量
     export NODE_ENV=production
     export PORT="${PORT:-3000}"
-    export HOSTNAME="${HOSTNAME:-0.0.0.0}"
+    export HOSTNAME="${HOSTNAME:-127.0.0.1}"
     export DATABASE_URL="${DATABASE_URL:-$DEFAULT_PACKAGED_DATABASE_URL}"
 
     if [ "$DATABASE_URL" = "$DEFAULT_PACKAGED_DATABASE_URL" ]; then
@@ -99,7 +99,8 @@ else
 fi
 
 # 启动 mini-services
-if [ -f "./mini-services-start.sh" ]; then
+INCLUDE_MINI_SERVICES="${INCLUDE_MINI_SERVICES:-0}"
+if [ "$INCLUDE_MINI_SERVICES" = "1" ] && [ -f "./mini-services-start.sh" ]; then
     echo "🚀 启动 mini-services..."
     
     # 运行启动脚本（从根目录运行，脚本内部会处理 mini-services-dist 目录）
@@ -114,10 +115,10 @@ if [ -f "./mini-services-start.sh" ]; then
     else
         echo "✅ mini-services 已启动 (PID: $MINI_PID)"
     fi
-elif [ -d "./mini-services-dist" ]; then
+elif [ "$INCLUDE_MINI_SERVICES" = "1" ] && [ -d "./mini-services-dist" ]; then
     echo "⚠️  未找到 mini-services 启动脚本，但目录存在"
 else
-    echo "ℹ️  mini-services 目录不存在，跳过"
+    echo "ℹ️  mini-services disabled for public alpha release"
 fi
 
 # 启动 Caddy（如果存在 Caddyfile）

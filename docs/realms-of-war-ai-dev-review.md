@@ -1215,12 +1215,7 @@ DATABASE_URL="file:./dev.db"
 NEXT_TELEMETRY_DISABLED=1
 ```
 
-Если будет auth:
-
-```env
-NEXTAUTH_SECRET="change-me"
-NEXTAUTH_URL="http://localhost:3000"
-```
+Если будет auth, добавить отдельную документацию по URL и secret-переменным без коммита реальных значений.
 
 **Acceptance criteria:**
 

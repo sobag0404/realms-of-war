@@ -19,9 +19,9 @@ import { GameRng } from '@/engine/core/GameRng';
 import { toIndex } from '@/engine/hex/mapStorage';
 
 import { SeededNoise } from './noise';
-import { assignBiomes, TERRAIN_ID, TERRAIN_ID_STR } from './biomes';
-import { generateRivers, computeRiverMasks, type River } from './rivers';
-import { placeResources, RESOURCE_ID, RESOURCE_ID_STR } from './resources';
+import { assignBiomes, TERRAIN_ID_STR } from './biomes';
+import { generateRivers, computeRiverMasks } from './rivers';
+import { placeResources, RESOURCE_ID_STR } from './resources';
 import { placeRuins, type Ruin } from './ruins';
 import { findStartingPositions } from './startingPositions';
 import { validateMap, type ValidationResult } from './validation';
