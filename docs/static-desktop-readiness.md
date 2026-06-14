@@ -87,6 +87,5 @@ P1 - static output runtime smoke should move into CI once browser availability i
 
 ## Next Order
 
-1. Verify the Tauri filesystem save backend through a fresh manual Windows artifact.
-2. Harden the unsigned installer flow with an explicit install/uninstall checklist.
-3. Add CI browser provisioning if static smoke becomes required in GitHub Actions.
+1. Harden the unsigned installer flow with an explicit install/uninstall checklist.
+2. Add CI browser provisioning if static smoke becomes required in GitHub Actions.

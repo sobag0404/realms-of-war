@@ -121,7 +121,7 @@ After required local checks pass:
 bun run desktop:tauri:build
 ```
 
-3. Verify the Tauri filesystem-backed save repository in a fresh Windows artifact.
+3. Harden the unsigned installer flow with an explicit install/uninstall checklist.
 
 ## Desktop Save Backend
 
@@ -133,6 +133,14 @@ The desktop runtime now has a Tauri filesystem save backend:
 - storage location: Tauri application data directory, `saves/*.json`
 
 The backend uses narrow Tauri commands instead of broad frontend filesystem permissions. Browser/static builds keep `BrowserLocalSaveRepository`, and existing browser-local saves remain visible as fallback entries when running inside Tauri.
+
+Verified in a PR #15 branch artifact:
+
+```text
+https://github.com/sobag0404/realms-of-war/actions/runs/27510619482
+```
+
+Runtime smoke confirmed `realms-of-war.exe` starts, gameplay renders, save writes a JSON file under `%APPDATA%\com.realmsofwar.game\saves`, and the saved game can be loaded after app restart.
 
 ## Manual CI Plan
 

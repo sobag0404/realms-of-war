@@ -82,10 +82,10 @@ Installer execution was intentionally skipped in automation because it changes t
 
 - The artifact is unsigned.
 - The icon is still a placeholder.
-- Tauri filesystem saves are implemented after this smoke baseline and should be verified in the next artifact.
+- Tauri filesystem saves are implemented after this smoke baseline and were verified in the PR #15 branch artifact.
 - Load/delete are fully covered by `bun run desktop:static:smoke`; this manual Tauri smoke confirmed startup, new game, render, and save in the actual WebView2 runtime.
 - Local Tauri builds on this machine still require Rust/Cargo/MSVC installation; GitHub Actions is the verified artifact path.
 
 ## Next Milestone
 
-Recommended next milestone: verify Tauri filesystem saves in a fresh artifact, then harden the installer flow.
+Recommended next milestone: harden the unsigned installer flow with an explicit install/uninstall checklist.
