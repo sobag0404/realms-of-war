@@ -81,6 +81,7 @@ Current scaffold:
 - `src-tauri/build.rs`
 - `src-tauri/src/main.rs`
 - `src-tauri/capabilities/default.json`
+- `src-tauri/icons/icon.ico`
 
 Configuration:
 
@@ -90,7 +91,18 @@ Configuration:
 - `frontendDist`: `../out`
 - dev URL: `http://localhost:3000`
 - bundle target: unsigned NSIS setup executable
+- placeholder Windows resource icon: `src-tauri/icons/icon.ico`
 - no signing, updater, auth, cloud, multiplayer, or payment configuration
+
+## Artifact Workflow Findings
+
+The first manual `Windows Desktop Artifact` run reached Rust/Tauri build and failed on the Windows resource icon requirement:
+
+```text
+icons/icon.ico not found; required for generating a Windows Resource file during tauri-build
+```
+
+This blocker is fixed by adding a small generated placeholder `src-tauri/icons/icon.ico` and referencing it in `tauri.conf.json`. It is not final branding.
 
 After required local checks pass:
 
