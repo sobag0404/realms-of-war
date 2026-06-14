@@ -1,0 +1,97 @@
+# Tauri Toolchain Readiness
+
+Date: 2026-06-14
+
+Status: scaffold deferred.
+
+Realms of War is now ready for a static desktop renderer, but this machine is not ready to verify a Tauri scaffold. We should not commit a `src-tauri` placeholder until the Rust/MSVC toolchain can build it.
+
+## Current Local Audit
+
+Run:
+
+```powershell
+bun run desktop:doctor
+```
+
+Observed on this Windows machine:
+
+- Bun: available, `1.3.14`.
+- WebView2 Runtime: available, version `149.0.4022.69`.
+- `winget.exe`: available.
+- `rustc`: missing from `PATH`.
+- `cargo`: missing from `PATH`.
+- `cl.exe`: missing from `PATH`.
+- Visual Studio Build Tools / MSVC C++ toolset: not detected by `vswhere.exe`.
+- NSIS/WiX tools: not detected; optional until choosing installer target.
+
+Decision: do not add `src-tauri` in this PR. A scaffold that cannot be built locally or in CI would be noise, not progress.
+
+## Required Install Commands
+
+Official Tauri prerequisites for Windows require Microsoft C++ Build Tools, WebView2, and Rust with an MSVC host toolchain.
+
+Verified official references on 2026-06-14:
+
+- Tauri Windows prerequisites require Microsoft C++ Build Tools and WebView2; Windows 10 1803+ usually already includes WebView2.
+- Rust should use the MSVC host toolchain; `rustup default stable-msvc` is the correction command after Rust installation.
+- Tauri + Next.js requires static export and `frontendDist: "../out"`.
+- Windows installers can be `.msi` through WiX v3 or `-setup.exe` through NSIS; `bun tauri build` is the build entrypoint.
+
+Recommended install path:
+
+```powershell
+winget install --id Microsoft.VisualStudio.2022.BuildTools
+winget install --id Rustlang.Rustup
+rustup default stable-msvc
+```
+
+During Visual Studio Build Tools installation, select `Desktop development with C++`.
+
+Installer tools, only when packaging:
+
+```powershell
+winget install --id NSIS.NSIS
+winget install --id WiXToolset.WiXToolset
+```
+
+Restart the terminal after installation, then rerun:
+
+```powershell
+bun run desktop:doctor --strict
+bun run desktop:static:audit
+bun run desktop:static:build
+bun run desktop:static:smoke
+```
+
+## Verified Tauri Inputs
+
+Static renderer inputs already pass:
+
+- `bun run desktop:static:build` emits `out/`.
+- `bun run desktop:static:smoke` serves `out/` without Next server/API and verifies new game, render, local save, load, and delete.
+- Tauri config should use `frontendDist: "../out"`.
+
+## Scaffold Plan
+
+After required checks pass:
+
+1. Add `src-tauri`.
+2. Configure:
+   - app id: `com.realmsofwar.game`
+   - product name: `Realms of War`
+   - `beforeBuildCommand`: `bun run desktop:static:build`
+   - `frontendDist`: `../out`
+   - dev URL: `http://localhost:3000`
+3. Add no signing, updater, cloud, auth, multiplayer, or payment features.
+4. Build locally:
+
+```powershell
+bun tauri build
+```
+
+5. Add a Tauri filesystem-backed `DesktopSaveRepository` under app data with atomic writes.
+
+## Manual CI Plan
+
+The manual `Desktop Readiness` GitHub Actions workflow runs static desktop gates on Windows without requiring a Tauri scaffold. Once `src-tauri` exists, extend it with Rust setup and `bun tauri build`.
