@@ -46,30 +46,30 @@ export function WaterLayer() {
   const depthGeometry = useMemo(() => createHexGeometry(0.88), []);
   const shorelineGeometry = useMemo(() => new THREE.RingGeometry(0.84, 0.97, 6), []);
   const waterMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: '#2d9bc1',
-    emissive: '#093952',
-    emissiveIntensity: 0.14,
+    color: '#2b91ba',
+    emissive: '#082f46',
+    emissiveIntensity: 0.12,
     transparent: true,
-    opacity: 0.72,
-    roughness: 0.18,
+    opacity: 0.74,
+    roughness: 0.22,
     metalness: 0.05,
     transmission: 0.06,
     thickness: 0.16,
-    clearcoat: 0.42,
-    clearcoatRoughness: 0.24,
+    clearcoat: 0.36,
+    clearcoatRoughness: 0.28,
     side: THREE.FrontSide,
   }), []);
   const depthMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#0b3755',
+    color: '#082f48',
     transparent: true,
-    opacity: 0.36,
+    opacity: 0.42,
     side: THREE.FrontSide,
     depthWrite: false,
   }), []);
   const shorelineMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#d4f6ff',
+    color: '#d9fbff',
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.22,
     side: THREE.FrontSide,
     depthWrite: false,
   }), []);
@@ -112,7 +112,7 @@ export function WaterLayer() {
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    groupRef.current.position.y = Math.sin(t * 0.85) * 0.008;
+    groupRef.current.position.y = Math.sin(t * 0.85) * 0.006;
   });
 
   if (waterTiles.length === 0) return null;

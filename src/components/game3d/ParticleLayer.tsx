@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
@@ -158,8 +158,8 @@ function ParticleSystem({ system }: { system: ParticleSystemData }) {
   const { config, particles } = system;
 
   // Pre-compute colors for interpolation
-  const colorStart = new THREE.Color(config.colorStart);
-  const colorEnd = new THREE.Color(config.colorEnd);
+  const colorStart = useMemo(() => new THREE.Color(config.colorStart), [config.colorStart]);
+  const colorEnd = useMemo(() => new THREE.Color(config.colorEnd), [config.colorEnd]);
 
   // Set up buffer geometry imperatively
   useEffect(() => {
