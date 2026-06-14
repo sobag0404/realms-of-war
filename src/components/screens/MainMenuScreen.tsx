@@ -5,18 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGameStore } from '@/store/useGameStore';
-import { loadSaveFile, verifyChecksum } from '@/lib/saveService';
+import { getSaveRepository, SaveRepositoryError } from '@/save/repository';
+import type { SaveSummary } from '@/save/repository';
 
 // ─── Save Entry ──────────────────────────────────────────────────────────────
-
-interface SaveEntry {
-  id: string;
-  name: string;
-  turn: number;
-  players: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 /**
  * MainMenuScreen — full-screen overlay shown when mode === 'menu'.
@@ -31,7 +23,7 @@ export function MainMenuScreen() {
   const addNotification = useGameStore((s) => s.addNotification);
   const [visible, setVisible] = useState(false);
   const [showLoadPanel, setShowLoadPanel] = useState(false);
-  const [saves, setSaves] = useState<SaveEntry[]>([]);
+  const [saves, setSaves] = useState<SaveSummary[]>([]);
   const [loadingSaves, setLoadingSaves] = useState(false);
 
   useEffect(() => {
@@ -43,17 +35,21 @@ export function MainMenuScreen() {
   const fetchSaves = useCallback(async () => {
     setLoadingSaves(true);
     try {
-      const res = await fetch('/api/saves');
-      if (res.ok) {
-        const data = await res.json();
-        setSaves(data.saves ?? []);
-      }
-    } catch {
-      // Non-critical: failed to fetch saves list
+      setSaves(await getSaveRepository().list());
+    } catch (error) {
+      setSaves([]);
+      addNotification({
+        type: 'error',
+        title: 'РћС€РёР±РєР°',
+        message: error instanceof SaveRepositoryError
+          ? error.message
+          : 'РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє СЃРѕС…СЂР°РЅРµРЅРёР№',
+        duration: 4000,
+      });
     } finally {
       setLoadingSaves(false);
     }
-  }, []);
+  }, [addNotification]);
 
   const handleLoadClick = useCallback(() => {
     setShowLoadPanel(true);
@@ -63,57 +59,22 @@ export function MainMenuScreen() {
   const handleLoadSave = useCallback(
     async (saveId: string) => {
       try {
-        const res = await fetch(`/api/load?id=${saveId}`);
-        if (!res.ok) {
-          addNotification({
-            type: 'error',
-            title: 'Ошибка',
-            message: res.status === 404 ? 'Сохранение не найдено' : 'Ошибка сервера при загрузке',
-            duration: 4000,
-          });
-          return;
-        }
-
-        const payload = await res.json();
-        const { data: saveData, checksum, name: saveName, turn: saveTurn } = payload;
-
-        // 1. Verify checksum before trusting the data
-        if (!verifyChecksum(saveData, checksum)) {
-          addNotification({
-            type: 'error',
-            title: 'Ошибка',
-            message: 'Повреждённое сохранение: checksum не совпадает',
-            duration: 5000,
-          });
-          return;
-        }
-
-        // 2. Deserialize and validate the save file through the engine save format
-        const result = loadSaveFile(saveData);
-        if (!result.success || !result.saveFile) {
-          addNotification({
-            type: 'error',
-            title: 'Ошибка',
-            message: result.error ?? 'Неверный формат сохранения',
-            duration: 5000,
-          });
-          return;
-        }
-
-        // 3. Load into the store using the proper SaveFile path
-        loadSaveFileIntoStore(result.saveFile);
+        const loaded = await getSaveRepository().load(saveId);
+        loadSaveFileIntoStore(loaded.saveFile);
         setShowLoadPanel(false);
         addNotification({
           type: 'success',
           title: 'Загрузка',
-          message: `Игра "${saveName}" загружена (ход ${saveTurn})`,
+          message: `Игра "${loaded.summary.name}" загружена (ход ${loaded.summary.turn})`,
           duration: 3000,
         });
-      } catch {
+      } catch (error) {
         addNotification({
           type: 'error',
           title: 'Ошибка',
-          message: 'Не удалось загрузить сохранение',
+          message: error instanceof SaveRepositoryError
+            ? error.message
+            : 'Не удалось загрузить сохранение',
           duration: 4000,
         });
       }
@@ -124,18 +85,23 @@ export function MainMenuScreen() {
   const handleDeleteSave = useCallback(
     async (saveId: string, saveName: string) => {
       try {
-        const res = await fetch(`/api/load?id=${saveId}`, { method: 'DELETE' });
-        if (res.ok) {
-          setSaves((prev) => prev.filter((s) => s.id !== saveId));
-          addNotification({
-            type: 'info',
-            title: 'Удалено',
-            message: `Сохранение "${saveName}" удалено`,
-            duration: 3000,
-          });
-        }
-      } catch {
-        // Non-critical: failed to delete save
+        await getSaveRepository().delete(saveId);
+        setSaves((prev) => prev.filter((s) => s.id !== saveId));
+        addNotification({
+          type: 'info',
+          title: 'Удалено',
+          message: `Сохранение "${saveName}" удалено`,
+          duration: 3000,
+        });
+      } catch (error) {
+        addNotification({
+          type: 'error',
+          title: 'Ошибка',
+          message: error instanceof SaveRepositoryError
+            ? error.message
+            : 'Не удалось удалить сохранение',
+          duration: 4000,
+        });
       }
     },
     [addNotification],
