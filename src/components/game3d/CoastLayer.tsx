@@ -18,6 +18,15 @@ function hexKey(q: number, r: number): string {
 
 export function CoastLayer() {
   const gameState = useGameStore((s) => s.gameState);
+  const showFog = useGameStore((s) => s.showFog);
+  const activePlayerId = useGameStore((s) => s.activePlayerId);
+
+  const knownHexes = useMemo(() => {
+    if (!gameState || !showFog) return null;
+    const player = gameState.players[activePlayerId];
+    const knownKeys = player ? [...player.visibleHexes, ...player.exploredHexes] : [];
+    return knownKeys.length > 0 ? new Set(knownKeys) : null;
+  }, [activePlayerId, gameState, showFog]);
 
   const coastalWaterTiles = useMemo(() => {
     if (!gameState) return [];
@@ -25,12 +34,13 @@ export function CoastLayer() {
     const tiles = gameState.map.tiles;
     return Object.values(tiles).filter((tile) => {
       if (tile.terrain !== 'water') return false;
+      if (knownHexes && !knownHexes.has(hexKey(tile.coord.q, tile.coord.r))) return false;
       return HEX_DIRECTIONS.some((dir) => {
         const neighbor = tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
         return neighbor && neighbor.terrain !== 'water';
       });
     });
-  }, [gameState]);
+  }, [gameState, knownHexes]);
 
   const shoreLandTiles = useMemo(() => {
     if (!gameState) return [];
@@ -38,12 +48,13 @@ export function CoastLayer() {
     const tiles = gameState.map.tiles;
     return Object.values(tiles).filter((tile) => {
       if (tile.terrain === 'water') return false;
+      if (knownHexes && !knownHexes.has(hexKey(tile.coord.q, tile.coord.r))) return false;
       return HEX_DIRECTIONS.some((dir) => {
         const neighbor = tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
-        return !neighbor || neighbor.terrain === 'water';
+        return neighbor?.terrain === 'water';
       });
     });
-  }, [gameState]);
+  }, [gameState, knownHexes]);
 
   const sandGeometry = useMemo(() => createHexRing(0.78, 0.98), []);
   const foamGeometry = useMemo(() => createHexRing(0.88, 1), []);
