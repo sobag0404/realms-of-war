@@ -46,15 +46,17 @@ const TERRAIN_TONE: Record<TerrainTypeId, {
   saturation: number;
   lightness: number;
   sideShade: number;
+  edgeShade: number;
+  centerLift: number;
 }> = {
-  plains: { hue: -0.012, saturation: 0.06, lightness: 0.08, sideShade: 0.72 },
-  forest: { hue: 0.01, saturation: 0.08, lightness: 0.07, sideShade: 0.58 },
-  mountain: { hue: -0.02, saturation: -0.12, lightness: 0.1, sideShade: 0.62 },
-  water: { hue: -0.012, saturation: 0.1, lightness: 0.08, sideShade: 0.68 },
-  desert: { hue: 0.018, saturation: -0.04, lightness: 0.1, sideShade: 0.74 },
-  swamp: { hue: -0.02, saturation: -0.08, lightness: 0.06, sideShade: 0.56 },
-  hills: { hue: 0.012, saturation: -0.02, lightness: 0.08, sideShade: 0.66 },
-  ruins: { hue: -0.01, saturation: -0.16, lightness: 0.08, sideShade: 0.64 },
+  plains: { hue: -0.014, saturation: 0.1, lightness: 0.1, sideShade: 0.7, edgeShade: 0.94, centerLift: 0.042 },
+  forest: { hue: 0.012, saturation: 0.11, lightness: 0.08, sideShade: 0.54, edgeShade: 0.88, centerLift: 0.022 },
+  mountain: { hue: -0.024, saturation: -0.16, lightness: 0.12, sideShade: 0.58, edgeShade: 0.91, centerLift: 0.052 },
+  water: { hue: -0.016, saturation: 0.12, lightness: 0.1, sideShade: 0.66, edgeShade: 0.96, centerLift: 0.038 },
+  desert: { hue: 0.022, saturation: -0.01, lightness: 0.12, sideShade: 0.72, edgeShade: 0.95, centerLift: 0.046 },
+  swamp: { hue: -0.018, saturation: -0.04, lightness: 0.07, sideShade: 0.52, edgeShade: 0.87, centerLift: 0.018 },
+  hills: { hue: 0.016, saturation: 0.02, lightness: 0.1, sideShade: 0.62, edgeShade: 0.91, centerLift: 0.04 },
+  ruins: { hue: -0.012, saturation: -0.18, lightness: 0.1, sideShade: 0.6, edgeShade: 0.9, centerLift: 0.032 },
 };
 
 function hash01(q: number, r: number, salt: number): number {
@@ -67,7 +69,9 @@ function getTerrainVertexColor(
   q: number,
   r: number,
   vertexIndex: number,
+  normalX: number,
   normalY: number,
+  normalZ: number,
 ): THREE.Color {
   const base = new THREE.Color(TERRAIN_COLORS[terrain] ?? '#555555');
   const tone = TERRAIN_TONE[terrain];
@@ -77,13 +81,18 @@ function getTerrainVertexColor(
   const tileNoise = hash01(q, r, 1) - 0.5;
   const vertexNoise = hash01(q, r, vertexIndex + 7) - 0.5;
   const isTop = normalY > 0.5;
-  const sideShade = isTop ? 1 : tone.sideShade;
-  const centerGlow = vertexIndex === 0 ? 0.035 : 0;
+  const lightFacing = THREE.MathUtils.clamp(normalX * -0.35 + normalZ * 0.65, -1, 1);
+  const sideShade = isTop
+    ? 1
+    : THREE.MathUtils.clamp(tone.sideShade + lightFacing * 0.08, 0.48, 0.82);
+  const edgeShade = isTop && vertexIndex > 0 ? tone.edgeShade : 1;
+  const centerGlow = isTop && vertexIndex === 0 ? tone.centerLift : 0;
+  const lightness = (hsl.l + tone.lightness * vertexNoise + centerGlow) * sideShade * edgeShade;
 
   return new THREE.Color().setHSL(
     THREE.MathUtils.euclideanModulo(hsl.h + tone.hue * tileNoise, 1),
     THREE.MathUtils.clamp(hsl.s + tone.saturation * tileNoise, 0.05, 0.95),
-    THREE.MathUtils.clamp((hsl.l + tone.lightness * vertexNoise + centerGlow) * sideShade, 0.08, 0.86),
+    THREE.MathUtils.clamp(lightness, 0.08, 0.88),
   );
 }
 
@@ -307,7 +316,9 @@ export function buildTerrainChunks(
           tile.coord.q,
           tile.coord.r,
           v,
+          hexData.normals[v * 3] ?? 0,
           hexData.normals[v * 3 + 1] ?? 1,
+          hexData.normals[v * 3 + 2] ?? 0,
         );
         allColors.push(color.r, color.g, color.b);
       }

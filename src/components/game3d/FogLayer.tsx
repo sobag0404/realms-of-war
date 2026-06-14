@@ -28,16 +28,16 @@ export function FogLayer() {
 
   const geometry = useMemo(() => createHexPlane(0.96), []);
   const hiddenMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#0b1420',
+    color: '#0c1622',
     transparent: true,
-    opacity: 0.74,
+    opacity: 0.68,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const exploredMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#22303a',
+    color: '#2d3d46',
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.26,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
