@@ -23,11 +23,8 @@ const CONTROLS: ControlEntry[] = [
   { keys: 'WASD / Arrows', action: 'Pan camera' },
   { keys: 'Mouse Wheel', action: 'Zoom' },
   { keys: 'Right Drag', action: 'Pan' },
-  { keys: 'Middle Drag', action: 'Rotate' },
+  { keys: 'Middle / Alt Drag', action: 'Rotate' },
   { keys: 'Left Click', action: 'Select' },
-  { keys: 'Shift+Click', action: 'Attack / Move' },
-  { keys: 'Space', action: 'End Turn' },
-  { keys: 'Esc', action: 'Deselect' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -51,11 +48,11 @@ export function ControlsHelp() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 text-white/30 hover:text-white hover:bg-white/10"
+              className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/10"
               onClick={toggleExpanded}
               aria-label="Collapse controls"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
 

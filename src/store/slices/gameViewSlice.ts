@@ -17,15 +17,14 @@ import {
   CAMERA_DEFAULT_PITCH,
   CAMERA_DEFAULT_ROTATION,
   CAMERA_DEFAULT_ZOOM,
-  CAMERA_MAX_ZOOM,
-  CAMERA_MIN_ZOOM,
+  clampCameraZoom,
 } from '@/config/camera';
 
 // ─── Slice Interface ──────────────────────────────────────────────────────────
 
 export interface GameViewSlice {
   cameraTarget: [number, number, number]; // Vector3Tuple
-  cameraZoom: number; // 8-56, default 30
+  cameraZoom: number; // 8-56, base default 30; rig applies map/viewport preset
   cameraRotation: number; // degrees, default 45
   cameraPitch: number; // degrees, default 58
   isDraggingCamera: boolean;
@@ -52,8 +51,6 @@ export interface GameViewSlice {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MIN_ZOOM = CAMERA_MIN_ZOOM;
-const MAX_ZOOM = CAMERA_MAX_ZOOM;
 const DEFAULT_ZOOM = CAMERA_DEFAULT_ZOOM;
 const DEFAULT_ROTATION = CAMERA_DEFAULT_ROTATION; // degrees
 const DEFAULT_PITCH = CAMERA_DEFAULT_PITCH; // degrees
@@ -87,8 +84,7 @@ export const createGameViewSlice: StateCreator<
   },
 
   setCameraZoom: (zoom) => {
-    const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
-    set({ cameraZoom: clamped }, false, 'gameView/setCameraZoom');
+    set({ cameraZoom: clampCameraZoom(zoom) }, false, 'gameView/setCameraZoom');
   },
 
   setCameraRotation: (rotation) => {

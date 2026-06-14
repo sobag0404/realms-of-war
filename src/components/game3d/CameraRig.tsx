@@ -1,55 +1,92 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
-import { CAMERA_MAX_ZOOM, CAMERA_MIN_ZOOM } from '@/config/camera';
+import {
+  CAMERA_BASE_PAN_ZOOM,
+  CAMERA_DEFAULT_DISTANCE,
+  CAMERA_DEFAULT_PITCH,
+  CAMERA_DEFAULT_ROTATION,
+  CAMERA_MAP_PADDING_HEXES,
+  getViewportMapDefaultZoom,
+  getWheelCameraZoom,
+} from '@/config/camera';
 import { hexToWorld } from '@/engine/hex/coordinates';
-
-/** Camera zoom limits */
-const MIN_ZOOM = CAMERA_MIN_ZOOM;
-const MAX_ZOOM = CAMERA_MAX_ZOOM;
 
 /** Edge scroll zone in pixels */
 const EDGE_ZONE = 20;
 
-/** Pan speed at zoom 12 */
+/** Pan speed at the configured reference zoom */
 const BASE_PAN_SPEED = 6;
 
 /** Rotation step in degrees */
 const ROTATION_STEP = 15;
 
-/** Map bounds padding in hex units */
-const MAP_PADDING = 4;
+const CAMERA_INPUT_KEYS = new Set([
+  'w',
+  'a',
+  's',
+  'd',
+  'arrowup',
+  'arrowdown',
+  'arrowleft',
+  'arrowright',
+]);
+
+function isKeyboardInputCaptured(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest('[role="dialog"], [role="menu"], [aria-modal="true"]')) return true;
+  return Boolean(target.closest('input, textarea, select, button, [contenteditable="true"], [data-camera-input-lock]'));
+}
 
 export function CameraRig() {
-  const { gl } = useThree();
+  const { gl, size } = useThree();
   const camRef = useRef<THREE.OrthographicCamera | null>(null);
   const isDragging = useRef(false);
   const lastMouse = useRef<{ x: number; y: number } | null>(null);
   const isRotating = useRef(false);
   const keysDown = useRef<Set<string>>(new Set());
   const mousePos = useRef<{ x: number; y: number } | null>(null);
+  const cameraPreset = useRef({
+    mapSignature: '',
+    defaultZoom: 0,
+    userAdjustedZoom: false,
+  });
 
   const setCameraTarget = useGameStore((s) => s.setCameraTarget);
   const setCameraZoom = useGameStore((s) => s.setCameraZoom);
   const setCameraRotation = useGameStore((s) => s.setCameraRotation);
+  const setCameraPitch = useGameStore((s) => s.setCameraPitch);
   const cameraTarget = useGameStore((s) => s.cameraTarget);
   const cameraZoom = useGameStore((s) => s.cameraZoom);
   const cameraRotation = useGameStore((s) => s.cameraRotation);
   const cameraPitch = useGameStore((s) => s.cameraPitch);
   const gameState = useGameStore((s) => s.gameState);
 
-  // Compute map bounds from game state
-  const mapBounds = useRef({ minX: -30, maxX: 30, minZ: -30, maxZ: 30 });
+  const mapMetrics = useMemo(() => {
+    if (!gameState) {
+      return {
+        bounds: { minX: -30, maxX: 30, minZ: -30, maxZ: 30 },
+        size: { width: 60, depth: 60 },
+        signature: 'empty',
+      };
+    }
 
-  useEffect(() => {
-    if (!gameState) return;
     const tiles = Object.values(gameState.map.tiles);
-    if (tiles.length === 0) return;
+    if (tiles.length === 0) {
+      return {
+        bounds: { minX: -30, maxX: 30, minZ: -30, maxZ: 30 },
+        size: { width: 60, depth: 60 },
+        signature: 'empty-map',
+      };
+    }
 
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
     for (const tile of tiles) {
       const [x, , z] = hexToWorld(tile.coord);
       if (x < minX) minX = x;
@@ -58,15 +95,83 @@ export function CameraRig() {
       if (z > maxZ) maxZ = z;
     }
 
-    const sqrt3 = Math.sqrt(3);
-    const padWorld = MAP_PADDING * sqrt3;
-    mapBounds.current = {
+    const width = Math.max(1, maxX - minX);
+    const depth = Math.max(1, maxZ - minZ);
+    const tileStep = Math.max(width, depth) / Math.max(1, Math.sqrt(tiles.length));
+    const padWorld = CAMERA_MAP_PADDING_HEXES * Math.max(Math.sqrt(3), tileStep);
+    const bounds = {
       minX: minX - padWorld,
       maxX: maxX + padWorld,
       minZ: minZ - padWorld,
       maxZ: maxZ + padWorld,
     };
+    const signature = [
+      gameState.seed,
+      gameState.map.radius,
+      tiles.length,
+      Math.round(minX * 100),
+      Math.round(maxX * 100),
+      Math.round(minZ * 100),
+      Math.round(maxZ * 100),
+    ].join(':');
+
+    return {
+      bounds,
+      size: { width, depth },
+      signature,
+    };
   }, [gameState]);
+
+  // Compute map bounds from game state
+  const mapBounds = useRef(mapMetrics.bounds);
+
+  useEffect(() => {
+    mapBounds.current = mapMetrics.bounds;
+  }, [mapMetrics.bounds]);
+
+  useEffect(() => {
+    if (!gameState) {
+      cameraPreset.current = {
+        mapSignature: '',
+        defaultZoom: 0,
+        userAdjustedZoom: false,
+      };
+      return;
+    }
+
+    const defaultZoom = getViewportMapDefaultZoom(mapMetrics.size, size);
+    const isNewMap = cameraPreset.current.mapSignature !== mapMetrics.signature;
+    const isStillOnPreset =
+      !cameraPreset.current.userAdjustedZoom &&
+      (cameraPreset.current.defaultZoom === 0 ||
+        Math.abs(cameraZoom - cameraPreset.current.defaultZoom) < 0.01);
+
+    if (isNewMap) {
+      cameraPreset.current = {
+        mapSignature: mapMetrics.signature,
+        defaultZoom,
+        userAdjustedZoom: false,
+      };
+      setCameraZoom(defaultZoom);
+      setCameraRotation(CAMERA_DEFAULT_ROTATION);
+      setCameraPitch(CAMERA_DEFAULT_PITCH);
+      return;
+    }
+
+    if (isStillOnPreset && Math.abs(defaultZoom - cameraPreset.current.defaultZoom) >= 0.5) {
+      cameraPreset.current.defaultZoom = defaultZoom;
+      setCameraZoom(defaultZoom);
+    }
+  }, [
+    cameraZoom,
+    gameState,
+    mapMetrics.signature,
+    mapMetrics.size,
+    setCameraPitch,
+    setCameraRotation,
+    setCameraZoom,
+    size,
+  ]);
 
   const clampCameraTarget = useCallback((target: [number, number, number]): [number, number, number] => {
     const bounds = mapBounds.current;
@@ -80,7 +185,12 @@ export function CameraRig() {
   // Keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      keysDown.current.add(e.key.toLowerCase());
+      const key = e.key.toLowerCase();
+      if (CAMERA_INPUT_KEYS.has(key) && isKeyboardInputCaptured(e.target)) {
+        keysDown.current.delete(key);
+        return;
+      }
+      keysDown.current.add(key);
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       keysDown.current.delete(e.key.toLowerCase());
@@ -118,7 +228,7 @@ export function CameraRig() {
 
       // Convert screen delta to world delta based on camera orientation
       const yawRad = (cameraRotation * Math.PI) / 180;
-      const zoomFactor = cameraZoom / 12;
+      const zoomFactor = cameraZoom / CAMERA_BASE_PAN_ZOOM;
       const panScale = 0.03 / zoomFactor;
 
       const worldDx = (-dx * Math.cos(yawRad) + dy * Math.sin(yawRad)) * panScale;
@@ -154,9 +264,8 @@ export function CameraRig() {
   // Wheel zoom
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -1 : 1;
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, cameraZoom + delta));
-    setCameraZoom(newZoom);
+    cameraPreset.current.userAdjustedZoom = true;
+    setCameraZoom(getWheelCameraZoom(cameraZoom, e.deltaY));
   }, [cameraZoom, setCameraZoom]);
 
   const handleContextMenu = useCallback((e: Event) => {
@@ -195,7 +304,7 @@ export function CameraRig() {
 
     // Keyboard panning
     const keys = keysDown.current;
-    const zoomFactor = cameraZoom / 12;
+    const zoomFactor = cameraZoom / CAMERA_BASE_PAN_ZOOM;
     const panSpeed = BASE_PAN_SPEED * delta / zoomFactor;
     const yawRad = (cameraRotation * Math.PI) / 180;
 
@@ -256,7 +365,7 @@ export function CameraRig() {
 
     // Compute camera position from target, yaw, pitch
     const pitchRad = (cameraPitch * Math.PI) / 180;
-    const distance = 30;
+    const distance = CAMERA_DEFAULT_DISTANCE;
     const cx = tx + distance * Math.cos(pitchRad) * Math.sin(yawRad);
     const cy = distance * Math.sin(pitchRad);
     const cz = tz + distance * Math.cos(pitchRad) * Math.cos(yawRad);

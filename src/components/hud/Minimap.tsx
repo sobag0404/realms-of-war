@@ -13,10 +13,20 @@ import { useGameStore } from '@/store/useGameStore';
 import { MinimapRenderer } from '@/rendering/minimap/minimapRenderer';
 import type { MinimapState } from '@/rendering/minimap/minimapRenderer';
 import { TERRAIN_TYPES } from '@/data/terrain';
+import { Button } from '@/components/ui/button';
+import { ChevronUp, Maximize2, Minimize2, PanelLeft, PanelRight, X } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CANVAS_SIZE = 200;
+const MOBILE_DISPLAY_SIZE = 116;
+const DESKTOP_DISPLAY_SIZES = {
+  compact: 152,
+  comfortable: 184,
+} as const;
+
+type DesktopSizeMode = keyof typeof DESKTOP_DISPLAY_SIZES;
+type DesktopDock = 'left' | 'right';
 
 // ─── Terrain Color Map (fallback) ────────────────────────────────────────────
 
@@ -37,16 +47,16 @@ export function Minimap() {
   const cameraZoom = useGameStore((s) => s.cameraZoom);
   const setCameraTarget = useGameStore((s) => s.setCameraTarget);
 
-  // Track mobile vs desktop display size
-  const [displaySize, setDisplaySize] = useState(200);
+  // Track mobile vs desktop display without changing the renderer's stable canvas size.
   const [isCompact, setIsCompact] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [desktopSizeMode, setDesktopSizeMode] = useState<DesktopSizeMode>('compact');
+  const [desktopDock, setDesktopDock] = useState<DesktopDock>('right');
 
   useEffect(() => {
     const check = () => {
       const compact = window.innerWidth < 640;
       setIsCompact(compact);
-      setDisplaySize(compact ? 116 : 200);
       setIsExpanded((current) => (compact ? false : current));
     };
     check();
@@ -265,14 +275,20 @@ export function Minimap() {
 
   if (!gameState) return null;
 
-  if (isCompact && !isExpanded) {
+  const displaySize = isCompact ? MOBILE_DISPLAY_SIZE : DESKTOP_DISPLAY_SIZES[desktopSizeMode];
+  const dockClass = isCompact || desktopDock === 'right'
+    ? 'right-2 sm:right-4'
+    : 'left-2 sm:left-4';
+
+  if (!isExpanded) {
     return (
-      <div className="absolute bottom-3 right-2 z-20 pointer-events-auto">
+      <div className={`absolute bottom-3 ${dockClass} z-20 pointer-events-auto`}>
         <button
           type="button"
           onClick={() => setIsExpanded(true)}
           className="h-10 rounded-lg border border-amber-200/20 bg-slate-950/75 px-3 text-xs font-semibold uppercase tracking-wide text-amber-100 shadow-2xl shadow-black/40 backdrop-blur-md"
           aria-label="Open minimap"
+          aria-expanded="false"
         >
           Map
         </button>
@@ -281,17 +297,66 @@ export function Minimap() {
   }
 
   return (
-    <div className="absolute bottom-3 right-2 sm:bottom-4 sm:right-4 z-20 pointer-events-auto">
+    <div className={`absolute bottom-3 ${dockClass} sm:bottom-4 z-20 pointer-events-auto`}>
       <div className="relative overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md">
         {isCompact && (
           <button
             type="button"
             onClick={() => setIsExpanded(false)}
-            className="absolute right-1 top-1 z-10 h-6 w-6 rounded-md border border-white/10 bg-black/50 text-xs text-white/80"
+            className="absolute right-1 top-1 z-10 inline-flex h-6 w-6 items-center justify-center rounded-md border border-white/10 bg-black/50 text-white/80"
             aria-label="Collapse minimap"
+            aria-expanded="true"
           >
-            x
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
+        )}
+
+        {!isCompact && (
+          <div className="absolute right-1 top-1 z-10 flex items-center gap-1 rounded-md border border-white/10 bg-slate-950/70 p-1 shadow-lg shadow-black/25 backdrop-blur-md">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-sm text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setIsExpanded(false)}
+              aria-label="Collapse minimap"
+              aria-expanded="true"
+              title="Collapse minimap"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-sm text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setDesktopSizeMode((mode) => (mode === 'compact' ? 'comfortable' : 'compact'))}
+              aria-label={desktopSizeMode === 'compact' ? 'Use larger minimap' : 'Use smaller minimap'}
+              aria-pressed={desktopSizeMode === 'comfortable'}
+              title={desktopSizeMode === 'compact' ? 'Larger minimap' : 'Smaller minimap'}
+            >
+              {desktopSizeMode === 'compact' ? (
+                <Maximize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Minimize2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-sm text-white/70 hover:bg-white/10 hover:text-white"
+              onClick={() => setDesktopDock((dock) => (dock === 'right' ? 'left' : 'right'))}
+              aria-label={desktopDock === 'right' ? 'Move minimap to left' : 'Move minimap to right'}
+              title={desktopDock === 'right' ? 'Move minimap left' : 'Move minimap right'}
+            >
+              {desktopDock === 'right' ? (
+                <PanelLeft className="h-3.5 w-3.5" />
+              ) : (
+                <PanelRight className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </div>
         )}
         <canvas
           ref={canvasRef}
