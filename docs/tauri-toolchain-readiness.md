@@ -2,7 +2,7 @@
 
 Date: 2026-06-14
 
-Status: scaffold deferred.
+Status: scaffold available, local build deferred until Rust/MSVC are installed.
 
 Realms of War is now ready for a static desktop renderer, but this machine is not ready to verify a Tauri scaffold. We should not commit a `src-tauri` placeholder until the Rust/MSVC toolchain can build it.
 
@@ -25,7 +25,7 @@ Observed on this Windows machine:
 - Visual Studio Build Tools / MSVC C++ toolset: not detected by `vswhere.exe`.
 - NSIS/WiX tools: not detected; optional until choosing installer target.
 
-Decision: do not add `src-tauri` in this PR. A scaffold that cannot be built locally or in CI would be noise, not progress.
+Decision update: a minimal `src-tauri` scaffold is allowed once the static renderer is verified and GitHub Windows workflow can be used as the first artifact path. Local build on this machine remains blocked until Rust/Cargo/MSVC are installed.
 
 ## Required Install Commands
 
@@ -74,24 +74,50 @@ Static renderer inputs already pass:
 
 ## Scaffold Plan
 
-After required checks pass:
+Current scaffold:
 
-1. Add `src-tauri`.
-2. Configure:
-   - app id: `com.realmsofwar.game`
-   - product name: `Realms of War`
-   - `beforeBuildCommand`: `bun run desktop:static:build`
-   - `frontendDist`: `../out`
-   - dev URL: `http://localhost:3000`
-3. Add no signing, updater, cloud, auth, multiplayer, or payment features.
-4. Build locally:
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/build.rs`
+- `src-tauri/src/main.rs`
+- `src-tauri/capabilities/default.json`
+
+Configuration:
+
+- app id: `com.realmsofwar.game`
+- product name: `Realms of War`
+- `beforeBuildCommand`: `bun run desktop:static:build`
+- `frontendDist`: `../out`
+- dev URL: `http://localhost:3000`
+- bundle target: unsigned NSIS setup executable
+- no signing, updater, auth, cloud, multiplayer, or payment configuration
+
+After required local checks pass:
+
+1. Run static gates.
+2. Build locally:
 
 ```powershell
-bun tauri build
+bun run desktop:tauri:build
 ```
 
-5. Add a Tauri filesystem-backed `DesktopSaveRepository` under app data with atomic writes.
+3. Add a Tauri filesystem-backed `DesktopSaveRepository` under app data with atomic writes.
 
 ## Manual CI Plan
 
-The manual `Desktop Readiness` GitHub Actions workflow runs static desktop gates on Windows without requiring a Tauri scaffold. Once `src-tauri` exists, extend it with Rust setup and `bun tauri build`.
+The manual `Desktop Readiness` GitHub Actions workflow runs static desktop gates on Windows.
+
+The manual `Windows Desktop Artifact` workflow builds the unsigned Tauri Windows artifact on `windows-latest` and uploads `RealmsOfWar-windows-unsigned`. It does not require signing secrets.
+
+GitHub only exposes a newly added `workflow_dispatch` workflow after the workflow file exists on the default branch. Before this PR is merged, attempting to run it by file name returns:
+
+```text
+HTTP 404: workflow windows-desktop-artifact.yml not found on the default branch
+```
+
+After merge, run:
+
+```powershell
+gh workflow run windows-desktop-artifact.yml --ref main
+gh run list --workflow "Windows Desktop Artifact" --limit 1
+```

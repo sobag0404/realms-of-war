@@ -18,6 +18,8 @@
     "desktop:static:audit": "bun scripts/static-desktop-audit.ts",
     "desktop:static:build": "bun scripts/desktop-static-build.ts",
     "desktop:static:smoke": "bun scripts/desktop-static-smoke.ts",
+    "desktop:tauri:build": "bun x @tauri-apps/cli@2 build",
+    "desktop:tauri:info": "bun x @tauri-apps/cli@2 info",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:push": "bun scripts/db-push.ts",
