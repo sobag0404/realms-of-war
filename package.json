@@ -16,6 +16,7 @@
     "smoke": "bun scripts/smoke.ts",
     "desktop:doctor": "bun scripts/desktop-doctor.ts",
     "desktop:static:audit": "bun scripts/static-desktop-audit.ts",
+    "desktop:static:build": "bun scripts/desktop-static-build.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:push": "bun scripts/db-push.ts",

@@ -50,6 +50,22 @@ if (!nextConfig.includes('REALMS_DESKTOP_STATIC_EXPORT')) {
     detail: 'desktop static export mode is not externally selectable for manual/probe builds.',
   });
 }
+if (!nextConfig.includes('pageExtensions') || !nextConfig.includes('desktop.tsx')) {
+  findings.push({
+    severity: 'blocker',
+    file: 'next.config.ts',
+    detail: 'desktop static export mode must use desktop-only page extensions so server API routes are excluded from the renderer build.',
+  });
+}
+for (const file of ['src/app/layout.desktop.tsx', 'src/app/page.desktop.tsx']) {
+  if (!existsSync(join(root, file))) {
+    findings.push({
+      severity: 'blocker',
+      file,
+      detail: 'desktop static export entry file is missing.',
+    });
+  }
+}
 
 const directApiFetchAllowList = new Set([
   'src/save/serverSaveRepository.ts',
@@ -109,7 +125,7 @@ for (const finding of known) {
 
 console.log('');
 console.log('Static export probe: REALMS_DESKTOP_STATIC_EXPORT=1 bun x next build');
-console.log('Expected today: route/API blockers may still fail until server routes move out of the renderer build.');
+console.log('Expected today: passes and emits only static app routes; server API routes stay in normal standalone builds.');
 
 if (blockers.length > 0) {
   process.exit(1);

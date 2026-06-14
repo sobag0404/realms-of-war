@@ -17,35 +17,60 @@ Implemented in this PR:
 - Added env-gated static export probe mode in `next.config.ts` with `REALMS_DESKTOP_STATIC_EXPORT=1`.
 - Marked the simple `src/app/api/route.ts` health route as `dynamic = "force-static"`.
 - Added `bun run desktop:static:audit` to detect regressions that would recouple the desktop renderer to Next server routes.
+- Added desktop-only App Router entries:
+  - `src/app/layout.desktop.tsx`
+  - `src/app/page.desktop.tsx`
+- In `REALMS_DESKTOP_STATIC_EXPORT=1` mode, `next.config.ts` uses `pageExtensions: ["desktop.tsx", "desktop.ts", "desktop.jsx", "desktop.js"]`. This keeps normal web builds unchanged while excluding `src/app/api/**/route.ts` from the desktop static renderer build.
 
 The normal web build remains `output: 'standalone'`.
 
-## Export Blockers
+## Export Result
 
-P0 - server route handlers are still in the app router:
+Current desktop static export command:
+
+```powershell
+$env:REALMS_DESKTOP_STATIC_EXPORT='1'; bun x next build
+```
+
+Equivalent package script:
+
+```powershell
+bun run desktop:static:build
+```
+
+Next clears its work directory during build. Run desktop static export checks before the normal standalone `bun run build`/`bun run smoke` gate pair.
+
+Current result: passes. The route table contains only:
+
+- `/`
+- `/_not-found`
+
+The previous `/api/saves` export blocker is removed from the desktop renderer path.
+
+## Preserved Web/API Surface
+
+Server route handlers are still present for normal web/dev standalone builds:
 
 - `src/app/api/save/route.ts` exports `POST`, reads request body, validates payload, and writes through Prisma.
 - `src/app/api/load/route.ts` exports `GET` and `DELETE`, reads request query params, and uses Prisma.
 - `src/app/api/saves/route.ts` exports `GET`, reads request query params, and uses Prisma.
 
-These routes must remain for web/dev compatibility for now, but they cannot be part of the future Tauri static renderer bundle.
+These routes remain available in the normal `bun run build` standalone output and are intentionally not included in desktop static export mode.
 
-The simple `src/app/api/route.ts` health route is static-compatible now. The next export probe reaches `/api/saves`, which confirms the remaining blocker is the preserved server save API surface.
+## Residual Blockers
 
-P1 - server save compatibility still depends on Prisma:
+P0 - Tauri filesystem save repository does not exist yet:
 
-- `src/lib/db.ts` creates `PrismaClient`.
-- `src/lib/saveService.ts` and API routes remain valid for web/server mode but are not the desktop local-first persistence path.
+- `src/save/browserLocalSaveRepository.ts` is good enough for browser-local proof, but desktop release should store saves under the app data directory with atomic file writes.
 
-P2 - static export probe is available but not yet expected to pass:
+P1 - static output needs runtime smoke under a static file server:
 
-- Manual probe command: `REALMS_DESKTOP_STATIC_EXPORT=1 bun x next build`.
-- Expected current blocker: server API routes preserved under `src/app/api/**`.
+- `REALMS_DESKTOP_STATIC_EXPORT=1 bun x next build` emits `out/`.
+- Next milestone should serve `out/` locally and verify new game, render, save/list/load/delete through browser-local repository.
 
 ## Next Order
 
 1. Keep `src/save/browserLocalSaveRepository.ts` as the default client path.
-2. Move web/server save APIs out of the desktop renderer build, either by route-group separation, a dedicated web config, or later by migrating the desktop renderer away from Next API routes entirely.
+2. Add a static-output smoke command that serves `out/` and checks the desktop-local save path.
 3. Add a Tauri filesystem-backed save repository after `src-tauri` exists.
-4. Make `REALMS_DESKTOP_STATIC_EXPORT=1 bun x next build` pass.
-5. Add the Tauri v2 scaffold with `frontendDist: '../out'`.
+4. Add the Tauri v2 scaffold with `frontendDist: '../out'`.

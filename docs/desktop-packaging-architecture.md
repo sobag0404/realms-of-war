@@ -91,16 +91,19 @@ for web/dev compatibility.
 
 Phase 2: static desktop renderer.
 
-Status: started. `next/font/google` is removed, a guarded static export probe is
-available through `REALMS_DESKTOP_STATIC_EXPORT=1`, and
-`bun run desktop:static:audit` reports remaining static renderer blockers.
-The simple `src/app/api/route.ts` health endpoint is marked static-compatible;
-the current export probe now stops at the preserved `/api/saves` server route.
+Status: static export build is available. `next/font/google` is removed, a guarded static export probe is
+available through `REALMS_DESKTOP_STATIC_EXPORT=1`, and `bun run desktop:static:audit`
+checks that the desktop renderer stays isolated from direct server API fetches.
+Desktop export mode uses `*.desktop.tsx` App Router entries through `pageExtensions`
+so `src/app/api/**/route.ts` remains available in normal standalone builds but is
+not part of the desktop static renderer output. Because Next clears its work
+directory during builds, run static export checks before the normal standalone
+build/smoke pair in local gate order.
 
 1. Keep the existing `next build` standalone path for web/VPS until desktop build is verified.
 2. Keep API route usage isolated behind repository implementations.
-3. Move or exclude `src/app/api/**` from the desktop renderer build.
-4. Validate route assumptions under `output: 'export'` until the probe passes.
+3. Add a static-output smoke command that serves `out/`.
+4. Validate new game, render, save/list/load/delete against the static output before adding Tauri.
 
 Phase 3: Tauri scaffold.
 
