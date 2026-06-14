@@ -104,6 +104,14 @@ icons/icon.ico not found; required for generating a Windows Resource file during
 
 This blocker is fixed by adding a small generated placeholder `src-tauri/icons/icon.ico` and referencing it in `tauri.conf.json`. It is not final branding.
 
+After PR #13 was merged, the main-branch `Windows Desktop Artifact` workflow completed successfully and uploaded `RealmsOfWar-windows-unsigned`:
+
+```text
+https://github.com/sobag0404/realms-of-war/actions/runs/27509390827
+```
+
+The first local smoke of that artifact is documented in `docs/windows-artifact-smoke.md`.
+
 After required local checks pass:
 
 1. Run static gates.
