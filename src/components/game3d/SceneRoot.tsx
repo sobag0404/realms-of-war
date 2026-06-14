@@ -3,11 +3,13 @@
 import { CameraRig } from './CameraRig';
 import { LightingRig } from './LightingRig';
 import { TerrainLayer } from './TerrainLayer';
+import { TerrainAccentLayer } from './TerrainAccentLayer';
 import { DecorationLayer } from './DecorationLayer';
 import { CoastLayer } from './CoastLayer';
 import { WaterLayer } from './WaterLayer';
 import { BuildingLayer } from './BuildingLayer';
 import { UnitLayer } from './UnitLayer';
+import { ResourceLayer } from './ResourceLayer';
 import { FogLayer } from './FogLayer';
 import { SelectionHighlights } from './SelectionHighlights';
 import { PathPreview } from './PathPreview';
@@ -23,9 +25,11 @@ export function SceneRoot() {
       <CameraRig />
       <LightingRig />
       <TerrainLayer />
+      <TerrainAccentLayer />
       <CoastLayer />
       <DecorationLayer />
       <WaterLayer />
+      <ResourceLayer />
       <BuildingLayer />
       <UnitLayer />
       <FogLayer />

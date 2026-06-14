@@ -116,6 +116,18 @@ Cities should read as owned strategic anchors, not decorative villages lost in t
 - Banners, health bars, and status marks should occupy predictable positions and avoid terrain-dependent contrast failures.
 - Unit silhouettes should favor strong faction-readable shapes over small equipment detail at default zoom.
 
+## V3 Biome And Resource Readability Pass
+
+The v3 pass adds a second visual layer on top of the vertical slice: low-profile procedural surface accents, original resource markers, and cheaper water/fog batching. These are renderer-only treatments using existing tile data.
+
+- Terrain accents should reinforce biome identity without becoming labels: plains use low warm grass strokes, desert uses pale dune bands, swamp uses dark wet pools, hills use warm contour/rock marks, mountains use light caps, forests use darker canopy shadow, and ruins use desaturated stone fragments.
+- Resource markers should use small original 3-D glyphs anchored near the hex perimeter so they do not compete with units, cities, selection rings, or path previews.
+- Water should be visually owned by the water layer, with calm blue-green surface, darker depth, and light shore highlights. The animation budget should stay at shared or instanced motion, not one animated React mesh per tile.
+- Fog should preserve broad explored terrain contrast while hiding unexplored information. Hidden fog can remain uniform; explored fog should be lighter and less flattening.
+- Coastline treatment should come from actual water adjacency. Missing map neighbors are map bounds, not beaches.
+
+Existing resource data is sufficient for marker rendering through `HexTile.resource`. Generic feature rendering is still blocked by data shape: `HexTile` does not currently carry durable `features`, `riverMask`, `biome`, moisture/elevation bands, or ruin metadata. Future feature art should add explicit tile fields before adding visual rules, rather than inferring gameplay features from renderer-only heuristics.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
