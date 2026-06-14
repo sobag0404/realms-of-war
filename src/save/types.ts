@@ -22,7 +22,7 @@ export interface LoadedSave {
 }
 
 export interface SaveRepository {
-  readonly kind: 'browser-local' | 'server';
+  readonly kind: 'browser-local' | 'server' | 'tauri-fs';
   list(): Promise<SaveSummary[]>;
   load(id: string): Promise<LoadedSave>;
   save(input: SaveWriteInput): Promise<SaveSummary>;

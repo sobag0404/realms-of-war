@@ -62,7 +62,7 @@ interface SaveRepository {
 Implementations:
 
 - `ServerSaveRepository`: current web/API path for local-alpha development or future authenticated web deployment.
-- `DesktopSaveRepository`: Tauri command or plugin-backed filesystem storage under the app data directory.
+- `TauriFilesystemSaveRepository`: Tauri command-backed filesystem storage under the app data directory.
 - Optional `BrowserLocalSaveRepository`: IndexedDB fallback for static browser builds, useful for testing local-first save behavior before Tauri.
 
 Recommended desktop save format:
@@ -105,7 +105,7 @@ build/smoke pair in local gate order.
 3. Use `bun run desktop:static:smoke` to serve `out/` and validate new game, render, save/list/load/delete without Next server/API.
 4. Decide whether to promote static smoke into CI after browser provisioning is standardized.
 
-Phase 3: Tauri scaffold.
+Phase 3: Tauri scaffold and filesystem saves.
 
 Status: minimal scaffold added for GitHub Windows artifact verification. Local
 build remains blocked until Rust/Cargo/MSVC are installed. See
@@ -118,7 +118,7 @@ build remains blocked until Rust/Cargo/MSVC are installed. See
    - NSIS if producing `-setup.exe`, WiX v3 if producing MSI.
 2. Keep `src-tauri` configured with `frontendDist` pointing at `../out`.
 3. Use `bun run desktop:tauri:build` or the manual `Windows Desktop Artifact` workflow for unsigned artifact verification.
-4. Add Tauri filesystem commands or plugins for save storage.
+4. Use Tauri filesystem commands for save storage under the app data directory.
 
 Phase 4: release workflow.
 
