@@ -155,6 +155,7 @@ export function MainMenuScreen() {
         <div className="flex flex-col gap-3 w-72 mt-4">
           <Button
             onClick={() => setOpenPanel('newGame')}
+            data-testid="main-menu-new-game"
             className="h-14 text-lg font-semibold bg-amber-700 hover:bg-amber-600 text-white shadow-lg shadow-amber-900/30 transition-all duration-200 hover:scale-[1.02]"
           >
             ⚔️ Новая игра
@@ -162,6 +163,7 @@ export function MainMenuScreen() {
 
           <Button
             onClick={handleLoadClick}
+            data-testid="main-menu-load-game"
             className="h-14 text-lg font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-all duration-200 hover:scale-[1.02]"
           >
             📂 Загрузить
@@ -203,7 +205,7 @@ export function MainMenuScreen() {
                   </div>
                 ) : (
                   saves.map((save) => (
-                    <Card key={save.id} className="bg-zinc-800/50 border-zinc-700">
+                    <Card key={save.id} className="bg-zinc-800/50 border-zinc-700" data-testid="save-list-entry">
                       <CardContent className="p-3 flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="text-white text-sm font-medium truncate">
@@ -217,6 +219,7 @@ export function MainMenuScreen() {
                           size="sm"
                           className="bg-amber-700 hover:bg-amber-600 text-white text-xs"
                           onClick={() => handleLoadSave(save.id)}
+                          data-testid="save-list-load"
                         >
                           Загрузить
                         </Button>
@@ -225,6 +228,7 @@ export function MainMenuScreen() {
                           variant="ghost"
                           className="text-zinc-500 hover:text-red-400 text-xs"
                           onClick={() => handleDeleteSave(save.id, save.name)}
+                          data-testid="save-list-delete"
                         >
                           🗑
                         </Button>

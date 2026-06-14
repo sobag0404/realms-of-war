@@ -393,6 +393,7 @@ export function NewGameScreen() {
       <div className="shrink-0 border-t border-zinc-800 bg-black/80 p-4">
         <Button
           onClick={handleStartGame}
+          data-testid="new-game-start"
           className="w-full h-12 text-lg font-semibold bg-amber-700 hover:bg-amber-600 text-white shadow-lg shadow-amber-900/30"
         >
           Начать игру
