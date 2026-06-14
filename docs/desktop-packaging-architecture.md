@@ -78,6 +78,12 @@ Recommended desktop save format:
 
 Phase 1: local-first web boundary.
 
+Status: partially implemented. The UI now routes save/list/load/delete through
+`SaveRepository`. The default browser implementation uses IndexedDB and falls
+back to localStorage only when IndexedDB is unavailable. The existing server API
+implementation remains available through `NEXT_PUBLIC_REALMS_SAVE_REPOSITORY=server`
+for web/dev compatibility.
+
 1. Introduce `SaveRepository` interface and move UI save/load calls away from direct `fetch('/api/...')`.
 2. Add an IndexedDB or file-like browser implementation for local saves.
 3. Keep current API implementation for web/dev compatibility.

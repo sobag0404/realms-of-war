@@ -115,6 +115,7 @@ export function TurnPanel() {
             className="h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:h-9 sm:w-9"
             onClick={handleMenu}
             aria-label="Back to menu"
+            data-testid="turn-back-to-menu"
             title="Вернуться в меню"
           >
             <Menu className="h-4 w-4" />
@@ -151,6 +152,7 @@ export function TurnPanel() {
             className="hidden h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-amber-900/25 hover:text-amber-300 sm:inline-flex sm:h-9 sm:w-9"
             onClick={handleSave}
             aria-label="Save game"
+            data-testid="turn-save-game"
             title="Сохранить"
           >
             <Save className="h-4 w-4" />

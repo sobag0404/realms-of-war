@@ -28,8 +28,8 @@ import { populateStartingPositions } from '@/engine/core/startPositions';
 import type { SaveFile } from '@/engine/save/saveGame';
 import {
   createSaveFile,
-  serializeSaveWithChecksum,
 } from '@/lib/saveService';
+import { getSaveRepository } from '@/save/repository';
 
 // ─── Slice Interface ──────────────────────────────────────────────────────────
 
@@ -375,21 +375,13 @@ export const createSessionSlice: StateCreator<
         },
       });
 
-      const { data, checksum } = serializeSaveWithChecksum(saveFile);
-
-      const res = await fetch('/api/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: saveName,
-          turn: gameState.turn,
-          players: playerNames,
-          data,
-          checksum,
-        }),
+      await getSaveRepository().save({
+        name: saveName,
+        turn: gameState.turn,
+        players: playerNames,
+        saveFile,
       });
-
-      return res.ok;
+      return true;
     } catch {
       return false;
     }
