@@ -107,7 +107,8 @@ build/smoke pair in local gate order.
 
 Phase 3: Tauri scaffold.
 
-Status: deferred until required Windows toolchain checks pass. See
+Status: minimal scaffold added for GitHub Windows artifact verification. Local
+build remains blocked until Rust/Cargo/MSVC are installed. See
 `docs/tauri-toolchain-readiness.md`.
 
 1. Install prerequisites on Windows:
@@ -115,9 +116,9 @@ Status: deferred until required Windows toolchain checks pass. See
    - MSVC C++ Build Tools / Visual Studio Build Tools;
    - WebView2 runtime;
    - NSIS if producing `-setup.exe`, WiX v3 if producing MSI.
-2. Add `src-tauri` with `frontendDist` pointing at `../out`.
-3. Add Tauri filesystem commands or plugins for save storage.
-4. Add `bun run desktop:dev` and `bun run desktop:build` only after the static desktop renderer works.
+2. Keep `src-tauri` configured with `frontendDist` pointing at `../out`.
+3. Use `bun run desktop:tauri:build` or the manual `Windows Desktop Artifact` workflow for unsigned artifact verification.
+4. Add Tauri filesystem commands or plugins for save storage.
 
 Phase 4: release workflow.
 
