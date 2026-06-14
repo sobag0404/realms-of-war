@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
         images: {
           unoptimized: true,
         },
+        pageExtensions: ["desktop.tsx", "desktop.ts", "desktop.jsx", "desktop.js"],
       }
     : {}),
 };
