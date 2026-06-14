@@ -55,24 +55,24 @@ function getUnitGeometry(typeId: string, attackType: AttackType): THREE.BufferGe
 function HealthBar({ hp, maxHp, position }: { hp: number; maxHp: number; position: [number, number, number] }) {
   const healthRatio = hp / maxHp;
   const barColor = healthRatio > 0.6 ? '#2ecc71' : healthRatio > 0.3 ? '#f39c12' : '#e74c3c';
-  const barWidth = 0.5;
-  const barHeight = 0.045;
+  const barWidth = 0.62;
+  const barHeight = 0.055;
 
   return (
     <group position={position}>
       {/* Background */}
       <mesh position={[0, 0, -0.002]}>
-        <planeGeometry args={[barWidth + 0.08, barHeight + 0.045]} />
-        <meshBasicMaterial color="#071018" transparent opacity={0.82} side={THREE.DoubleSide} />
+        <planeGeometry args={[barWidth + 0.12, barHeight + 0.055]} />
+        <meshBasicMaterial color="#020507" transparent opacity={0.9} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <mesh position={[0, 0, 0]}>
         <planeGeometry args={[barWidth, barHeight]} />
-        <meshBasicMaterial color="#18202a" transparent opacity={0.92} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#18202a" transparent opacity={0.95} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       {/* Health fill */}
       <mesh position={[(healthRatio - 1) * barWidth / 2, 0, 0.001]}>
         <planeGeometry args={[barWidth * healthRatio, barHeight]} />
-        <meshBasicMaterial color={barColor} transparent opacity={0.9} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={barColor} transparent opacity={0.96} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -82,27 +82,62 @@ function UnitBaseMarker({ playerColor, isSelected }: { playerColor: string; isSe
   return (
     <group position={[0, -0.32, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.012, 0]}>
-        <circleGeometry args={[0.44, 32]} />
-        <meshBasicMaterial color="#030507" transparent opacity={0.34} depthWrite={false} />
+        <circleGeometry args={[0.52, 32]} />
+        <meshBasicMaterial color="#020406" transparent opacity={0.48} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.004, 0]}>
+        <ringGeometry args={[0.42, 0.54, 32]} />
+        <meshBasicMaterial color="#05080b" transparent opacity={0.82} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.36, 0.47, 32]} />
+        <ringGeometry args={[0.34, 0.5, 32]} />
         <meshBasicMaterial
           color={isSelected ? '#ffd84d' : playerColor}
           transparent
-          opacity={isSelected ? 0.92 : 0.68}
+          opacity={isSelected ? 0.98 : 0.84}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
       </mesh>
-      <mesh position={[0.24, 0.42, 0.03]} castShadow>
-        <cylinderGeometry args={[0.018, 0.018, 0.54, 6]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+        <ringGeometry args={[0.2, 0.26, 6]} />
+        <meshBasicMaterial color={playerColor} transparent opacity={0.95} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <mesh position={[0.28, 0.42, 0.03]} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, 0.58, 6]} />
         <meshStandardMaterial color="#2d2118" roughness={0.72} />
       </mesh>
-      <mesh position={[0.3, 0.58, 0.03]} rotation={[0, 0, -0.18]} castShadow>
-        <coneGeometry args={[0.13, 0.18, 3]} />
-        <meshStandardMaterial color={playerColor} roughness={0.58} metalness={0.04} />
+      <mesh position={[0.34, 0.6, 0.03]} rotation={[0, 0, -0.18]} castShadow>
+        <coneGeometry args={[0.16, 0.22, 3]} />
+        <meshStandardMaterial color={playerColor} emissive={playerColor} emissiveIntensity={0.18} roughness={0.58} metalness={0.04} />
       </mesh>
+    </group>
+  );
+}
+
+function UnitTacticalHalo({ playerColor, isSelected }: { playerColor: string; isSelected: boolean }) {
+  return (
+    <group position={[0, -0.28, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+        <ringGeometry args={[0.53, 0.59, 40]} />
+        <meshBasicMaterial color="#05080c" transparent opacity={0.76} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.014, 0]}>
+        <ringGeometry args={[0.56, 0.62, 40]} />
+        <meshBasicMaterial
+          color={isSelected ? '#ffe66b' : playerColor}
+          transparent
+          opacity={isSelected ? 0.94 : 0.46}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      {isSelected && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+          <ringGeometry args={[0.67, 0.72, 40]} />
+          <meshBasicMaterial color="#fff5b0" transparent opacity={0.66} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -165,11 +200,12 @@ function UnitMesh({ entity, playerColor, isSelected }: {
 
   return (
     <group position={[wx, yOffset, wz]}>
+      <UnitTacticalHalo playerColor={playerColor} isSelected={isSelected} />
       <UnitBaseMarker playerColor={playerColor} isSelected={isSelected} />
 
       {/* Unit body — use compound model if available, otherwise single geometry */}
       {compoundGroup ? (
-        <group scale={[1.08, 1.08, 1.08]}>
+        <group scale={[1.16, 1.16, 1.16]}>
           <primitive object={compoundGroup} castShadow />
         </group>
       ) : (
@@ -179,20 +215,21 @@ function UnitMesh({ entity, playerColor, isSelected }: {
             roughness={0.6}
             metalness={0.2}
             emissive={playerColor}
-            emissiveIntensity={0.1}
+            emissiveIntensity={0.16}
           />
         </mesh>
       )}
 
       {/* Selection ring */}
       {isSelected && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.3, 0]}>
-          <ringGeometry args={[0.35, 0.45, 32]} />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.25, 0]}>
+          <ringGeometry args={[0.72, 0.78, 40]} />
           <meshBasicMaterial
-            color="#ffdd00"
+            color="#fff2a8"
             transparent
-            opacity={0.8}
+            opacity={0.76}
             side={THREE.DoubleSide}
+            depthWrite={false}
           />
         </mesh>
       )}
@@ -201,7 +238,7 @@ function UnitMesh({ entity, playerColor, isSelected }: {
       <HealthBar
         hp={entity.hp}
         maxHp={entity.maxHp}
-        position={[0, 0.72, 0]}
+        position={[0, 0.84, 0]}
       />
     </group>
   );

@@ -29,7 +29,9 @@ export function SelectionHighlights() {
   const movementPath = useGameStore((s) => s.movementPath);
   const attackTargets = useGameStore((s) => s.attackTargets);
 
-  const geometry = useMemo(() => createHexOverlay(0.92), []);
+  const fillGeometry = useMemo(() => createHexOverlay(0.9), []);
+  const innerRingGeometry = useMemo(() => new THREE.RingGeometry(0.72, 0.86, 6), []);
+  const outerRingGeometry = useMemo(() => new THREE.RingGeometry(0.9, 1.0, 6), []);
 
   if (!gameState) return null;
 
@@ -72,51 +74,59 @@ export function SelectionHighlights() {
         const terrainY = terrain ? TERRAIN_ELEVATION[terrain] ?? 0 : 0;
 
         let color: string;
-        let opacity: number;
+        let fillOpacity: number;
+        let ringOpacity: number;
         let yOffset: number;
 
         switch (type) {
           case 'selected':
             color = '#ffdd00';
-            opacity = 0.35;
-            yOffset = 0.08;
+            fillOpacity = 0.16;
+            ringOpacity = 0.92;
+            yOffset = 0.12;
             break;
           case 'hovered':
             color = '#ffffff';
-            opacity = 0.2;
-            yOffset = 0.07;
+            fillOpacity = 0.08;
+            ringOpacity = 0.66;
+            yOffset = 0.1;
             break;
           case 'reachable':
-            color = '#4488ff';
-            opacity = 0.2;
-            yOffset = 0.06;
+            color = '#4db2ff';
+            fillOpacity = 0.12;
+            ringOpacity = 0.58;
+            yOffset = 0.09;
             break;
           case 'attackable':
-            color = '#ff4444';
-            opacity = 0.25;
-            yOffset = 0.09;
+            color = '#ff4d3f';
+            fillOpacity = 0.16;
+            ringOpacity = 0.82;
+            yOffset = 0.13;
             break;
           default:
             color = '#ffffff';
-            opacity = 0.1;
+            fillOpacity = 0.08;
+            ringOpacity = 0.4;
             yOffset = 0.05;
         }
 
         return (
-          <mesh
-            key={`highlight-${i}-${hex.q},${hex.r}`}
-            geometry={geometry}
-            rotation={[-Math.PI / 2, 0, 0]}
-            position={[wx, terrainY + 0.18 + yOffset, wz]}
-          >
-            <meshBasicMaterial
-              color={color}
-              transparent
-              opacity={opacity}
-              side={THREE.DoubleSide}
-              depthWrite={false}
-            />
-          </mesh>
+          <group key={`highlight-${i}-${hex.q},${hex.r}`} position={[wx, terrainY + 0.18 + yOffset, wz]}>
+            <mesh geometry={fillGeometry} rotation={[-Math.PI / 2, 0, 0]}>
+              <meshBasicMaterial color={color} transparent opacity={fillOpacity} side={THREE.DoubleSide} depthWrite={false} />
+            </mesh>
+            <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+              <meshBasicMaterial color="#030507" transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
+            </mesh>
+            <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+              <meshBasicMaterial color={color} transparent opacity={ringOpacity} side={THREE.DoubleSide} depthWrite={false} />
+            </mesh>
+            {(type === 'selected' || type === 'attackable') && (
+              <mesh geometry={innerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
+                <meshBasicMaterial color={color} transparent opacity={ringOpacity * 0.7} side={THREE.DoubleSide} depthWrite={false} />
+              </mesh>
+            )}
+          </group>
         );
       })}
     </group>

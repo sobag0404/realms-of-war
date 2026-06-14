@@ -11,7 +11,7 @@ import { getModelDefinition, buildMesh } from '@/rendering/assets/ModelRegistry'
 import { InstancedModelPool } from '@/rendering/instancing/InstancedModelPool';
 
 /** Single building/city mesh using ModelRegistry definitions */
-function CityMesh({ city, playerColor }: { city: CityState; playerColor: string }) {
+function CityMesh({ city, playerColor, isSelected }: { city: CityState; playerColor: string; isSelected: boolean }) {
   const gameState = useGameStore((s) => s.gameState);
   const [wx, , wz] = hexToWorld(city.hex);
   const tile = gameState?.map.tiles[`${city.hex.q},${city.hex.r}`];
@@ -39,18 +39,26 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
 
   return (
     <group position={[wx, yOffset, wz]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.092, 0]}>
+        <circleGeometry args={[0.94, 32]} />
+        <meshBasicMaterial color="#020407" transparent opacity={0.48} depthWrite={false} />
+      </mesh>
       <mesh position={[0, -0.035, 0]} receiveShadow>
-        <cylinderGeometry args={[0.72, 0.8, 0.08, 6]} />
+        <cylinderGeometry args={[0.78, 0.86, 0.1, 6]} />
         <meshStandardMaterial color="#7a6a4e" roughness={0.92} metalness={0.02} flatShading />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.07, 0]}>
-        <circleGeometry args={[0.86, 32]} />
-        <meshBasicMaterial color="#030507" transparent opacity={0.24} depthWrite={false} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.012, 0]}>
+        <ringGeometry args={[0.72, 0.88, 6]} />
+        <meshBasicMaterial color="#05080c" transparent opacity={0.8} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.006, 0]}>
+        <ringGeometry args={[0.76, 0.9, 6]} />
+        <meshBasicMaterial color={playerColor} transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
       {/* City building — use ModelRegistry if available, otherwise fallback */}
       {modelGroup ? (
-        <group scale={[1 + city.level * 0.08, 1 + city.level * 0.08, 1 + city.level * 0.08]}>
+        <group scale={[1.08 + city.level * 0.08, 1.08 + city.level * 0.08, 1.08 + city.level * 0.08]}>
           <primitive object={modelGroup} castShadow />
         </group>
       ) : (
@@ -78,28 +86,45 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
       {/* Walls indicator */}
       {city.wallHp > 0 && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-          <ringGeometry args={[0.5, 0.55, 6]} />
-          <meshBasicMaterial color="#ead08a" transparent opacity={0.72} side={THREE.DoubleSide} />
+          <ringGeometry args={[0.5, 0.58, 6]} />
+          <meshBasicMaterial color="#ead08a" transparent opacity={0.86} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       )}
 
       {/* Territory border ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <ringGeometry args={[0.64, 0.71, 6]} />
+        <ringGeometry args={[0.92, 1.0, 6]} />
         <meshBasicMaterial
           color={playerColor}
           transparent
-          opacity={0.62}
+          opacity={0.72}
           side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
+      {isSelected && (
+        <>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.045, 0]}>
+            <ringGeometry args={[1.04, 1.1, 6]} />
+            <meshBasicMaterial color="#fff0a3" transparent opacity={0.86} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.052, 0]}>
+            <ringGeometry args={[1.14, 1.18, 6]} />
+            <meshBasicMaterial color="#05080c" transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
+          </mesh>
+        </>
+      )}
       <mesh position={[-0.38, 0.48, 0.18]} castShadow>
         <cylinderGeometry args={[0.018, 0.018, 0.62, 6]} />
         <meshStandardMaterial color="#2d2118" roughness={0.72} />
       </mesh>
       <mesh position={[-0.3, 0.68, 0.18]} rotation={[0, 0, 0.18]} castShadow>
-        <coneGeometry args={[0.15, 0.22, 3]} />
-        <meshStandardMaterial color={playerColor} roughness={0.58} metalness={0.04} />
+        <coneGeometry args={[0.18, 0.26, 3]} />
+        <meshStandardMaterial color={playerColor} emissive={playerColor} emissiveIntensity={0.18} roughness={0.58} metalness={0.04} />
+      </mesh>
+      <mesh position={[0.46, 0.13, -0.3]} rotation={[0, 0.5, 0]} castShadow>
+        <boxGeometry args={[0.22, 0.08, 0.08]} />
+        <meshStandardMaterial color={playerColor} emissive={playerColor} emissiveIntensity={0.12} roughness={0.68} metalness={0.06} />
       </mesh>
     </group>
   );
@@ -107,6 +132,7 @@ function CityMesh({ city, playerColor }: { city: CityState; playerColor: string 
 
 export function BuildingLayer() {
   const gameState = useGameStore((s) => s.gameState);
+  const selectedCityId = useGameStore((s) => s.selectedCityId);
 
   if (!gameState) return null;
 
@@ -121,6 +147,7 @@ export function BuildingLayer() {
             key={city.id}
             city={city}
             playerColor={playerColor}
+            isSelected={selectedCityId === city.id}
           />
         );
       })}
