@@ -142,6 +142,28 @@ https://github.com/sobag0404/realms-of-war/actions/runs/27510619482
 
 Runtime smoke confirmed `realms-of-war.exe` starts, gameplay renders, save writes a JSON file under `%APPDATA%\com.realmsofwar.game\saves`, and the saved game can be loaded after app restart.
 
+## Installer Smoke
+
+The unsigned NSIS setup executable was verified through a reversible temp-directory smoke:
+
+```powershell
+$installDir = "$env:TEMP\realms-of-war-installer-smoke"
+& ".\bundle\nsis\Realms of War_0.2.0_x64-setup.exe" /S "/D=$installDir"
+& "$installDir\realms-of-war.exe"
+& "$installDir\uninstall.exe" /S
+```
+
+Observed result:
+
+- setup exit code `0`
+- installed files: `realms-of-war.exe`, `uninstall.exe`
+- installed app launched and reached gameplay
+- save button wrote through the Tauri filesystem backend
+- silent uninstall exit code `0`
+- temp install directory removed
+
+This is still not production distribution readiness. The installer remains unsigned and should show unknown-publisher/SmartScreen warnings on some machines.
+
 ## Manual CI Plan
 
 The manual `Desktop Readiness` GitHub Actions workflow runs static desktop gates on Windows.
