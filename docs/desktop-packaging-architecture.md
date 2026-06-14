@@ -107,6 +107,9 @@ build/smoke pair in local gate order.
 
 Phase 3: Tauri scaffold.
 
+Status: deferred until required Windows toolchain checks pass. See
+`docs/tauri-toolchain-readiness.md`.
+
 1. Install prerequisites on Windows:
    - Rust stable toolchain with Cargo;
    - MSVC C++ Build Tools / Visual Studio Build Tools;
@@ -136,8 +139,12 @@ Phase 4: release workflow.
 Current local check on this machine:
 
 - Bun is available: `1.3.14`.
+- WebView2 Runtime is available: `149.0.4022.69`.
+- `winget.exe` is available.
 - Rust/Cargo are not on `PATH`.
 - MSVC `cl.exe` is not on `PATH`.
+- Visual Studio Build Tools / MSVC C++ toolset are not detected by `vswhere.exe`.
+- NSIS/WiX are not on `PATH`; optional until installer target is chosen.
 
 Run:
 
