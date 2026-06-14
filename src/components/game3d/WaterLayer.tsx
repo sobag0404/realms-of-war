@@ -37,30 +37,30 @@ export function WaterLayer() {
   const depthGeometry = useMemo(() => createHexGeometry(0.88), []);
   const shorelineGeometry = useMemo(() => new THREE.RingGeometry(0.84, 0.97, 6), []);
   const waterMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: '#2c8fc1',
-    emissive: '#06344b',
-    emissiveIntensity: 0.12,
+    color: '#2f97c8',
+    emissive: '#0a3d56',
+    emissiveIntensity: 0.16,
     transparent: true,
-    opacity: 0.78,
-    roughness: 0.22,
-    metalness: 0.08,
-    transmission: 0.08,
-    thickness: 0.18,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.28,
+    opacity: 0.72,
+    roughness: 0.18,
+    metalness: 0.05,
+    transmission: 0.06,
+    thickness: 0.16,
+    clearcoat: 0.42,
+    clearcoatRoughness: 0.24,
     side: THREE.DoubleSide,
   }), []);
   const depthMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#0d3f5f',
+    color: '#0b3755',
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.36,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const shorelineMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#b9ecff',
+    color: '#d4f6ff',
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.18,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
@@ -70,8 +70,8 @@ export function WaterLayer() {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
     groupRef.current.children.forEach((child, i) => {
-      // Gentle wave: each tile slightly different phase
-      child.position.y = -0.17 + Math.sin(t * 1.15 + i * 0.47) * 0.018;
+      // Gentle wave with stable per-tile phase keeps water alive without blurring the board.
+      child.position.y = -0.17 + Math.sin(t * 1.05 + i * 0.47) * 0.014;
     });
   });
 

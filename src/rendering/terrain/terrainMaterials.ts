@@ -25,14 +25,14 @@ const TERRAIN_MATERIAL_TUNING: Record<TerrainTypeId, {
   saturation: number;
   lightness: number;
 }> = {
-  plains: { roughness: 0.92, metalness: 0.02, saturation: 1.08, lightness: 1.06 },
-  forest: { roughness: 0.96, metalness: 0.01, saturation: 1.12, lightness: 0.88 },
-  mountain: { roughness: 0.82, metalness: 0.08, saturation: 0.78, lightness: 1.08 },
-  water: { roughness: 0.34, metalness: 0.06, saturation: 1.2, lightness: 1.08 },
-  desert: { roughness: 0.98, metalness: 0.0, saturation: 0.95, lightness: 1.1 },
-  swamp: { roughness: 0.96, metalness: 0.01, saturation: 0.82, lightness: 0.82 },
-  hills: { roughness: 0.9, metalness: 0.03, saturation: 0.96, lightness: 0.96 },
-  ruins: { roughness: 0.88, metalness: 0.04, saturation: 0.58, lightness: 1.0 },
+  plains: { roughness: 0.94, metalness: 0.01, saturation: 1.16, lightness: 1.08 },
+  forest: { roughness: 0.98, metalness: 0.0, saturation: 1.18, lightness: 0.82 },
+  mountain: { roughness: 0.86, metalness: 0.05, saturation: 0.7, lightness: 1.12 },
+  water: { roughness: 0.28, metalness: 0.04, saturation: 1.28, lightness: 1.1 },
+  desert: { roughness: 0.99, metalness: 0.0, saturation: 1.02, lightness: 1.13 },
+  swamp: { roughness: 0.98, metalness: 0.0, saturation: 0.9, lightness: 0.78 },
+  hills: { roughness: 0.93, metalness: 0.02, saturation: 1.02, lightness: 0.98 },
+  ruins: { roughness: 0.9, metalness: 0.03, saturation: 0.52, lightness: 1.04 },
 };
 
 function tunedTerrainColor(terrain: TerrainTypeId): THREE.Color {
