@@ -1,0 +1,143 @@
+# Graphics Art Direction: Realms Of War Vertical Slice
+
+## Purpose
+
+This document defines the visual target for the Realms of War graphics vertical slice: a readable, original fantasy 4X strategy map that proves the game can support long-form planning, fast tactical scanning, and attractive close inspection without compromising board-state clarity.
+
+The slice should demonstrate production discipline comparable to modern PC 4X titles, with Civilization VI referenced only as a quality benchmark for polish, readability, and responsiveness. It is not a style target. Realms of War needs its own visual identity: an authored war-table world with large symbolic hexes, crisp terrain families, restrained fantasy richness, and original UI, unit, city, resource, and overlay language.
+
+## Vertical Slice Target
+
+The vertical slice should prioritize a small but complete map presentation over a broad set of unfinished effects. The goal is to prove the core graphics language under real gameplay pressure: mixed terrain, faction ownership, units, roads, resources, fog, selection, movement, attack preview, and camera movement all visible at once.
+
+The slice should include:
+
+- A representative hex map with plains, forest, hills, mountains, desert, swamp or wetland, coast, ocean, and at least one snow or tundra region.
+- Clear transitions between terrain families, including coastlines, elevation changes, forest edges, and mountain chains.
+- At least two faction ownership treatments shown on cities, borders, units, and banners.
+- Roads or paths, rivers or shoreline routes, resources, ruins or landmarks, and one fortified or high-value city.
+- A complete interaction overlay pass covering hover, selection, movement range, attack range, invalid targets, path preview, fog of war, and explored-but-not-visible tiles.
+- Daylight lighting and camera framing that work in motion, not only in still screenshots.
+
+Defer purely decorative variety until the slice reads well under these conditions. A smaller set of finished, coherent terrain and overlay rules is more valuable than many props with inconsistent readability.
+
+## Visual Pillars
+
+### Strategy First
+
+The player should understand the tactical shape of the frontier before opening tooltips. Terrain class, elevation, ownership, unit presence, routes, resources, fog state, and current interaction mode must be legible at default zoom within one second.
+
+### Authored War Table
+
+The map should feel like a physical fantasy command table brought to life: broad cells, carved elevation, readable symbolic terrain, controlled material richness, and subtle motion. Avoid miniature-diorama clutter, cinematic terrain realism, or noisy procedural dressing that competes with decisions.
+
+### Original Fantasy Language
+
+Use custom silhouettes, faction symbols, resource icons, city architecture, border treatments, and overlay shapes. The world can be colorful and inviting, but it should not echo another 4X game's recognizable palette, tile dressing, city banner language, lens treatments, icons, or UI composition.
+
+## Hex Scale And Camera
+
+Hexes should be broad readable cells, not dense texture patches. At default strategic zoom, each tile needs one dominant terrain identity, enough negative space for gameplay markers, and visible relationships to adjacent tiles.
+
+- Use an orthographic or near-orthographic strategy camera with restrained perspective so distant hexes do not shrink aggressively.
+- Keep the camera angle high enough to read the board and low enough to show elevation, cities, and unit silhouettes.
+- Preserve tile silhouettes through elevation rims, coastline shapes, slope planes, borders, roads, and rivers.
+- Tune the default zoom first; close zoom may add material detail, but it must not introduce a second conflicting style.
+- Make the grid readable through form and adjacency before relying on explicit grid lines.
+- Keep camera movement smooth and stable, with no visual shimmer on tile edges, icons, or overlays.
+
+## Terrain Readability
+
+Every terrain class needs a distinct combination of hue, value, material, silhouette, elevation, and prop density. Color alone is not sufficient.
+
+- Plains: open medium-green fields, broad grass planes, low prop density, and high negative space for units and overlays.
+- Forest: grouped canopy masses with darker values and a vertical rhythm; the hex should read as forest from canopy shape before individual trees are noticed.
+- Hills: stepped elevation, exposed warm earth, slope bands, and enough height contrast to imply movement cost without hiding markers.
+- Mountains: tall angular ridges, cool stone values, snow or light edge accents where useful, and strong shadow breaks; peaks must not obscure banners or selected units.
+- Desert: ochre sand, dry stone, sparse scrub, and clean value contrast against plains, hills, and swamp.
+- Swamp or wetland: low wet ground, muted green-gray vegetation, dark water pockets, and soft irregular edges.
+- Snow or tundra: cool high-value ground, pale blue-gray shadows, dark rock punctuation, and explicit contrast protection for roads, resources, and selection.
+- Coast and ocean: readable shoreline boundaries, calm blue-to-blue-green water, and subtle motion that stays below land decisions in visual priority.
+- Ruins and landmarks: desaturated stone or ancient magical forms with simple footprints; use them as map punctuation, not background clutter.
+
+Terrain decoration must not cover unit bases, city footprints, resource icons, path previews, attack markers, selection rings, or ownership marks. If a prop competes with a gameplay marker, the marker loses detail or moves; the marker never loses priority.
+
+## Palette
+
+Use a broad but controlled fantasy strategy palette. Terrain should separate through hue and value, while the strongest chroma is reserved for factions, alerts, and interaction states.
+
+- Plains: medium warm green with matte grass variation.
+- Forest: deeper green, cooler shadow masses, and small warm highlights only where needed.
+- Hills: green-gold grass, warm brown soil, and stone accents.
+- Mountains: blue-gray, neutral stone, charcoal shadow, and light ridge accents.
+- Desert: ochre, pale gold, dry beige, and muted red-brown rock.
+- Swamp: olive, gray-green, dark teal water, and low-saturation reed colors.
+- Snow: off-white, pale blue-gray, charcoal rock, and restrained cold shadows.
+- Ocean: blue, blue-green, and deeper offshore values with lower saturation near fog.
+
+Avoid letting the map collapse into a single color cast. Bright cyan, orange, magenta, saturated red, and high-saturation yellow should be reserved for UI feedback, objective emphasis, danger, and faction identity rather than base terrain.
+
+## Lighting, Materials, And Depth
+
+Lighting should give the world shape without hiding the board state. Use a consistent sun direction, soft ambient fill, and readable contact shadows. Terrain should feel dimensional through elevation bands, slope shading, rim accents, and material roughness rather than heavy bloom or dramatic contrast.
+
+- Keep shadows soft enough that terrain type, occupancy, and roads remain readable.
+- Use ambient occlusion to ground forests, mountains, cities, and units, but cap darkness inside playable cells.
+- Let elevation create depth through stacked rims, slope planes, cliff edges, and controlled parallax.
+- Keep water specular restrained; shimmer should never overpower coastlines or selection overlays.
+- Apply color grading lightly so faction colors and interaction states remain accurate.
+- Prefer crisp stylized materials over noisy photo texture detail.
+
+## Fog, Hover, And Selection
+
+Fog of war, hover, selection, movement, and attack states must function as one overlay system. These states need to work on every terrain type and remain understandable in common color-blind viewing conditions through value, shape, pattern, and motion.
+
+- Unexplored fog: darkened, desaturated, simplified silhouettes with terrain identity mostly hidden.
+- Explored but not visible: desaturated terrain with reduced contrast, still showing broad terrain class and known infrastructure.
+- Visible tiles: full terrain palette, material detail, ownership, routes, resources, and unit status.
+- Hover: thin luminous hex edge, slight rim lift, or subtle pulse; avoid opaque fills that hide terrain.
+- Selection: clear primary ring, raised outline, or animated edge around the selected cell and selected unit.
+- Movement range: calm cool tint, dotted edge, or transparent fill that does not resemble attack or selection.
+- Attack range: warmer warning color plus a distinct edge pattern or marker shape.
+- Invalid target: low-saturation red, barred edge pattern, or broken outline that reads without relying only on hue.
+- Path preview: segmented line, chevrons, or arrow markers above terrain and below final confirmation UI.
+
+Overlay priority should be predictable: selection overrides hover, attack overrides movement where both apply, invalid target overrides attack, and fog reduces terrain detail before it reduces critical gameplay icons.
+
+## Cities, Units, Roads, And Resources
+
+Cities should read as owned strategic anchors, not decorative villages lost in terrain. Units should remain identifiable against every tile type through silhouettes, bases, banners, and status marks.
+
+- City footprints need clean boundaries, faction-readable ownership, and a recognizable center of power at default zoom.
+- City architecture should express Realms of War factions through original massing, rooflines, banners, fortifications, and magical or military details.
+- Roads and rivers must support route planning at a glance; keep their values and widths distinct from terrain cracks, roots, coast foam, and decorative trails.
+- Resource icons should be original, simple, scalable, and consistent in outline, shadow, and anchor position.
+- Unit bases should separate units from terrain without becoming oversized UI plates.
+- Banners, health bars, and status marks should occupy predictable positions and avoid terrain-dependent contrast failures.
+- Unit silhouettes should favor strong faction-readable shapes over small equipment detail at default zoom.
+
+## Originality And Reference Boundary
+
+Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
+
+Do not copy, trace, sample, extract, recreate, or imitate:
+
+- Civilization VI assets, textures, models, animations, screenshots, promotional art, leaders, wonders, districts, or map dressing.
+- Civilization VI UI layouts, panels, buttons, minimap treatment, selection rings, unit flags, city banners, lens overlays, icons, or typography.
+- Civilization VI palette choices, distinctive terrain silhouettes, resource icon language, wonder shapes, improvement shapes, or hex decoration patterns.
+- Any names, symbols, faction identities, leader presentation, audio-visual motifs, or other protected IP from Civilization VI or related Firaxis, 2K, or Take-Two properties.
+
+Reference work should be transformed into principles, not replicas. Build Realms of War around its own fantasy war-table identity: larger symbolic hexes, carved terrain readability, original faction and resource language, and a palette designed for this world.
+
+## Slice Acceptance Checks
+
+Before the vertical slice graphics pass is considered ready, verify:
+
+- At default zoom, terrain class, elevation, roads, resources, city ownership, unit presence, selected tile, reachable tiles, attackable tiles, invalid targets, and fog state are identifiable within one second.
+- The map remains readable on dense continents, mixed coastlines, mountain chains, forest-heavy regions, and city-adjacent clutter.
+- Interaction overlays are visible over plains, forest, hills, mountains, desert, swamp, snow, coast, and ocean.
+- Faction colors remain distinguishable across terrain, fog, hover, selection, movement, and attack overlays.
+- No decoration obscures core gameplay markers, including unit bases, banners, resource icons, selection rings, path previews, city labels, or ownership borders.
+- Camera movement, water motion, fog transitions, and overlay animation remain stable and do not create shimmer or ambiguous states.
+- Screenshots cannot be reasonably mistaken for Civilization VI assets, UI, palette, terrain silhouettes, icon language, or branded presentation.
+- All imported, generated, or commissioned assets have documented source and usage rights compatible with the project.

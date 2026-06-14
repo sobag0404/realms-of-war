@@ -119,6 +119,7 @@ export function TerrainLayer() {
               key={key}
               position={[wx, 0, wz]}
               hex={tile.coord}
+              terrain={tile.terrain as TerrainTypeId}
               isHighlighted={isSelected}
               isHovered={isHovered}
               onClick={handleHexClick}
@@ -141,6 +142,7 @@ export function TerrainLayer() {
 interface HexInteractionPlaneProps {
   position: [number, number, number];
   hex: HexCoord;
+  terrain: TerrainTypeId;
   isHighlighted?: boolean;
   isHovered?: boolean;
   onClick?: (hex: HexCoord) => void;
@@ -150,12 +152,14 @@ interface HexInteractionPlaneProps {
 function HexInteractionPlane({
   position,
   hex,
+  terrain,
   isHighlighted,
   isHovered,
   onClick,
   onHover,
 }: HexInteractionPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const overlayY = Math.max(0.04, (TERRAIN_ELEVATION[terrain] ?? 0) + 0.2);
 
   const handlePointerOver = (e: THREE.Event) => {
     (e as unknown as { stopPropagation: () => void }).stopPropagation();
@@ -178,7 +182,7 @@ function HexInteractionPlane({
       <mesh
         ref={meshRef}
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0.02, 0]}
+        position={[0, overlayY, 0]}
         onClick={handleClick}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
@@ -191,7 +195,7 @@ function HexInteractionPlane({
       {(isHighlighted || isHovered) && (
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, 0.03, 0]}
+          position={[0, overlayY + 0.02, 0]}
         >
           <ringGeometry args={[0.85, 0.95, 6]} />
           <primitive

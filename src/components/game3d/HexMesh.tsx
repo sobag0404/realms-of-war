@@ -81,6 +81,7 @@ export function HexMesh({
   // so no rotation needed (unlike ExtrudeGeometry which creates on XY plane)
   const yPos = position[1];
   const terrainElev = TERRAIN_ELEVATION[terrain] ?? 0;
+  const topY = terrainElev + Math.max(0.05, elevation + 0.1);
 
   return (
     <group position={[position[0], yPos, position[2]]}>
@@ -101,7 +102,7 @@ export function HexMesh({
       {(isHighlighted || isHovered || hovered) && (
         <mesh
           rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, (terrainElev > 0 ? terrainElev : 0) + 0.01, 0]}
+          position={[0, topY + 0.02, 0]}
         >
           <ringGeometry args={[0.85, 0.95, 6]} />
           <primitive

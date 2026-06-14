@@ -5,13 +5,18 @@ import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
 import type { CityState } from '@/engine/core/GameState';
+import type { TerrainTypeId } from '@/engine/core/types';
+import { TERRAIN_ELEVATION } from '@/data/terrain';
 import { getModelDefinition, buildMesh } from '@/rendering/assets/ModelRegistry';
 import { InstancedModelPool } from '@/rendering/instancing/InstancedModelPool';
 
 /** Single building/city mesh using ModelRegistry definitions */
 function CityMesh({ city, playerColor }: { city: CityState; playerColor: string }) {
+  const gameState = useGameStore((s) => s.gameState);
   const [wx, , wz] = hexToWorld(city.hex);
-  const yOffset = 0.1;
+  const tile = gameState?.map.tiles[`${city.hex.q},${city.hex.r}`];
+  const terrainY = tile ? TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0 : 0;
+  const yOffset = terrainY + 0.2;
 
   // Try to get the city center model from ModelRegistry for the main building
   const cityCenterModel = useMemo(() => getModelDefinition('building_city_center'), []);
