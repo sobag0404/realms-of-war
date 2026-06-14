@@ -128,6 +128,16 @@ The v3 pass adds a second visual layer on top of the vertical slice: low-profile
 
 Existing resource data is sufficient for marker rendering through `HexTile.resource`. Generic feature rendering is still blocked by data shape: `HexTile` does not currently carry durable `features`, `riverMask`, `biome`, moisture/elevation bands, or ruin metadata. Future feature art should add explicit tile fields before adding visual rules, rather than inferring gameplay features from renderer-only heuristics.
 
+## V4 City, Unit, And Tactical Readability Pass
+
+The v4 pass prioritizes gameplay markers over the richer map surface added in v3. Units, cities, ownership, selected objects, attack targets, and paths should stay readable on busy terrain/resource clusters without adding UI panels or changing game rules.
+
+- Units should have a dark tactical footprint, faction-colored base language, a stronger banner, and a health bar that reads at default PC zoom.
+- Cities should read as owned anchors through a larger city plinth, faction-color perimeter, wall ring, banner, and selected-city outline.
+- Selection and hover states should rely on bright rings plus dark under-rings, not only transparent fills that can disappear over forests, hills, water, or resources.
+- Path preview should float above terrain elevation and use a dark under-line plus a bright dashed route so it remains visible across biomes.
+- These treatments remain renderer-only and original: no copied 4X UI icon shapes, unit flags, city banners, or selection language from Civilization VI.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
