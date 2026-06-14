@@ -4,6 +4,7 @@ import { CameraRig } from './CameraRig';
 import { LightingRig } from './LightingRig';
 import { TerrainLayer } from './TerrainLayer';
 import { DecorationLayer } from './DecorationLayer';
+import { CoastLayer } from './CoastLayer';
 import { WaterLayer } from './WaterLayer';
 import { BuildingLayer } from './BuildingLayer';
 import { UnitLayer } from './UnitLayer';
@@ -22,6 +23,7 @@ export function SceneRoot() {
       <CameraRig />
       <LightingRig />
       <TerrainLayer />
+      <CoastLayer />
       <DecorationLayer />
       <WaterLayer />
       <BuildingLayer />

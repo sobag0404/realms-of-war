@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
+import { TERRAIN_ELEVATION } from '@/data/terrain';
+import type { TerrainTypeId } from '@/engine/core/types';
 
 /** Create hex plane geometry for fog overlay */
 function createHexPlane(radius: number): THREE.BufferGeometry {
@@ -69,13 +71,14 @@ export function FogLayer() {
       {fogTiles.map(({ tile, visibility }) => {
         const [wx, , wz] = hexToWorld(tile.coord);
         const isHidden = visibility === 'hidden';
+        const terrainY = TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
 
         return (
           <mesh
             key={`fog-${tile.coord.q},${tile.coord.r}`}
             geometry={geometry}
             rotation={[-Math.PI / 2, 0, 0]}
-            position={[wx, 0.5, wz]}
+            position={[wx, Math.max(0.38, terrainY + 0.38), wz]}
           >
             <primitive object={isHidden ? hiddenMaterial : exploredMaterial} attach="material" />
           </mesh>

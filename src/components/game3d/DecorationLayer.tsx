@@ -26,6 +26,7 @@ interface DecorationDef {
   color: string;
   yOffset: number;
   scaleRange: [number, number];
+  sway?: boolean;
 }
 
 function getDecorationDefs(terrain: TerrainTypeId): DecorationDef[] {
@@ -33,88 +34,92 @@ function getDecorationDefs(terrain: TerrainTypeId): DecorationDef[] {
     case 'forest':
       return [
         {
-          geometry: new THREE.ConeGeometry(0.12, 0.4, 6),
-          color: '#1a5c2a',
-          yOffset: 0.2,
-          scaleRange: [0.8, 1.3],
+          geometry: new THREE.ConeGeometry(0.16, 0.48, 7),
+          color: '#184f2f',
+          yOffset: 0.24,
+          scaleRange: [0.82, 1.22],
+          sway: true,
         },
         {
-          geometry: new THREE.ConeGeometry(0.08, 0.25, 6),
-          color: '#2d8a4e',
-          yOffset: 0.12,
-          scaleRange: [0.6, 1.0],
+          geometry: new THREE.ConeGeometry(0.12, 0.34, 7),
+          color: '#2f7b45',
+          yOffset: 0.18,
+          scaleRange: [0.68, 1.04],
+          sway: true,
         },
         {
           // Tree trunk
-          geometry: new THREE.CylinderGeometry(0.03, 0.04, 0.15, 5),
-          color: '#5c3a1e',
-          yOffset: 0.07,
-          scaleRange: [0.8, 1.2],
+          geometry: new THREE.CylinderGeometry(0.035, 0.045, 0.18, 5),
+          color: '#4b3424',
+          yOffset: 0.09,
+          scaleRange: [0.76, 1.08],
         },
       ];
     case 'mountain':
       return [
         {
-          geometry: new THREE.DodecahedronGeometry(0.15, 0),
-          color: '#6b6e73',
-          yOffset: 0.1,
-          scaleRange: [0.7, 1.4],
+          geometry: new THREE.ConeGeometry(0.22, 0.72, 5),
+          color: '#676f78',
+          yOffset: 0.36,
+          scaleRange: [0.72, 1.2],
         },
         {
-          geometry: new THREE.DodecahedronGeometry(0.08, 0),
-          color: '#8a8d92',
-          yOffset: 0.06,
-          scaleRange: [0.5, 1.0],
+          geometry: new THREE.ConeGeometry(0.14, 0.5, 5),
+          color: '#aeb8c1',
+          yOffset: 0.25,
+          scaleRange: [0.54, 0.92],
         },
       ];
     case 'desert':
       return [
         {
           // Cactus body
-          geometry: new THREE.CylinderGeometry(0.04, 0.05, 0.3, 6),
-          color: '#3a6b35',
-          yOffset: 0.15,
-          scaleRange: [0.7, 1.3],
+          geometry: new THREE.CylinderGeometry(0.045, 0.06, 0.26, 6),
+          color: '#ad8244',
+          yOffset: 0.13,
+          scaleRange: [0.64, 1.1],
         },
         {
           // Small cactus arm
-          geometry: new THREE.CylinderGeometry(0.025, 0.03, 0.12, 5),
-          color: '#4a8b45',
-          yOffset: 0.06,
-          scaleRange: [0.6, 1.0],
+          geometry: new THREE.CylinderGeometry(0.025, 0.035, 0.22, 5),
+          color: '#4f7a3d',
+          yOffset: 0.11,
+          scaleRange: [0.52, 0.86],
         },
       ];
     case 'swamp':
       return [
         {
           // Mushroom cap
-          geometry: new THREE.SphereGeometry(0.07, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2),
-          color: '#5a4a3a',
-          yOffset: 0.08,
-          scaleRange: [0.7, 1.2],
+          geometry: new THREE.CylinderGeometry(0.025, 0.04, 0.28, 5),
+          color: '#61784a',
+          yOffset: 0.14,
+          scaleRange: [0.72, 1.18],
+          sway: true,
         },
         {
           // Mushroom stem
-          geometry: new THREE.CylinderGeometry(0.02, 0.025, 0.08, 5),
-          color: '#8a7a6a',
-          yOffset: 0.04,
-          scaleRange: [0.8, 1.1],
+          geometry: new THREE.SphereGeometry(0.09, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2),
+          color: '#263f3c',
+          yOffset: 0.025,
+          scaleRange: [0.76, 1.18],
         },
       ];
     case 'plains':
       return [
         {
           // Grass tuft
-          geometry: new THREE.ConeGeometry(0.04, 0.12, 4),
-          color: '#8bc34a',
+          geometry: new THREE.ConeGeometry(0.045, 0.13, 4),
+          color: '#8fbd52',
           yOffset: 0.06,
-          scaleRange: [0.6, 1.2],
+          scaleRange: [0.58, 1.08],
+          sway: true,
         },
         {
-          geometry: new THREE.ConeGeometry(0.03, 0.08, 4),
-          color: '#a4d65e',
+          geometry: new THREE.BoxGeometry(0.18, 0.018, 0.055),
+          color: '#c1a362',
           yOffset: 0.04,
-          scaleRange: [0.5, 0.9],
+          scaleRange: [0.48, 0.84],
         },
       ];
     case 'ruins':
@@ -138,17 +143,17 @@ function getDecorationDefs(terrain: TerrainTypeId): DecorationDef[] {
       return [
         {
           // Small rock
-          geometry: new THREE.DodecahedronGeometry(0.08, 0),
-          color: '#7a7462',
-          yOffset: 0.05,
-          scaleRange: [0.6, 1.2],
+          geometry: new THREE.DodecahedronGeometry(0.1, 0),
+          color: '#7d735f',
+          yOffset: 0.07,
+          scaleRange: [0.62, 1.18],
         },
         {
           // Grass patch
-          geometry: new THREE.ConeGeometry(0.035, 0.1, 4),
-          color: '#7fa34e',
+          geometry: new THREE.BoxGeometry(0.22, 0.035, 0.08),
+          color: '#b28248',
           yOffset: 0.05,
-          scaleRange: [0.6, 1.0],
+          scaleRange: [0.54, 0.98],
         },
       ];
     case 'water':
@@ -190,9 +195,9 @@ function DecorationInstances({
         const baseY = elevation > 0 ? elevation : 0;
 
         for (let i = 0; i < count; i++) {
-          // Random position within hex (polar coordinates within radius)
+          // Keep the cell center open for units, cities, resources, and selection rings.
           const angle = rng() * Math.PI * 2;
-          const radius = Math.sqrt(rng()) * 0.7; // sqrt for uniform distribution
+          const radius = 0.28 + Math.sqrt(rng()) * 0.42;
           const px = wx + Math.cos(angle) * radius;
           const pz = wz + Math.sin(angle) * radius;
 
@@ -223,6 +228,7 @@ function DecorationInstances({
             geometry={def.geometry}
             baseColor={def.color}
             instances={instances}
+            sway={def.sway}
           />
         );
       })}
@@ -236,10 +242,12 @@ function InstancedDecorationMesh({
   geometry,
   baseColor,
   instances,
+  sway,
 }: {
   geometry: THREE.BufferGeometry;
   baseColor: string;
   instances: DecoInstanceData[];
+  sway?: boolean;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
 
@@ -259,14 +267,16 @@ function InstancedDecorationMesh({
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
 
-      // Slight color variation per instance
+      // Deterministic color variation per instance keeps screenshots stable.
       color.copy(inst.color);
       const hsl = { h: 0, s: 0, l: 0 };
       color.getHSL(hsl);
+      const variation = Math.sin(inst.position.x * 12.9898 + inst.position.z * 78.233) * 43758.5453;
+      const unit = variation - Math.floor(variation);
       color.setHSL(
-        hsl.h + (Math.random() - 0.5) * 0.02,
-        hsl.s + (Math.random() - 0.5) * 0.1,
-        hsl.l + (Math.random() - 0.5) * 0.08,
+        hsl.h + (unit - 0.5) * 0.018,
+        hsl.s + (unit - 0.5) * 0.08,
+        hsl.l + (unit - 0.5) * 0.065,
       );
       mesh.setColorAt(i, color);
     }
@@ -278,7 +288,7 @@ function InstancedDecorationMesh({
   // Gentle wind sway for vegetation
   useFrame(({ clock }) => {
     const mesh = meshRef.current;
-    if (!mesh) return;
+    if (!mesh || !sway) return;
 
     // Only sway forest/plains decorations (optimization)
     const t = clock.getElapsedTime();

@@ -5,8 +5,9 @@ import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
 import type { EntityData } from '@/engine/core/GameState';
-import type { AttackType } from '@/engine/core/types';
+import type { AttackType, TerrainTypeId } from '@/engine/core/types';
 import { getModelDefinition } from '@/rendering/assets/ModelRegistry';
+import { TERRAIN_ELEVATION } from '@/data/terrain';
 
 /** Get player color from game state */
 function getPlayerColor(gameState: { players: Record<string, { color: string }> }, playerId: string): string {
@@ -147,14 +148,17 @@ function UnitMesh({ entity, playerColor, isSelected }: {
   playerColor: string;
   isSelected: boolean;
 }) {
+  const gameState = useGameStore((s) => s.gameState);
   const [wx, , wz] = hexToWorld(entity.hex);
+  const tile = gameState?.map.tiles[`${entity.hex.q},${entity.hex.r}`];
+  const terrainY = tile ? TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0 : 0;
 
   // Try ModelRegistry for full compound model first
   const modelDef = useMemo(() => getModelDefinition(`unit_${entity.typeId}`), [entity.typeId]);
   const geometry = useMemo(() => getUnitGeometry(entity.typeId, entity.attackType), [entity.typeId, entity.attackType]);
 
   // Height offset: raise unit above terrain
-  const yOffset = 0.4;
+  const yOffset = terrainY + 0.52;
 
   // Build compound mesh group from ModelRegistry if available
   const compoundGroup = useMemo(() => buildCompoundGroup(modelDef), [modelDef]);

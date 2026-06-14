@@ -4,7 +4,9 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
+import { TERRAIN_ELEVATION } from '@/data/terrain';
 import type { HexCoord } from '@/engine/core/types';
+import type { TerrainTypeId } from '@/engine/core/types';
 
 /** Create hex overlay geometry */
 function createHexOverlay(radius: number): THREE.BufferGeometry {
@@ -65,6 +67,9 @@ export function SelectionHighlights() {
     <group>
       {highlights.map(({ hex, type }, i) => {
         const [wx, , wz] = hexToWorld(hex);
+        const tile = gameState.map.tiles[`${hex.q},${hex.r}`];
+        const terrain = tile?.terrain as TerrainTypeId | undefined;
+        const terrainY = terrain ? TERRAIN_ELEVATION[terrain] ?? 0 : 0;
 
         let color: string;
         let opacity: number;
@@ -102,7 +107,7 @@ export function SelectionHighlights() {
             key={`highlight-${i}-${hex.q},${hex.r}`}
             geometry={geometry}
             rotation={[-Math.PI / 2, 0, 0]}
-            position={[wx, yOffset, wz]}
+            position={[wx, terrainY + 0.18 + yOffset, wz]}
           >
             <meshBasicMaterial
               color={color}

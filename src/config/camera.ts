@@ -21,10 +21,10 @@ export const CAMERA_WHEEL_ZOOM_FACTOR = 1.12;
 const DEFAULT_VIEWPORT: CameraViewportSize = { width: 1280, height: 720 };
 const DEFAULT_MAP_SIZE: CameraMapSize = { width: 42, depth: 26 };
 const MIN_DEFAULT_VISIBLE_DEPTH = 22;
-const MAX_DEFAULT_VISIBLE_DEPTH = 42;
+const MAX_DEFAULT_VISIBLE_DEPTH = 36;
 const COMPACT_MAX_DEFAULT_VISIBLE_DEPTH = 32;
-const MAP_DEPTH_VISIBLE_FRACTION = 0.85;
-const MAP_WIDTH_VISIBLE_FRACTION = 0.72;
+const MAP_DEPTH_VISIBLE_FRACTION = 0.74;
+const MAP_WIDTH_VISIBLE_FRACTION = 0.62;
 
 export function clampCameraZoom(zoom: number): number {
   if (!Number.isFinite(zoom)) return CAMERA_DEFAULT_ZOOM;
