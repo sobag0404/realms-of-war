@@ -37,10 +37,10 @@ Verified official docs on 2026-06-14:
 
 - Core gameplay loop is mostly client-side: `GameEngine`, rules, mapgen, command dispatch, Zustand state, R3F rendering.
 - New game flow does not require the remote server. It can generate maps in a worker with sync fallback.
-- Current save/load UI is server-shaped:
-  - `sessionSlice.saveGame()` posts to `/api/save`;
-  - `MainMenuScreen` lists `/api/saves` and loads/deletes via `/api/load`;
-  - API routes use Prisma SQLite through `src/lib/db.ts`.
+- Save/load UI now goes through `SaveRepository`:
+  - default browser-local implementation stores validated saves in IndexedDB, with localStorage fallback;
+  - `ServerSaveRepository` preserves `/api/save`, `/api/saves`, and `/api/load` for web/dev compatibility;
+  - server API routes still use Prisma SQLite through `src/lib/db.ts`.
 - Server saves are intentionally disabled by default in production unless `REALMS_SERVER_SAVES=local-alpha` is set. This is correct for public web deployment, but not sufficient for a packaged offline PC game.
 - Settings already persist through browser `localStorage`; this is acceptable for preferences, not for primary campaign saves.
 
@@ -78,7 +78,7 @@ Recommended desktop save format:
 
 Phase 1: local-first web boundary.
 
-Status: partially implemented. The UI now routes save/list/load/delete through
+Status: implemented for the browser-local milestone. The UI now routes save/list/load/delete through
 `SaveRepository`. The default browser implementation uses IndexedDB and falls
 back to localStorage only when IndexedDB is unavailable. The existing server API
 implementation remains available through `NEXT_PUBLIC_REALMS_SAVE_REPOSITORY=server`
@@ -91,13 +91,16 @@ for web/dev compatibility.
 
 Phase 2: static desktop renderer.
 
-1. Add a desktop build mode that can run without Next server APIs.
-2. Resolve static export blockers:
-   - API route usage replaced by repository abstraction;
-   - `next/font` external network dependency replaced or made build-stable;
-   - image/font handling compatible with static export;
-   - route assumptions validated under `output: 'export'`.
-3. Keep the existing `next build` standalone path for web/VPS until desktop build is verified.
+Status: started. `next/font/google` is removed, a guarded static export probe is
+available through `REALMS_DESKTOP_STATIC_EXPORT=1`, and
+`bun run desktop:static:audit` reports remaining static renderer blockers.
+The simple `src/app/api/route.ts` health endpoint is marked static-compatible;
+the current export probe now stops at the preserved `/api/saves` server route.
+
+1. Keep the existing `next build` standalone path for web/VPS until desktop build is verified.
+2. Keep API route usage isolated behind repository implementations.
+3. Move or exclude `src/app/api/**` from the desktop renderer build.
+4. Validate route assumptions under `output: 'export'` until the probe passes.
 
 Phase 3: Tauri scaffold.
 
