@@ -74,9 +74,11 @@ These routes remain available in the normal `bun run build` standalone output an
 
 ## Residual Blockers
 
-P0 - Tauri filesystem save repository does not exist yet:
+Resolved - Tauri filesystem save repository boundary exists:
 
-- `src/save/browserLocalSaveRepository.ts` is good enough for browser-local proof, but desktop release should store saves under the app data directory with atomic file writes.
+- `src/save/tauriFilesystemSaveRepository.ts` selects Tauri app-data filesystem saves when the runtime exposes Tauri internals.
+- `src-tauri/src/main.rs` owns the narrow filesystem commands and writes under the application data directory.
+- `src/save/browserLocalSaveRepository.ts` remains the browser/static fallback and legacy-save fallback.
 
 P1 - static output runtime smoke should move into CI once browser availability is standardized:
 
@@ -85,7 +87,6 @@ P1 - static output runtime smoke should move into CI once browser availability i
 
 ## Next Order
 
-1. Keep `src/save/browserLocalSaveRepository.ts` as the default client path.
-2. Add a Tauri filesystem-backed save repository after `src-tauri` exists.
-3. Add the Tauri v2 scaffold with `frontendDist: '../out'`.
-4. Add CI browser provisioning if static smoke becomes required in GitHub Actions.
+1. Verify the Tauri filesystem save backend through a fresh manual Windows artifact.
+2. Harden the unsigned installer flow with an explicit install/uninstall checklist.
+3. Add CI browser provisioning if static smoke becomes required in GitHub Actions.

@@ -121,7 +121,18 @@ After required local checks pass:
 bun run desktop:tauri:build
 ```
 
-3. Add a Tauri filesystem-backed `DesktopSaveRepository` under app data with atomic writes.
+3. Verify the Tauri filesystem-backed save repository in a fresh Windows artifact.
+
+## Desktop Save Backend
+
+The desktop runtime now has a Tauri filesystem save backend:
+
+- frontend boundary: `src/save/tauriFilesystemSaveRepository.ts`
+- runtime selector: `src/save/repository.ts`
+- Rust command backend: `src-tauri/src/main.rs`
+- storage location: Tauri application data directory, `saves/*.json`
+
+The backend uses narrow Tauri commands instead of broad frontend filesystem permissions. Browser/static builds keep `BrowserLocalSaveRepository`, and existing browser-local saves remain visible as fallback entries when running inside Tauri.
 
 ## Manual CI Plan
 
