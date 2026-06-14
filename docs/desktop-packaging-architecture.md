@@ -102,8 +102,8 @@ build/smoke pair in local gate order.
 
 1. Keep the existing `next build` standalone path for web/VPS until desktop build is verified.
 2. Keep API route usage isolated behind repository implementations.
-3. Add a static-output smoke command that serves `out/`.
-4. Validate new game, render, save/list/load/delete against the static output before adding Tauri.
+3. Use `bun run desktop:static:smoke` to serve `out/` and validate new game, render, save/list/load/delete without Next server/API.
+4. Decide whether to promote static smoke into CI after browser provisioning is standardized.
 
 Phase 3: Tauri scaffold.
 

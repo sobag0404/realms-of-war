@@ -40,6 +40,21 @@ bun run desktop:static:build
 
 Next clears its work directory during build. Run desktop static export checks before the normal standalone `bun run build`/`bun run smoke` gate pair.
 
+Static runtime smoke:
+
+```powershell
+bun run desktop:static:smoke
+```
+
+The smoke script serves `out/` as plain static files on loopback, launches headless Edge through CDP, and verifies the desktop path without Next server/API:
+
+- load the static app at 1366x768;
+- start a new game;
+- confirm the canvas exists and the captured frame has visible rendered pixels;
+- save through `BrowserLocalSaveRepository`/IndexedDB;
+- return to menu;
+- list, load, and delete the local save.
+
 Current result: passes. The route table contains only:
 
 - `/`
@@ -63,14 +78,14 @@ P0 - Tauri filesystem save repository does not exist yet:
 
 - `src/save/browserLocalSaveRepository.ts` is good enough for browser-local proof, but desktop release should store saves under the app data directory with atomic file writes.
 
-P1 - static output needs runtime smoke under a static file server:
+P1 - static output runtime smoke should move into CI once browser availability is standardized:
 
-- `REALMS_DESKTOP_STATIC_EXPORT=1 bun x next build` emits `out/`.
-- Next milestone should serve `out/` locally and verify new game, render, save/list/load/delete through browser-local repository.
+- `bun run desktop:static:smoke` is available locally and validates `out/`.
+- Next milestone should decide whether to install/use a pinned browser in CI or keep this as a manual Windows desktop gate until Tauri tooling is added.
 
 ## Next Order
 
 1. Keep `src/save/browserLocalSaveRepository.ts` as the default client path.
-2. Add a static-output smoke command that serves `out/` and checks the desktop-local save path.
-3. Add a Tauri filesystem-backed save repository after `src-tauri` exists.
-4. Add the Tauri v2 scaffold with `frontendDist: '../out'`.
+2. Add a Tauri filesystem-backed save repository after `src-tauri` exists.
+3. Add the Tauri v2 scaffold with `frontendDist: '../out'`.
+4. Add CI browser provisioning if static smoke becomes required in GitHub Actions.
