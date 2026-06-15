@@ -342,6 +342,7 @@ async function runBrowserFlow(baseUrl: string): Promise<void> {
     await click(cdp, 'turn-back-to-menu');
     await click(cdp, 'main-menu-load-game');
     await waitFor(cdp, `document.querySelectorAll('[data-testid="save-list-entry"]').length === 1`);
+    await evaluate(cdp, `window.confirm = () => true`);
     await click(cdp, 'save-list-delete');
     await waitFor(cdp, `document.querySelectorAll('[data-testid="save-list-entry"]').length === 0`);
   } finally {

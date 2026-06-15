@@ -174,3 +174,4 @@ Key points:
 - The game engine uses deterministic RNG for reproducible game states.
 
 Manual smoke coverage is tracked in [`docs/smoke-checklist.md`](docs/smoke-checklist.md).
+Local save recovery behavior is documented in [`docs/local-save-recovery.md`](docs/local-save-recovery.md).

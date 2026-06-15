@@ -1,7 +1,6 @@
 import {
-  loadSaveFile,
+  isSaveDataWithinSizeLimit,
   serializeSaveWithChecksum,
-  verifyChecksum,
 } from '@/lib/saveService';
 import type {
   LoadedSave,
@@ -10,16 +9,18 @@ import type {
   SaveWriteInput,
 } from './types';
 import { SaveRepositoryError } from './types';
+import {
+  loadStoredSave,
+  summarizeStoredSave,
+  type StoredSavePayload,
+} from './saveRecordHealth';
 
 const DB_NAME = 'realms-of-war-local-saves';
 const DB_VERSION = 1;
 const STORE_NAME = 'saves';
 const LOCAL_STORAGE_KEY = 'realms-of-war.local-saves.v1';
 
-interface StoredSaveRecord extends SaveSummary {
-  data: string;
-  checksum: string;
-}
+type StoredSaveRecord = StoredSavePayload;
 
 type BrowserLocalSaveRepositoryOptions = {
   indexedDB?: IDBFactory;
@@ -33,23 +34,6 @@ function makeSaveId(now: number): string {
     globalThis.crypto?.randomUUID?.() ??
     Math.random().toString(36).slice(2, 10);
   return `local-${now}-${random}`;
-}
-
-function toLoadedSave(record: StoredSaveRecord): LoadedSave {
-  if (!verifyChecksum(record.data, record.checksum)) {
-    throw new SaveRepositoryError('Local save checksum mismatch', 'corrupt');
-  }
-
-  const loadResult = loadSaveFile(record.data);
-  if (!loadResult.success || !loadResult.saveFile) {
-    throw new SaveRepositoryError(
-      loadResult.error ?? 'Local save is invalid',
-      'corrupt',
-    );
-  }
-
-  const { data: _data, checksum: _checksum, ...summary } = record;
-  return { summary, saveFile: loadResult.saveFile };
 }
 
 export class BrowserLocalSaveRepository implements SaveRepository {
@@ -71,7 +55,7 @@ export class BrowserLocalSaveRepository implements SaveRepository {
   async list(): Promise<SaveSummary[]> {
     const records = await this.getAllRecords();
     return records
-      .map(({ data: _data, checksum: _checksum, ...summary }) => summary)
+      .map((record) => summarizeStoredSave(record, { source: this.kind }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
@@ -80,11 +64,15 @@ export class BrowserLocalSaveRepository implements SaveRepository {
     if (!record) {
       throw new SaveRepositoryError('Save not found', 'not-found');
     }
-    return toLoadedSave(record);
+    return loadStoredSave(record, { source: this.kind });
   }
 
   async save(input: SaveWriteInput): Promise<SaveSummary> {
     const { data, checksum } = serializeSaveWithChecksum(input.saveFile);
+    if (!isSaveDataWithinSizeLimit(data)) {
+      throw new SaveRepositoryError('Save data is too large for local storage', 'too-large');
+    }
+
     const nowIso = new Date(this.now()).toISOString();
     const id = this.idFactory?.() ?? makeSaveId(this.now());
     const existing = await this.getRecord(id);
@@ -97,18 +85,23 @@ export class BrowserLocalSaveRepository implements SaveRepository {
       updatedAt: nowIso,
       data,
       checksum,
+      backupData: existing?.data ?? data,
+      backupChecksum: existing?.checksum ?? checksum,
     };
 
     await this.putRecord(record);
-    const { data: _data, checksum: _checksum, ...summary } = record;
-    return summary;
+    return summarizeStoredSave(record, { source: this.kind });
   }
 
   async delete(id: string): Promise<void> {
     if (this.indexedDB) {
-      const db = await this.openDb();
-      await requestToPromise(db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id));
-      return;
+      try {
+        const db = await this.openDb();
+        await requestToPromise(db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).delete(id));
+        return;
+      } catch (error) {
+        if (!this.localStorage) throw toStorageUnavailable(error);
+      }
     }
 
     const records = this.readLocalStorageRecords().filter((record) => record.id !== id);
@@ -117,10 +110,15 @@ export class BrowserLocalSaveRepository implements SaveRepository {
 
   private async getAllRecords(): Promise<StoredSaveRecord[]> {
     if (this.indexedDB) {
-      const db = await this.openDb();
-      return requestToPromise<StoredSaveRecord[]>(
-        db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll(),
-      );
+      try {
+        const db = await this.openDb();
+        const records = await requestToPromise<StoredSaveRecord[]>(
+          db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).getAll(),
+        );
+        return records.filter(isStoredSaveRecord);
+      } catch (error) {
+        if (!this.localStorage) throw toStorageUnavailable(error);
+      }
     }
 
     return this.readLocalStorageRecords();
@@ -128,10 +126,14 @@ export class BrowserLocalSaveRepository implements SaveRepository {
 
   private async getRecord(id: string): Promise<StoredSaveRecord | undefined> {
     if (this.indexedDB) {
-      const db = await this.openDb();
-      return requestToPromise<StoredSaveRecord | undefined>(
-        db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id),
-      );
+      try {
+        const db = await this.openDb();
+        return requestToPromise<StoredSaveRecord | undefined>(
+          db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(id),
+        );
+      } catch (error) {
+        if (!this.localStorage) throw toStorageUnavailable(error);
+      }
     }
 
     return this.readLocalStorageRecords().find((record) => record.id === id);
@@ -139,9 +141,13 @@ export class BrowserLocalSaveRepository implements SaveRepository {
 
   private async putRecord(record: StoredSaveRecord): Promise<void> {
     if (this.indexedDB) {
-      const db = await this.openDb();
-      await requestToPromise(db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record));
-      return;
+      try {
+        const db = await this.openDb();
+        await requestToPromise(db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(record));
+        return;
+      } catch (error) {
+        if (!this.localStorage) throw toStorageUnavailable(error);
+      }
     }
 
     const records = this.readLocalStorageRecords().filter((item) => item.id !== record.id);
@@ -199,6 +205,11 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
   });
+}
+
+function toStorageUnavailable(error: unknown): SaveRepositoryError {
+  const message = error instanceof Error ? error.message : 'Browser local save storage is unavailable';
+  return new SaveRepositoryError(message, 'storage-unavailable');
 }
 
 function isStoredSaveRecord(value: unknown): value is StoredSaveRecord {

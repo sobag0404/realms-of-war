@@ -1,4 +1,4 @@
-import { loadSaveFile, verifyChecksum } from '@/lib/saveService';
+import { serializeSaveWithChecksum } from '@/lib/saveService';
 import type {
   LoadedSave,
   SaveRepository,
@@ -6,12 +6,37 @@ import type {
   SaveWriteInput,
 } from './types';
 import { SaveRepositoryError } from './types';
-import { serializeSaveWithChecksum } from '@/lib/saveService';
+import {
+  loadStoredSave,
+  summarizeStoredSave,
+  type StoredSavePayload,
+} from './saveRecordHealth';
 
 type ServerLoadPayload = SaveSummary & {
   data: string;
   checksum: string;
 };
+
+function isSaveSummary(value: unknown): value is SaveSummary {
+  if (!value || typeof value !== 'object') return false;
+  const summary = value as Partial<SaveSummary>;
+  return (
+    typeof summary.id === 'string' &&
+    typeof summary.name === 'string' &&
+    typeof summary.turn === 'number' &&
+    typeof summary.players === 'string' &&
+    typeof summary.createdAt === 'string' &&
+    typeof summary.updatedAt === 'string'
+  );
+}
+
+function isServerLoadPayload(value: unknown): value is ServerLoadPayload {
+  return (
+    isSaveSummary(value) &&
+    typeof (value as Partial<ServerLoadPayload>).data === 'string' &&
+    typeof (value as Partial<ServerLoadPayload>).checksum === 'string'
+  );
+}
 
 export class ServerSaveRepository implements SaveRepository {
   readonly kind = 'server' as const;
@@ -22,12 +47,16 @@ export class ServerSaveRepository implements SaveRepository {
       throw new SaveRepositoryError('Failed to list server saves', 'network');
     }
 
-    const payload = await response.json();
-    if (!Array.isArray(payload.saves)) {
+    const payload = await response.json() as { saves?: unknown };
+    if (!Array.isArray(payload.saves) || !payload.saves.every(isSaveSummary)) {
       throw new SaveRepositoryError('Invalid save list response', 'invalid-response');
     }
 
-    return payload.saves as SaveSummary[];
+    return payload.saves.map((summary) => ({
+      ...summary,
+      source: this.kind,
+      health: summary.health ?? 'available',
+    }));
   }
 
   async load(id: string): Promise<LoadedSave> {
@@ -39,27 +68,12 @@ export class ServerSaveRepository implements SaveRepository {
       throw new SaveRepositoryError('Failed to load server save', 'network');
     }
 
-    const payload = (await response.json()) as ServerLoadPayload;
-    if (!verifyChecksum(payload.data, payload.checksum)) {
-      throw new SaveRepositoryError('Server save checksum mismatch', 'corrupt');
+    const payload = await response.json();
+    if (!isServerLoadPayload(payload)) {
+      throw new SaveRepositoryError('Invalid save load response', 'invalid-response');
     }
 
-    const loadResult = loadSaveFile(payload.data);
-    if (!loadResult.success || !loadResult.saveFile) {
-      throw new SaveRepositoryError(loadResult.error ?? 'Server save is invalid', 'corrupt');
-    }
-
-    return {
-      summary: {
-        id: payload.id,
-        name: payload.name,
-        turn: payload.turn,
-        players: payload.players,
-        createdAt: payload.createdAt,
-        updatedAt: payload.updatedAt,
-      },
-      saveFile: loadResult.saveFile,
-    };
+    return loadStoredSave(payload, { source: this.kind });
   }
 
   async save(input: SaveWriteInput): Promise<SaveSummary> {
@@ -80,15 +94,19 @@ export class ServerSaveRepository implements SaveRepository {
       throw new SaveRepositoryError('Failed to save through server API', 'network');
     }
 
-    const payload = await response.json();
-    return {
+    const payload = await response.json() as { id?: unknown; createdAt?: unknown; updatedAt?: unknown };
+    const now = new Date().toISOString();
+    const record: StoredSavePayload = {
       id: String(payload.id),
       name: input.name,
       turn: input.turn,
       players: input.players,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : now,
+      updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : now,
+      data,
+      checksum,
     };
+    return summarizeStoredSave(record, { source: this.kind });
   }
 
   async delete(id: string): Promise<void> {

@@ -158,7 +158,7 @@ describe('BrowserLocalSaveRepository localStorage fallback', () => {
     await expect(repository.list()).resolves.toEqual([]);
   });
 
-  it('rejects corrupted save records on load', async () => {
+  it('marks corrupted primary data as recoverable and loads the backup copy', async () => {
     const storage = new MemoryStorage();
     const repository = new BrowserLocalSaveRepository({
       indexedDB: undefined,
@@ -175,9 +175,92 @@ describe('BrowserLocalSaveRepository localStorage fallback', () => {
     records[0].data = records[0].data.replace('Corrupt Save', 'Tampered Save');
     storage.setItem('realms-of-war.local-saves.v1', JSON.stringify(records));
 
+    await expect(repository.list()).resolves.toMatchObject([
+      { id: summary.id, health: 'recoverable' },
+    ]);
+    const loaded = await repository.load(summary.id);
+    expect(loaded.summary.health).toBe('recoverable');
+    expect(loaded.saveFile.name).toBe('Corrupt Save');
+  });
+
+  it('keeps unrecoverable corrupted records visible but unloadable', async () => {
+    const storage = new MemoryStorage();
+    const repository = new BrowserLocalSaveRepository({
+      indexedDB: undefined,
+      localStorage: storage,
+      idFactory: () => 'local-corrupt-no-backup',
+    });
+    const summary = await repository.save({
+      name: 'Corrupt Save',
+      turn: 3,
+      players: 'Player 1',
+      saveFile: makeSaveFile('Corrupt Save'),
+    });
+    const records = JSON.parse(storage.getItem('realms-of-war.local-saves.v1') ?? '[]');
+    delete records[0].backupData;
+    delete records[0].backupChecksum;
+    records[0].data = records[0].data.replace('Corrupt Save', 'Tampered Save');
+    storage.setItem('realms-of-war.local-saves.v1', JSON.stringify(records));
+
+    await expect(repository.list()).resolves.toMatchObject([
+      { id: summary.id, health: 'corrupt' },
+    ]);
     await expect(repository.load(summary.id)).rejects.toBeInstanceOf(SaveRepositoryError);
     await expect(repository.load(summary.id)).rejects.toMatchObject({
       code: 'corrupt',
+    });
+  });
+
+  it('rejects oversized saves before writing them', async () => {
+    const storage = new MemoryStorage();
+    const repository = new BrowserLocalSaveRepository({
+      indexedDB: undefined,
+      localStorage: storage,
+      idFactory: () => 'local-too-large-save',
+    });
+    const saveFile = makeSaveFile('Large Save');
+    saveFile.name = 'x'.repeat(2_000_100);
+
+    await expect(repository.save({
+      name: 'Large Save',
+      turn: 3,
+      players: 'Player 1',
+      saveFile,
+    })).rejects.toMatchObject({ code: 'too-large' });
+    expect(await repository.list()).toEqual([]);
+  });
+
+  it('falls back to localStorage when IndexedDB cannot open', async () => {
+    const storage = new MemoryStorage();
+    const indexedDB = {
+      open: () => {
+        const request = {} as IDBOpenDBRequest;
+        queueMicrotask(() => {
+          Object.defineProperty(request, 'error', {
+            value: new DOMException('blocked', 'UnknownError'),
+          });
+          request.onerror?.(new Event('error'));
+        });
+        return request;
+      },
+    } as unknown as IDBFactory;
+    const repository = new BrowserLocalSaveRepository({
+      indexedDB,
+      localStorage: storage,
+      idFactory: () => 'local-fallback-save',
+    });
+
+    const summary = await repository.save({
+      name: 'Fallback Save',
+      turn: 3,
+      players: 'Player 1',
+      saveFile: makeSaveFile('Fallback Save'),
+    });
+
+    expect(summary.id).toBe('local-fallback-save');
+    expect(storage.getItem('realms-of-war.local-saves.v1')).toContain('Fallback Save');
+    await expect(repository.load(summary.id)).resolves.toMatchObject({
+      summary: { id: summary.id, source: 'browser-local' },
     });
   });
 });

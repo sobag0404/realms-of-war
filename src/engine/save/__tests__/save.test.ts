@@ -20,6 +20,7 @@ import {
 import type { SaveFile } from '@/engine/save/saveGame';
 import type { GameState } from '@/engine/core/GameState';
 import type { GameConfig } from '@/engine/core/GameConfig';
+import { loadSaveFile } from '@/lib/saveService';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -188,6 +189,32 @@ describe('validateSave', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('rngState'))).toBe(true);
   });
+
+  it.each([
+    ['missing gameConfig', (save: Record<string, unknown>) => delete save.gameConfig, 'gameConfig'],
+    ['non-array commandLog', (save: Record<string, unknown>) => { save.commandLog = {}; }, 'commandLog'],
+    ['invalid rngState seed', (save: Record<string, unknown>) => {
+      save.rngState = { seed: '42', position: 0 };
+    }, 'rngState.seed'],
+    ['missing gameState turn', (save: Record<string, unknown>) => {
+      (save.gameState as Record<string, unknown>).turn = undefined;
+    }, 'gameState.turn'],
+    ['null gameState map', (save: Record<string, unknown>) => {
+      (save.gameState as Record<string, unknown>).map = null;
+    }, 'gameState.map'],
+    ['null gameState entities', (save: Record<string, unknown>) => {
+      (save.gameState as Record<string, unknown>).entities = null;
+    }, 'gameState.entities'],
+    ['null gameState cities', (save: Record<string, unknown>) => {
+      (save.gameState as Record<string, unknown>).cities = null;
+    }, 'gameState.cities'],
+  ])('rejects %s', (_name, mutate, expectedError) => {
+    const save = structuredClone(makeValidSaveFile()) as unknown as Record<string, unknown>;
+    mutate(save);
+    const result = validateSave(save);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((error) => error.includes(expectedError))).toBe(true);
+  });
 });
 
 describe('calculateChecksum', () => {
@@ -211,6 +238,26 @@ describe('deserializeSave', () => {
   it('throws on save that fails validation', () => {
     const badSave = JSON.stringify({ version: 99, timestamp: 0, name: '' });
     expect(() => deserializeSave(badSave)).toThrow(/validation/i);
+  });
+
+  it('throws on a future save version after parsing', () => {
+    const save = makeValidSaveFile();
+    save.version = CURRENT_SAVE_VERSION + 1;
+    expect(() => deserializeSave(JSON.stringify(save))).toThrow(/newer than supported/i);
+  });
+});
+
+describe('loadSaveFile', () => {
+  it('rejects oversized save data before parsing', () => {
+    const result = loadSaveFile('x'.repeat(2_000_001));
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/too large/i);
+  });
+
+  it('reports corrupt JSON without throwing', () => {
+    const result = loadSaveFile('{not valid json');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/parse/i);
   });
 });
 

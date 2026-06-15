@@ -1,7 +1,6 @@
 import {
-  loadSaveFile,
+  isSaveDataWithinSizeLimit,
   serializeSaveWithChecksum,
-  verifyChecksum,
 } from '@/lib/saveService';
 import type {
   LoadedSave,
@@ -10,15 +9,18 @@ import type {
   SaveWriteInput,
 } from './types';
 import { SaveRepositoryError } from './types';
+import {
+  loadStoredSave,
+  summarizeStoredSave,
+  type StoredSavePayload,
+} from './saveRecordHealth';
 
 const STORAGE_VERSION = 1;
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-interface DesktopStoredSaveRecord extends SaveSummary {
+interface DesktopStoredSaveRecord extends StoredSavePayload {
   storageVersion: number;
-  data: string;
-  checksum: string;
 }
 
 type TauriFilesystemSaveRepositoryOptions = {
@@ -40,35 +42,6 @@ async function defaultInvoke<T>(command: string, args?: Record<string, unknown>)
   return invoke<T>(command, args);
 }
 
-function toSummary(record: DesktopStoredSaveRecord): SaveSummary {
-  const {
-    storageVersion: _storageVersion,
-    data: _data,
-    checksum: _checksum,
-    ...summary
-  } = record;
-  return summary;
-}
-
-function toLoadedSave(record: DesktopStoredSaveRecord): LoadedSave {
-  if (!verifyChecksum(record.data, record.checksum)) {
-    throw new SaveRepositoryError('Desktop save checksum mismatch', 'corrupt');
-  }
-
-  const loadResult = loadSaveFile(record.data);
-  if (!loadResult.success || !loadResult.saveFile) {
-    throw new SaveRepositoryError(
-      loadResult.error ?? 'Desktop save is invalid',
-      'corrupt',
-    );
-  }
-
-  return {
-    summary: toSummary(record),
-    saveFile: loadResult.saveFile,
-  };
-}
-
 function isDesktopSaveId(id: string): boolean {
   return id.startsWith('desktop-');
 }
@@ -77,7 +50,7 @@ function isStoredSaveRecord(value: unknown): value is DesktopStoredSaveRecord {
   if (!value || typeof value !== 'object') return false;
   const record = value as Partial<DesktopStoredSaveRecord>;
   return (
-    record.storageVersion === STORAGE_VERSION &&
+    typeof record.storageVersion === 'number' &&
     typeof record.id === 'string' &&
     typeof record.name === 'string' &&
     typeof record.turn === 'number' &&
@@ -113,7 +86,11 @@ export class TauriFilesystemSaveRepository implements SaveRepository {
     const records = await this.invoke<unknown[]>('desktop_save_list');
     const summaries = records
       .filter(isStoredSaveRecord)
-      .map(toSummary);
+      .map((record) => summarizeStoredSave(record, {
+        source: this.kind,
+        storageVersion: record.storageVersion,
+        maxStorageVersion: STORAGE_VERSION,
+      }));
 
     const fallbackSummaries = this.fallbackRepository
       ? await this.fallbackRepository.list()
@@ -128,35 +105,56 @@ export class TauriFilesystemSaveRepository implements SaveRepository {
       return this.fallbackRepository.load(id);
     }
 
-    const record = await this.invoke<unknown | null>('desktop_save_load', { id });
+    let record: unknown | null;
+    try {
+      record = await this.invoke<unknown | null>('desktop_save_load', { id });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new SaveRepositoryError(message, 'corrupt');
+    }
+
     if (!record) {
       throw new SaveRepositoryError('Save not found', 'not-found');
     }
     if (!isStoredSaveRecord(record)) {
       throw new SaveRepositoryError('Desktop save metadata is invalid', 'corrupt');
     }
-    return toLoadedSave(record);
+    return loadStoredSave(record, {
+      source: this.kind,
+      storageVersion: record.storageVersion,
+      maxStorageVersion: STORAGE_VERSION,
+    });
   }
 
   async save(input: SaveWriteInput): Promise<SaveSummary> {
     const { data, checksum } = serializeSaveWithChecksum(input.saveFile);
+    if (!isSaveDataWithinSizeLimit(data)) {
+      throw new SaveRepositoryError('Save data is too large for desktop storage', 'too-large');
+    }
+
     const nowIso = new Date(this.now()).toISOString();
     const id = this.idFactory?.() ?? makeSaveId(this.now());
-    const existing = await this.tryLoadExisting(id);
+    const existing = await this.tryLoadExistingRecord(id);
     const record: DesktopStoredSaveRecord = {
       storageVersion: STORAGE_VERSION,
       id,
       name: input.name,
       turn: input.turn,
       players: input.players,
-      createdAt: existing?.summary.createdAt ?? nowIso,
+      createdAt: existing?.createdAt ?? nowIso,
       updatedAt: nowIso,
       data,
       checksum,
+      backupData: existing?.data ?? data,
+      backupChecksum: existing?.checksum ?? checksum,
     };
 
     await this.invoke<void>('desktop_save_write', { record });
-    return toSummary(record);
+    return summarizeStoredSave(record, {
+      source: this.kind,
+      storageVersion: record.storageVersion,
+      maxStorageVersion: STORAGE_VERSION,
+    });
   }
 
   async delete(id: string): Promise<void> {
@@ -167,14 +165,15 @@ export class TauriFilesystemSaveRepository implements SaveRepository {
     await this.invoke<void>('desktop_save_delete', { id });
   }
 
-  private async tryLoadExisting(id: string): Promise<LoadedSave | null> {
+  private async tryLoadExistingRecord(id: string): Promise<DesktopStoredSaveRecord | null> {
     try {
-      return await this.load(id);
-    } catch (error) {
-      if (error instanceof SaveRepositoryError && error.code === 'not-found') {
+      const record = await this.invoke<unknown | null>('desktop_save_load', { id });
+      if (!record || !isStoredSaveRecord(record) || record.storageVersion > STORAGE_VERSION) {
         return null;
       }
-      throw error;
+      return record;
+    } catch {
+      return null;
     }
   }
 }
