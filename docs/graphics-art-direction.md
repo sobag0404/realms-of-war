@@ -165,6 +165,21 @@ The v6 pass makes existing strategic infrastructure data readable without adding
 
 Current schema supports `HexTile.hasRoad`, `HexTile.hasFort`, `HexTile.improvement`, `HexTile.hasRiftPortal`, `HexTile.riftPortalOwner`, and `HexTile.owningCityId`. Directional road masks, rivers, durable landmark categories, and multi-tile improvement footprints remain future schema work and should not be inferred in renderer-only code.
 
+## V7 Zoom, Readability, And Evidence Hardening Pass
+
+The v7 pass protects the richer v2-v6 map presentation across desktop PC camera distances and common viewports. The goal is not to add a new gameplay layer, but to make existing terrain, water, resources, cities, units, roads, improvements, fog, selection, and path signals keep their intended priority when the player zooms, pans, or plays on 1366x768, 1920x1080, and 2560x1440 displays.
+
+- Use a clear vertical priority ladder: terrain and water at the base, low-profile infrastructure above terrain, resources above infrastructure, cities and units above resources, fog as a readability veil, and selection/path overlays as the clearest interaction language.
+- Roads should be slightly wider and have a dark underlay, but remain low and non-depth-writing so they do not block resources, unit bases, city plinths, or selection rings.
+- Improvements and landmarks should reuse stable procedural geometry definitions. They may add silhouette detail, but they should not allocate new geometry per tile or introduce per-frame animation for this vertical slice.
+- Selection and attack rings should use explicit overlay depth policy so they remain visible over forests, hills, cities, roads, resources, water, and fog. Transparent fills must stay light enough that terrain and ownership are still readable underneath.
+- Path previews should sit below unit silhouettes and health markers while remaining above terrain and infrastructure. A dark under-line plus bright dashed route should remain legible without cutting through unit bodies at close zoom.
+- Water and coastline highlights should sit above the rendered water terrain surface, with restrained transparency and depth writes disabled, so water reads as water instead of buried color under terrain chunks.
+- Resource marker geometry should be shared and only built for resource types that are actually visible. This keeps the readability layer cheap enough for large desktop maps.
+- Visual evidence should be saved outside the repository under a sibling evidence/artifact directory. Screenshots and logs are verification artifacts, not source assets, and must not be committed.
+
+Generated maps may still contain sparse `hasRoad`, `hasFort`, `improvement`, and `hasRiftPortal` data. When a screenshot does not naturally include those fields, the verification note should say so explicitly and separate renderer readiness from future map-generation or scenario-authoring needs. The renderer must use existing schema only and must not invent infrastructure gameplay rules to make prettier screenshots.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.

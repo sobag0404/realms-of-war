@@ -111,19 +111,19 @@ export function SelectionHighlights() {
         }
 
         return (
-          <group key={`highlight-${i}-${hex.q},${hex.r}`} position={[wx, terrainY + 0.18 + yOffset, wz]}>
-            <mesh geometry={fillGeometry} rotation={[-Math.PI / 2, 0, 0]}>
-              <meshBasicMaterial color={color} transparent opacity={fillOpacity} side={THREE.DoubleSide} depthWrite={false} />
+          <group key={`highlight-${i}-${hex.q},${hex.r}`} position={[wx, terrainY + 0.18 + yOffset, wz]} renderOrder={40 + i}>
+            <mesh geometry={fillGeometry} rotation={[-Math.PI / 2, 0, 0]} renderOrder={40 + i}>
+              <meshBasicMaterial color={color} transparent opacity={fillOpacity} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
             </mesh>
-            <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
-              <meshBasicMaterial color="#030507" transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
+            <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]} renderOrder={41 + i}>
+              <meshBasicMaterial color="#030507" transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
             </mesh>
-            <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
-              <meshBasicMaterial color={color} transparent opacity={ringOpacity} side={THREE.DoubleSide} depthWrite={false} />
+            <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} renderOrder={42 + i}>
+              <meshBasicMaterial color={color} transparent opacity={ringOpacity} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
             </mesh>
             {(type === 'selected' || type === 'attackable') && (
-              <mesh geometry={innerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
-                <meshBasicMaterial color={color} transparent opacity={ringOpacity * 0.7} side={THREE.DoubleSide} depthWrite={false} />
+              <mesh geometry={innerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]} renderOrder={43 + i}>
+                <meshBasicMaterial color={color} transparent opacity={ringOpacity * 0.7} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
               </mesh>
             )}
           </group>

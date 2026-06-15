@@ -8,6 +8,8 @@ import { HEX_DIRECTIONS } from '@/engine/core/types';
 import { TERRAIN_ELEVATION } from '@/data/terrain';
 import type { TerrainTypeId } from '@/engine/core/types';
 
+const COASTAL_WATER_Y = -0.01;
+
 function createHexRing(innerRadius: number, outerRadius: number): THREE.BufferGeometry {
   return new THREE.RingGeometry(innerRadius, outerRadius, 6);
 }
@@ -100,7 +102,7 @@ export function CoastLayer() {
         const rotation = -Math.PI / 2 + phase * 0.018;
 
         return (
-          <group key={`coast-${tile.coord.q},${tile.coord.r}`} position={[wx, -0.118, wz]}>
+          <group key={`coast-${tile.coord.q},${tile.coord.r}`} position={[wx, COASTAL_WATER_Y, wz]} renderOrder={5}>
             <mesh geometry={shallowsGeometry} rotation={[rotation, 0, 0]}>
               <primitive object={shallowsMaterial} attach="material" />
             </mesh>
