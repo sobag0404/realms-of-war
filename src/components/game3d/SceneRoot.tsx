@@ -7,6 +7,7 @@ import { TerrainAccentLayer } from './TerrainAccentLayer';
 import { DecorationLayer } from './DecorationLayer';
 import { CoastLayer } from './CoastLayer';
 import { WaterLayer } from './WaterLayer';
+import { InfrastructureLayer } from './InfrastructureLayer';
 import { BuildingLayer } from './BuildingLayer';
 import { UnitLayer } from './UnitLayer';
 import { ResourceLayer } from './ResourceLayer';
@@ -29,6 +30,7 @@ export function SceneRoot() {
       <CoastLayer />
       <DecorationLayer />
       <WaterLayer />
+      <InfrastructureLayer />
       <ResourceLayer />
       <BuildingLayer />
       <UnitLayer />

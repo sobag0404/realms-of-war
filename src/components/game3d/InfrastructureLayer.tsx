@@ -1,0 +1,407 @@
+'use client';
+
+import { useEffect, useMemo, useRef } from 'react';
+import * as THREE from 'three';
+import { TERRAIN_ELEVATION } from '@/data/terrain';
+import { hexToWorld } from '@/engine/hex/coordinates';
+import { HEX_DIRECTIONS, type HexCoord, type TerrainTypeId } from '@/engine/core/types';
+import type { GameState, HexTile } from '@/engine/core/GameState';
+import { useGameStore } from '@/store/useGameStore';
+
+type InfrastructureDef = {
+  geometry: THREE.BufferGeometry;
+  color: string;
+  emissive?: string;
+  emissiveIntensity?: number;
+  roughness?: number;
+  metalness?: number;
+};
+
+type InfrastructureInstance = {
+  position: THREE.Vector3;
+  rotation: THREE.Euler;
+  scale: THREE.Vector3;
+  color?: THREE.Color;
+};
+
+type InfrastructureBatch = {
+  key: string;
+  def: InfrastructureDef;
+  instances: InfrastructureInstance[];
+};
+
+const DIRECTIONS = [0, 1, 2, 3, 4, 5] as const;
+const IMPROVEMENT_TYPES = ['farm', 'mine', 'lumber_mill', 'quarry_improvement', 'mana_focus'] as const;
+
+function hash01(q: number, r: number, salt: number): number {
+  const x = Math.sin(q * 127.1 + r * 311.7 + salt * 53.9) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function tileKey(tile: HexTile): string {
+  return `${tile.coord.q},${tile.coord.r}`;
+}
+
+function coordKey(coord: HexCoord): string {
+  return `${coord.q},${coord.r}`;
+}
+
+function terrainY(tile: HexTile): number {
+  return TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
+}
+
+function neighborCoord(coord: HexCoord, direction: number): HexCoord {
+  const delta = HEX_DIRECTIONS[direction];
+  return { q: coord.q + delta.q, r: coord.r + delta.r };
+}
+
+function directionVector(tile: HexTile, direction: number): THREE.Vector3 {
+  const [x, , z] = hexToWorld(tile.coord);
+  const neighbor = neighborCoord(tile.coord, direction);
+  const [nx, , nz] = hexToWorld(neighbor);
+  return new THREE.Vector3(nx - x, 0, nz - z).normalize();
+}
+
+function visibleInfrastructureTiles(gameState: GameState, activePlayerId: string, showFog: boolean): HexTile[] {
+  const player = gameState.players[activePlayerId];
+  const known = showFog && player && (player.visibleHexes.length > 0 || player.exploredHexes.length > 0)
+    ? new Set([...player.visibleHexes, ...player.exploredHexes])
+    : null;
+
+  return Object.values(gameState.map.tiles).filter((tile) => (
+    tile.terrain !== 'water' &&
+    (!known || known.has(tileKey(tile)))
+  ));
+}
+
+function buildRoadBatches(tiles: HexTile[], tileMap: Record<string, HexTile>): InfrastructureBatch[] {
+  const roadTiles = tiles.filter((tile) => tile.hasRoad || tile.improvement === 'road');
+  const roadKeys = new Set(roadTiles.map(tileKey));
+  const centerShadow: InfrastructureInstance[] = [];
+  const centerTop: InfrastructureInstance[] = [];
+  const segmentShadow: InfrastructureInstance[] = [];
+  const segmentTop: InfrastructureInstance[] = [];
+
+  for (const tile of roadTiles) {
+    const [wx, , wz] = hexToWorld(tile.coord);
+    const y = Math.max(0.035, terrainY(tile) + 0.052);
+    const turn = hash01(tile.coord.q, tile.coord.r, 19) * Math.PI * 2;
+
+    centerShadow.push({
+      position: new THREE.Vector3(wx, y, wz),
+      rotation: new THREE.Euler(0, turn, 0),
+      scale: new THREE.Vector3(1.12, 1, 0.82),
+    });
+    centerTop.push({
+      position: new THREE.Vector3(wx, y + 0.006, wz),
+      rotation: new THREE.Euler(0, turn, 0),
+      scale: new THREE.Vector3(0.92, 1, 0.64),
+    });
+
+    const connected = DIRECTIONS.filter((direction) => {
+      const neighbor = tileMap[coordKey(neighborCoord(tile.coord, direction))];
+      return neighbor && neighbor.terrain !== 'water' && roadKeys.has(tileKey(neighbor));
+    });
+    const fallbackDirection = Math.floor(hash01(tile.coord.q, tile.coord.r, 31) * 6);
+    const visualDirections = connected.length > 0 ? connected : [fallbackDirection, (fallbackDirection + 3) % 6];
+
+    for (const direction of visualDirections) {
+      const vector = directionVector(tile, direction);
+      const rotation = new THREE.Euler(0, Math.atan2(vector.x, vector.z), 0);
+      const base = new THREE.Vector3(wx, y + 0.004, wz).addScaledVector(vector, 0.32);
+      const lengthScale = connected.length > 0 ? 1 : 0.58;
+
+      segmentShadow.push({
+        position: base,
+        rotation,
+        scale: new THREE.Vector3(1.18, 1, lengthScale),
+      });
+      segmentTop.push({
+        position: new THREE.Vector3(base.x, base.y + 0.006, base.z),
+        rotation,
+        scale: new THREE.Vector3(0.82, 1, lengthScale * 0.92),
+      });
+    }
+  }
+
+  return [
+    {
+      key: 'road-center-shadow',
+      def: { geometry: new THREE.CylinderGeometry(0.24, 0.29, 0.018, 12), color: '#2c2419', roughness: 0.96 },
+      instances: centerShadow,
+    },
+    {
+      key: 'road-center-top',
+      def: { geometry: new THREE.CylinderGeometry(0.19, 0.23, 0.014, 12), color: '#8a7048', roughness: 0.9 },
+      instances: centerTop,
+    },
+    {
+      key: 'road-segment-shadow',
+      def: { geometry: new THREE.BoxGeometry(0.18, 0.016, 0.74), color: '#2c2419', roughness: 0.96 },
+      instances: segmentShadow,
+    },
+    {
+      key: 'road-segment-top',
+      def: { geometry: new THREE.BoxGeometry(0.12, 0.012, 0.7), color: '#9d8358', roughness: 0.9 },
+      instances: segmentTop,
+    },
+  ];
+}
+
+function pushBatch(
+  batches: Map<string, InfrastructureBatch>,
+  key: string,
+  def: InfrastructureDef,
+  instance: InfrastructureInstance,
+): void {
+  const batch = batches.get(key);
+  if (batch) {
+    batch.instances.push(instance);
+  } else {
+    batches.set(key, { key, def, instances: [instance] });
+  }
+}
+
+function improvementAnchor(tile: HexTile, salt: number, radius = 0.32): THREE.Vector3 {
+  const [wx, , wz] = hexToWorld(tile.coord);
+  const angle = Math.PI * 0.25 + hash01(tile.coord.q, tile.coord.r, salt) * Math.PI * 2;
+  return new THREE.Vector3(
+    wx + Math.cos(angle) * radius,
+    Math.max(0.04, terrainY(tile) + 0.18),
+    wz + Math.sin(angle) * radius,
+  );
+}
+
+function buildImprovementBatches(tiles: HexTile[], players: GameState['players']): InfrastructureBatch[] {
+  const batches = new Map<string, InfrastructureBatch>();
+
+  for (const tile of tiles) {
+    const turn = hash01(tile.coord.q, tile.coord.r, 41) * Math.PI * 2;
+
+    if (tile.hasFort) {
+      const [wx, , wz] = hexToWorld(tile.coord);
+      const y = Math.max(0.05, terrainY(tile) + 0.24);
+      pushBatch(batches, 'fort-ring', {
+        geometry: new THREE.TorusGeometry(0.34, 0.035, 6, 24),
+        color: '#3b2b22',
+        roughness: 0.82,
+      }, {
+        position: new THREE.Vector3(wx, y, wz),
+        rotation: new THREE.Euler(Math.PI / 2, 0, turn),
+        scale: new THREE.Vector3(1, 1, 1),
+      });
+      pushBatch(batches, 'fort-tower', {
+        geometry: new THREE.BoxGeometry(0.16, 0.24, 0.16),
+        color: '#8d7457',
+        roughness: 0.78,
+      }, {
+        position: new THREE.Vector3(wx, y + 0.11, wz),
+        rotation: new THREE.Euler(0, turn, 0),
+        scale: new THREE.Vector3(1, 1, 1),
+      });
+    }
+
+    if (tile.hasRiftPortal) {
+      const [wx, , wz] = hexToWorld(tile.coord);
+      const y = Math.max(0.06, terrainY(tile) + 0.24);
+      const ownerColor = tile.riftPortalOwner ? players[tile.riftPortalOwner]?.color : undefined;
+      pushBatch(batches, 'rift-base', {
+        geometry: new THREE.CylinderGeometry(0.24, 0.28, 0.05, 16),
+        color: '#191426',
+        roughness: 0.7,
+        metalness: 0.08,
+      }, {
+        position: new THREE.Vector3(wx, y, wz),
+        rotation: new THREE.Euler(0, turn, 0),
+        scale: new THREE.Vector3(1, 1, 1),
+      });
+      pushBatch(batches, 'rift-arc', {
+        geometry: new THREE.TorusGeometry(0.19, 0.021, 8, 24),
+        color: '#9c66ff',
+        emissive: '#5d33ca',
+        emissiveIntensity: 0.38,
+        roughness: 0.45,
+      }, {
+        position: new THREE.Vector3(wx, y + 0.24, wz),
+        rotation: new THREE.Euler(0, turn, 0),
+        scale: new THREE.Vector3(1, 1, 1),
+        color: ownerColor ? new THREE.Color(ownerColor) : undefined,
+      });
+    }
+
+    switch (tile.improvement) {
+      case 'farm': {
+        const position = improvementAnchor(tile, 53, 0.26);
+        for (let strip = -1; strip <= 1; strip++) {
+          pushBatch(batches, 'farm-strip', {
+            geometry: new THREE.BoxGeometry(0.055, 0.018, 0.42),
+            color: '#d6b866',
+            roughness: 0.93,
+          }, {
+            position: new THREE.Vector3(position.x + strip * 0.08, position.y, position.z),
+            rotation: new THREE.Euler(0, turn, 0),
+            scale: new THREE.Vector3(1, 1, 1),
+          });
+        }
+        break;
+      }
+      case 'mine': {
+        const position = improvementAnchor(tile, 59);
+        pushBatch(batches, 'mine-mouth', {
+          geometry: new THREE.ConeGeometry(0.18, 0.24, 5),
+          color: '#3d3b39',
+          roughness: 0.88,
+        }, {
+          position: new THREE.Vector3(position.x, position.y + 0.05, position.z),
+          rotation: new THREE.Euler(0, turn, Math.PI),
+          scale: new THREE.Vector3(1, 0.75, 1),
+        });
+        pushBatch(batches, 'mine-post', {
+          geometry: new THREE.BoxGeometry(0.08, 0.18, 0.08),
+          color: '#8b673d',
+          roughness: 0.82,
+        }, {
+          position: new THREE.Vector3(position.x, position.y + 0.08, position.z),
+          rotation: new THREE.Euler(0, turn, 0),
+          scale: new THREE.Vector3(1, 1, 1),
+        });
+        break;
+      }
+      case 'lumber_mill': {
+        const position = improvementAnchor(tile, 61, 0.36);
+        for (let log = 0; log < 2; log++) {
+          pushBatch(batches, 'lumber-log', {
+            geometry: new THREE.CylinderGeometry(0.045, 0.045, 0.34, 8),
+            color: log === 0 ? '#7a4d2d' : '#a46a3d',
+            roughness: 0.9,
+          }, {
+            position: new THREE.Vector3(position.x, position.y + log * 0.052, position.z + (log - 0.5) * 0.07),
+            rotation: new THREE.Euler(Math.PI / 2, 0, turn),
+            scale: new THREE.Vector3(1, 1, 1),
+          });
+        }
+        break;
+      }
+      case 'quarry_improvement': {
+        const position = improvementAnchor(tile, 67, 0.3);
+        pushBatch(batches, 'quarry-stone', {
+          geometry: new THREE.DodecahedronGeometry(0.16, 0),
+          color: '#a49d8e',
+          roughness: 0.86,
+        }, {
+          position: new THREE.Vector3(position.x, position.y + 0.04, position.z),
+          rotation: new THREE.Euler(0, turn, 0.2),
+          scale: new THREE.Vector3(1, 0.68, 1),
+        });
+        pushBatch(batches, 'quarry-cut', {
+          geometry: new THREE.BoxGeometry(0.26, 0.055, 0.12),
+          color: '#c8bda7',
+          roughness: 0.82,
+        }, {
+          position: new THREE.Vector3(position.x + 0.11, position.y + 0.05, position.z - 0.08),
+          rotation: new THREE.Euler(0, turn + 0.4, 0),
+          scale: new THREE.Vector3(1, 1, 1),
+        });
+        break;
+      }
+      case 'mana_focus': {
+        const position = improvementAnchor(tile, 71, 0.28);
+        pushBatch(batches, 'mana-base', {
+          geometry: new THREE.CylinderGeometry(0.15, 0.18, 0.04, 12),
+          color: '#211a36',
+          roughness: 0.7,
+        }, {
+          position,
+          rotation: new THREE.Euler(0, turn, 0),
+          scale: new THREE.Vector3(1, 1, 1),
+        });
+        pushBatch(batches, 'mana-crystal', {
+          geometry: new THREE.OctahedronGeometry(0.13),
+          color: '#9b7dff',
+          emissive: '#5c3de0',
+          emissiveIntensity: 0.34,
+          roughness: 0.42,
+        }, {
+          position: new THREE.Vector3(position.x, position.y + 0.18, position.z),
+          rotation: new THREE.Euler(0.3, turn, 0.2),
+          scale: new THREE.Vector3(1, 1.2, 1),
+        });
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  return [...batches.values()];
+}
+
+function InfrastructureMesh({ def, instances }: { def: InfrastructureDef; instances: InfrastructureInstance[] }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    const dummy = new THREE.Object3D();
+    const baseColor = new THREE.Color(def.color);
+    for (let index = 0; index < instances.length; index++) {
+      const instance = instances[index];
+      dummy.position.copy(instance.position);
+      dummy.rotation.copy(instance.rotation);
+      dummy.scale.copy(instance.scale);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+      mesh.setColorAt(index, instance.color ?? baseColor);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [def.color, instances]);
+
+  if (instances.length === 0) return null;
+
+  return (
+    <instancedMesh ref={meshRef} args={[def.geometry, undefined, instances.length]} castShadow receiveShadow>
+      <meshStandardMaterial
+        color="#ffffff"
+        emissive={def.emissive ?? '#000000'}
+        emissiveIntensity={def.emissiveIntensity ?? 0}
+        roughness={def.roughness ?? 0.82}
+        metalness={def.metalness ?? 0.04}
+        vertexColors
+        flatShading
+      />
+    </instancedMesh>
+  );
+}
+
+export function InfrastructureLayer() {
+  const gameState = useGameStore((s) => s.gameState);
+  const showFog = useGameStore((s) => s.showFog);
+  const activePlayerId = useGameStore((s) => s.activePlayerId);
+
+  const batches = useMemo(() => {
+    if (!gameState) return [];
+    const tiles = visibleInfrastructureTiles(gameState, activePlayerId, showFog);
+    const improvementTiles = tiles.filter((tile) => (
+      tile.hasFort ||
+      tile.hasRiftPortal ||
+      (tile.improvement !== null && IMPROVEMENT_TYPES.includes(tile.improvement as typeof IMPROVEMENT_TYPES[number]))
+    ));
+
+    return [
+      ...buildRoadBatches(tiles, gameState.map.tiles),
+      ...buildImprovementBatches(improvementTiles, gameState.players),
+    ].filter((batch) => batch.instances.length > 0);
+  }, [activePlayerId, gameState, showFog]);
+
+  if (!gameState || batches.length === 0) return null;
+
+  return (
+    <group>
+      {batches.map((batch) => (
+        <InfrastructureMesh key={batch.key} def={batch.def} instances={batch.instances} />
+      ))}
+    </group>
+  );
+}
