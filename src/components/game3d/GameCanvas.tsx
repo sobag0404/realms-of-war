@@ -12,7 +12,7 @@ export function GameCanvas({ className }: GameCanvasProps) {
   return (
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       gl={{
         antialias: true,
         powerPreference: 'high-performance',

@@ -138,6 +138,20 @@ The v4 pass prioritizes gameplay markers over the richer map surface added in v3
 - Path preview should float above terrain elevation and use a dark under-line plus a bright dashed route so it remains visible across biomes.
 - These treatments remain renderer-only and original: no copied 4X UI icon shapes, unit flags, city banners, or selection language from Civilization VI.
 
+## V5 Lighting, Atmosphere, And Performance Pass
+
+The v5 pass unifies the richer terrain and tactical marker work with a calmer strategic-map lighting model. The target is a bright fantasy command-table scene with stronger depth cues, softer shadowing, restrained atmosphere, and predictable performance at desktop PC viewports.
+
+- Lighting should use one warm primary sun, cool fill, and a low-intensity rim so forests, hills, cities, and units feel grounded without darkening selection, health, ownership, or path markers.
+- Shadow quality should favor stable readable contact over maximum resolution. A wider 2048 shadow atlas and balanced ambient fill reduce harsh contrast and cost while still giving cities, terrain props, and units a visible footprint.
+- Post-processing should remain an accent layer. Bloom and vignette are reduced from v4 so faction colors and overlay colors stay accurate; expensive bloom blur is reserved for ultra settings.
+- Water should read deeper through darker underlay and subtle specular material changes, with shared group motion instead of per-tile animation.
+- Fog should sit behind board readability: distant atmospheric fog can widen slightly, but explored terrain, ownership, unit bases, city rings, and selection/path outlines must remain visible.
+- The desktop budget assumes PC viewports from 1366x768 through 2560x1440. DPR is capped below 2x for the 3-D canvas to avoid fill-rate spikes on high-resolution monitors while preserving readable large hexes.
+- Per-frame renderer work should remain bounded and instanced. Decorative vegetation sway reuses transform objects and only updates a limited subset, avoiding object allocation inside the frame loop.
+
+This pass remains renderer-only and original. It does not copy another 4X game's lighting grade, fog color, shoreline treatment, bloom signature, camera mood, or protected presentation language.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.

@@ -32,22 +32,22 @@ const CONFIGS: Record<GraphicsPreset, PostProcessConfig> = {
   low: {
     bloom: { enabled: false, intensity: 0, luminanceThreshold: 1, luminanceSmoothing: 0, mipmapBlur: false },
     vignette: { enabled: false, offset: 0, darkness: 0 },
-    toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.04 },
+    toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.02 },
   },
   medium: {
-    bloom: { enabled: true, intensity: 0.16, luminanceThreshold: 0.93, luminanceSmoothing: 0.26, mipmapBlur: false },
+    bloom: { enabled: true, intensity: 0.12, luminanceThreshold: 0.95, luminanceSmoothing: 0.22, mipmapBlur: false },
+    vignette: { enabled: true, offset: 0.22, darkness: 0.12 },
+    toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.05 },
+  },
+  high: {
+    bloom: { enabled: true, intensity: 0.18, luminanceThreshold: 0.93, luminanceSmoothing: 0.24, mipmapBlur: false },
     vignette: { enabled: true, offset: 0.24, darkness: 0.16 },
     toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.08 },
   },
-  high: {
-    bloom: { enabled: true, intensity: 0.24, luminanceThreshold: 0.9, luminanceSmoothing: 0.3, mipmapBlur: true },
-    vignette: { enabled: true, offset: 0.26, darkness: 0.2 },
-    toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.12 },
-  },
   ultra: {
-    bloom: { enabled: true, intensity: 0.3, luminanceThreshold: 0.88, luminanceSmoothing: 0.34, mipmapBlur: true },
-    vignette: { enabled: true, offset: 0.28, darkness: 0.22 },
-    toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.15 },
+    bloom: { enabled: true, intensity: 0.24, luminanceThreshold: 0.91, luminanceSmoothing: 0.28, mipmapBlur: true },
+    vignette: { enabled: true, offset: 0.26, darkness: 0.19 },
+    toneMapping: { enabled: true, mode: ToneMappingMode.ACES_FILMIC, exposure: 1.1 },
   },
 };
 

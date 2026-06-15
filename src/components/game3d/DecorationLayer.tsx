@@ -250,13 +250,14 @@ function InstancedDecorationMesh({
   sway?: boolean;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummyRef = useRef(new THREE.Object3D());
 
   // Set up instance matrices and colors
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
 
-    const dummy = new THREE.Object3D();
+    const dummy = dummyRef.current;
     const color = new THREE.Color();
 
     for (let i = 0; i < instances.length; i++) {
@@ -292,7 +293,7 @@ function InstancedDecorationMesh({
 
     // Only sway forest/plains decorations (optimization)
     const t = clock.getElapsedTime();
-    const dummy = new THREE.Object3D();
+    const dummy = dummyRef.current;
 
     for (let i = 0; i < Math.min(instances.length, 200); i++) {
       const inst = instances[i];
