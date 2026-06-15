@@ -1,66 +1,86 @@
 # Windows Artifact Smoke
 
-Date: 2026-06-14
+Date: 2026-06-15
 
-Status: unsigned portable exe and NSIS installer both pass local smoke.
+Status: reusable smoke checklist for the unsigned Windows desktop playtest
+artifact. Player-facing download and uninstall steps live in
+[`download/README.md`](../download/README.md).
 
-## Artifact
+## Artifact Source
 
-Source workflow:
+Use the manual GitHub Actions workflow:
 
-- Run: https://github.com/sobag0404/realms-of-war/actions/runs/27511030159
+- Workflow: `Windows Desktop Artifact`
+- File: `.github/workflows/windows-desktop-artifact.yml`
+- Branch: `main`
 - Artifact name: `RealmsOfWar-windows-unsigned`
-- Local inspection path: `C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\pr15-27510619482`
 
-Artifact contents inspected locally:
+The workflow builds the Tauri app on `windows-latest` and uploads:
 
-- `realms-of-war.exe` - 9,338,368 bytes
-- `bundle\nsis\Realms of War_0.2.0_x64-setup.exe` - 2,684,820 bytes
+```text
+src-tauri/target/release/*.exe
+src-tauri/target/release/bundle/nsis/*.exe
+```
 
-No artifact binaries are committed to the repository.
+Do not commit generated executable or installer artifacts to the repository.
+Download artifacts to a directory outside the checkout, for example:
 
-## Player Download And Run Steps
+```text
+C:\Users\<you>\Documents\STR\realms-of-war-artifacts\<run-id>
+```
 
-1. Open the workflow run:
-   https://github.com/sobag0404/realms-of-war/actions/runs/27511030159
-2. Download the `RealmsOfWar-windows-unsigned` artifact from the run page.
-3. Extract the downloaded `.zip`.
-4. For the portable smoke path, run:
+## Expected Artifact Contents
+
+The extracted artifact should contain:
+
+```text
+realms-of-war.exe
+bundle\nsis\Realms of War_0.2.0_x64-setup.exe
+```
+
+`realms-of-war.exe` is the quickest portable smoke target. The NSIS setup file
+is the installer/uninstaller smoke target.
+
+## Unsigned Warning
+
+The installer and executable are unsigned. Windows SmartScreen or antivirus
+software may warn that the publisher is unknown. That warning is expected for the
+current playtest artifact and should be called out in any handoff.
+
+Only run artifacts downloaded from the official repository Actions run.
+
+## Portable Smoke
+
+1. Extract the `RealmsOfWar-windows-unsigned` artifact.
+2. Run:
 
 ```text
 realms-of-war.exe
 ```
 
-5. The app should open a `Realms of War` window and load the main menu.
-6. Click `New game`, keep the default setup, then click `Start game`.
-7. The map should render with the desktop HUD and playable hex grid.
-8. Click the save button in the top-right action row. A saved notification should appear.
+3. Verify a native `Realms of War` window opens.
+4. Verify the main menu renders.
+5. Click `New game`.
+6. Keep the default setup and click `Start game`.
+7. Verify the gameplay map renders nonblank with the desktop HUD.
+8. Click the save action and verify a saved notification appears.
+9. Verify a save file exists under:
 
-## Unsigned Installer Notes
+```text
+%APPDATA%\com.realmsofwar.game\saves
+```
 
-The artifact also contains:
+## Installer Smoke
+
+Interactive path:
+
+1. Run:
 
 ```text
 bundle\nsis\Realms of War_0.2.0_x64-setup.exe
 ```
 
-This setup file is unsigned. Windows SmartScreen or antivirus software may warn that the publisher is unknown. That is expected for the current development artifact.
-
-Do not treat this installer as a production release yet:
-
-- no code signing
-- no updater
-- no final app icon/branding
-- no installer upgrade QA matrix
-
-Use the top-level `realms-of-war.exe` for the quickest smoke path. Use the setup executable when specifically testing install/uninstall behavior.
-
-## Installer Playtest Steps
-
-Interactive path:
-
-1. Run `bundle\nsis\Realms of War_0.2.0_x64-setup.exe`.
-2. Accept the Windows unsigned-publisher warning if shown.
+2. Accept the unsigned-publisher warning if shown.
 3. Install Realms of War.
 4. Launch the installed app.
 5. Start a new game and save once.
@@ -70,7 +90,13 @@ Interactive path:
 %APPDATA%\com.realmsofwar.game\saves
 ```
 
-Silent user-safe smoke path used locally:
+7. Uninstall through Windows Settings:
+
+```text
+Settings -> Apps -> Installed apps -> Realms of War -> Uninstall
+```
+
+Silent temp-directory smoke path:
 
 ```powershell
 $installDir = "$env:TEMP\realms-of-war-installer-smoke"
@@ -81,41 +107,23 @@ $installDir = "$env:TEMP\realms-of-war-installer-smoke"
 
 The `/D=...` argument must be the final installer argument for NSIS.
 
-## Smoke Result
+Uninstalling removes the installed app files. It may leave user save data under
+`%APPDATA%\com.realmsofwar.game`; remove that directory manually when a clean
+playtest profile is required.
 
-Verified locally on Windows from the downloaded artifact:
+## Local-First Expectations
 
-- Portable `realms-of-war.exe` starts.
-- Native window title is `Realms of War`.
-- WebView2 child process starts.
-- Main menu renders.
-- New game setup panel opens.
-- Default new game starts.
-- Gameplay map renders nonblank.
-- Save button works and shows a saved notification.
-- NSIS setup installs successfully to a temp user directory with `/S /D=...`.
-- Installed `realms-of-war.exe` starts from the temp install directory.
-- Installed app reaches gameplay and saves successfully.
-- `uninstall.exe /S` removes the temp install directory.
+The Windows desktop artifact should not require a VPS, public server, or local
+HTTP server for core gameplay. New game, render, save, list, load, and delete
+must work through the desktop static renderer and Tauri filesystem save path.
 
-Screenshots were captured outside the repo:
-
-- `C:\Users\pcia0\AppData\Local\Temp\realms-windows-artifact-smoke-game.png`
-- `C:\Users\pcia0\AppData\Local\Temp\realms-windows-artifact-newgame-modal.png`
-- `C:\Users\pcia0\AppData\Local\Temp\realms-windows-artifact-gameplay.png`
-- `C:\Users\pcia0\AppData\Local\Temp\realms-windows-artifact-save.png`
-- `C:\Users\pcia0\AppData\Local\Temp\realms-installer-smoke-save2.png`
-
-Installer smoke was run only through a reversible temp-directory install. No generated installer artifacts are committed.
+The only network requirement for this playtest is downloading the artifact from
+GitHub Actions.
 
 ## Current Limitations
 
-- The artifact is unsigned.
-- The icon is still a placeholder.
-- Tauri filesystem saves were verified in the PR #15 branch artifact.
-- Load/delete are covered by `bun run desktop:static:smoke`; manual Tauri smoke confirmed startup, new game, render, save, filesystem save path, installed-app launch, and uninstall cleanup.
-- Local Tauri builds on this machine still require Rust/Cargo/MSVC installation; GitHub Actions is the verified artifact path.
-
-## Next Milestone
-
-Recommended next milestone: add a signed release plan and replace placeholder branding assets.
+- No code signing yet.
+- No updater yet.
+- Placeholder branding may still appear in installer metadata or icons.
+- Online multiplayer, cloud saves, accounts, payments, and production release
+  signing are out of scope for this artifact.
