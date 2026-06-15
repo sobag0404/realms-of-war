@@ -11,6 +11,7 @@ export { LightingRig } from './LightingRig';
 export { TerrainLayer } from './TerrainLayer';
 export { HexMesh } from './HexMesh';
 export { WaterLayer } from './WaterLayer';
+export { InfrastructureLayer } from './InfrastructureLayer';
 export { UnitLayer } from './UnitLayer';
 export { BuildingLayer } from './BuildingLayer';
 export { FogLayer } from './FogLayer';

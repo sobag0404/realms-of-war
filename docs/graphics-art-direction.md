@@ -152,6 +152,19 @@ The v5 pass unifies the richer terrain and tactical marker work with a calmer st
 
 This pass remains renderer-only and original. It does not copy another 4X game's lighting grade, fog color, shoreline treatment, bloom signature, camera mood, or protected presentation language.
 
+## V6 Roads, Improvements, And Landmark Readability Pass
+
+The v6 pass makes existing strategic infrastructure data readable without adding new rules. Roads, forts, tile improvements, and rift portals should become map objects the player can scan at default PC zoom while terrain, resources, units, cities, ownership, and selection remain visually dominant.
+
+- Roads should be low-profile trails with a dark underlay and warm worn surface. Adjacent road tiles may visually connect, but the renderer must not invent movement rules or road masks that are not present in data.
+- Improvements should use small original procedural silhouettes near the hex interior edge: farm strips, mine or quarry stonework, lumber logs, and mana-focus crystals. They should not hide resources, unit bases, city plinths, selection rings, or path previews.
+- Forts should read as defensive infrastructure through compact palisade or tower forms, but city walls and selected-unit rings keep higher visual priority.
+- Rift portals should use restrained magical geometry and owner color when `riftPortalOwner` exists, avoiding large animated effects until gameplay needs them.
+- Infrastructure visibility follows fog knowledge. Hidden tiles should not reveal infrastructure; explored tiles may keep silhouettes under fog so known strategic routes remain legible.
+- The pass should remain instanced and static per state update: no per-frame road, fort, improvement, or portal animation is needed for this vertical slice.
+
+Current schema supports `HexTile.hasRoad`, `HexTile.hasFort`, `HexTile.improvement`, `HexTile.hasRiftPortal`, `HexTile.riftPortalOwner`, and `HexTile.owningCityId`. Directional road masks, rivers, durable landmark categories, and multi-tile improvement footprints remain future schema work and should not be inferred in renderer-only code.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
