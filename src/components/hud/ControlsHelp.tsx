@@ -37,7 +37,7 @@ export function ControlsHelp() {
   }, []);
 
   return (
-    <div className="absolute bottom-[170px] sm:bottom-[220px] right-2 sm:right-4 z-20 pointer-events-auto">
+    <div className="absolute bottom-[144px] sm:bottom-[184px] right-2 sm:right-4 z-20 pointer-events-auto">
       {expanded ? (
         <div className="bg-black/60 backdrop-blur-sm rounded-lg border border-white/10 p-3 min-w-[200px] animate-in fade-in slide-in-from-bottom-1 duration-200">
           {/* Header */}

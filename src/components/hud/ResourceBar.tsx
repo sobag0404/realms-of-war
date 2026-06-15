@@ -114,8 +114,8 @@ export function ResourceBar() {
     : RESOURCE_DISPLAYS;
 
   return (
-    <div className="absolute top-2 left-2 right-2 sm:left-4 sm:right-auto z-10 pointer-events-auto">
-      <div className="flex max-w-full flex-wrap items-center gap-1.5 sm:gap-2 rounded-lg border border-amber-200/15 bg-slate-950/60 px-2 py-1.5 shadow-2xl shadow-black/25 backdrop-blur-md">
+    <div className="absolute top-2 left-2 right-2 sm:left-4 sm:right-auto z-10 pointer-events-auto max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-28rem)] xl:max-w-[calc(100vw-34rem)]">
+      <div className="flex max-w-full flex-wrap items-center gap-1.5 sm:gap-2 rounded-lg border border-amber-200/15 bg-slate-950/65 px-2 py-1.5 shadow-2xl shadow-black/25 backdrop-blur-md">
         {/* Resource items */}
         {visibleResources.map((res) => {
           const amount = resources[res.id] ?? 0;

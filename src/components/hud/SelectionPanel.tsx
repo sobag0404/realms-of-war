@@ -85,7 +85,7 @@ export function SelectionPanel() {
         transition-all duration-200 ease-out
         ${hasContent ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'}`}
     >
-      <div className="min-w-[220px] max-w-[280px] rounded-lg border border-amber-200/15 bg-slate-950/60 p-3 shadow-2xl shadow-black/30 backdrop-blur-md sm:max-w-[320px] sm:p-4">
+      <div className="min-w-[220px] max-w-[280px] max-h-[min(48vh,27rem)] overflow-y-auto rounded-lg border border-amber-200/15 bg-slate-950/70 p-3 shadow-2xl shadow-black/30 backdrop-blur-md sm:max-w-[320px] sm:p-4">
         {/* Close button */}
         <div className="flex justify-end mb-1">
           <Button
