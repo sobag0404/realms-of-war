@@ -62,33 +62,47 @@ export function CoastLayer() {
   const foamGeometry = useMemo(() => createHexRing(0.88, 1), []);
   const shallowsGeometry = useMemo(() => new THREE.CircleGeometry(0.82, 6), []);
   const landShoreGeometry = useMemo(() => createHexRing(0.82, 0.98), []);
+  const edgeFoamGeometry = useMemo(() => new THREE.BoxGeometry(0.7, 0.018, 0.08), []);
+  const edgeSandGeometry = useMemo(() => new THREE.BoxGeometry(0.6, 0.014, 0.12), []);
 
   const sandMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#d7c185',
+    color: '#dec88d',
+    transparent: true,
+    opacity: 0.42,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
+  const foamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#effff7',
     transparent: true,
     opacity: 0.34,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
-  const foamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#e7fbff',
-    transparent: true,
-    opacity: 0.28,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  }), []);
   const shallowsMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#58b8b1',
+    color: '#64c1ad',
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.24,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const landShoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#d8c487',
+    color: '#e0ca8d',
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.3,
     side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
+  const edgeFoamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#f7fff6',
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false,
+  }), []);
+  const edgeSandMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#d8bd75',
+    transparent: true,
+    opacity: 0.28,
     depthWrite: false,
   }), []);
 
@@ -100,6 +114,10 @@ export function CoastLayer() {
         const [wx, , wz] = hexToWorld(tile.coord);
         const phase = (tile.coord.q * 17 + tile.coord.r * 31) % 6;
         const rotation = -Math.PI / 2 + phase * 0.018;
+        const shoreEdges = HEX_DIRECTIONS.filter((dir) => {
+          const neighbor = gameState?.map.tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
+          return neighbor && neighbor.terrain !== 'water';
+        });
 
         return (
           <group key={`coast-${tile.coord.q},${tile.coord.r}`} position={[wx, COASTAL_WATER_Y, wz]} renderOrder={5}>
@@ -112,6 +130,29 @@ export function CoastLayer() {
             <mesh geometry={foamGeometry} rotation={[rotation, 0, 0]} position={[0, 0.012, 0]}>
               <primitive object={foamMaterial} attach="material" />
             </mesh>
+            {shoreEdges.map((dir, index) => {
+              const [nx, , nz] = hexToWorld({ q: tile.coord.q + dir.q, r: tile.coord.r + dir.r });
+              const edgeX = nx - wx;
+              const edgeZ = nz - wz;
+              const length = Math.sqrt(edgeX * edgeX + edgeZ * edgeZ) || 1;
+              const ux = edgeX / length;
+              const uz = edgeZ / length;
+              const yaw = Math.atan2(uz, ux);
+              return (
+                <group
+                  key={`edge-${index}`}
+                  position={[ux * 0.72, 0.02, uz * 0.72]}
+                  rotation={[0, -yaw, 0]}
+                >
+                  <mesh geometry={edgeSandGeometry} position={[0, 0, 0]}>
+                    <primitive object={edgeSandMaterial} attach="material" />
+                  </mesh>
+                  <mesh geometry={edgeFoamGeometry} position={[0, 0.012, 0.05]}>
+                    <primitive object={edgeFoamMaterial} attach="material" />
+                  </mesh>
+                </group>
+              );
+            })}
           </group>
         );
       })}

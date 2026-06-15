@@ -11,20 +11,20 @@ export interface CameraMapSize {
 export const CAMERA_MIN_ZOOM = 8;
 export const CAMERA_MAX_ZOOM = 56;
 export const CAMERA_DEFAULT_ZOOM = 30;
-export const CAMERA_DEFAULT_ROTATION = 45;
-export const CAMERA_DEFAULT_PITCH = 58;
-export const CAMERA_DEFAULT_DISTANCE = 36;
+export const CAMERA_DEFAULT_ROTATION = 42;
+export const CAMERA_DEFAULT_PITCH = 53;
+export const CAMERA_DEFAULT_DISTANCE = 42;
 export const CAMERA_BASE_PAN_ZOOM = 24;
 export const CAMERA_MAP_PADDING_HEXES = 4;
 export const CAMERA_WHEEL_ZOOM_FACTOR = 1.12;
 
 const DEFAULT_VIEWPORT: CameraViewportSize = { width: 1280, height: 720 };
 const DEFAULT_MAP_SIZE: CameraMapSize = { width: 42, depth: 26 };
-const MIN_DEFAULT_VISIBLE_DEPTH = 22;
-const MAX_DEFAULT_VISIBLE_DEPTH = 36;
+const MIN_DEFAULT_VISIBLE_DEPTH = 20;
+const MAX_DEFAULT_VISIBLE_DEPTH = 34;
 const COMPACT_MAX_DEFAULT_VISIBLE_DEPTH = 32;
-const MAP_DEPTH_VISIBLE_FRACTION = 0.74;
-const MAP_WIDTH_VISIBLE_FRACTION = 0.62;
+const MAP_DEPTH_VISIBLE_FRACTION = 0.68;
+const MAP_WIDTH_VISIBLE_FRACTION = 0.58;
 
 export function clampCameraZoom(zoom: number): number {
   if (!Number.isFinite(zoom)) return CAMERA_DEFAULT_ZOOM;

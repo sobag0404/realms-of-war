@@ -21,8 +21,8 @@ import { PostProcessing } from './PostProcessing';
 export function SceneRoot() {
   return (
     <>
-      <color attach="background" args={['#0d1720']} />
-      <fog attach="fog" args={['#0d1720', 38, 110]} />
+      <color attach="background" args={['#11181d']} />
+      <fog attach="fog" args={['#11181d', 32, 96]} />
       <CameraRig />
       <LightingRig />
       <TerrainLayer />

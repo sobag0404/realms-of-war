@@ -18,6 +18,26 @@ interface HexMeshProps {
   onHover?: (hex: HexCoord | null) => void;
 }
 
+function hash01(q: number, r: number, salt: number): number {
+  const x = Math.sin(q * 127.1 + r * 311.7 + salt * 74.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function colorForVertex(terrain: TerrainTypeId, q: number, r: number, vertexIndex: number, normalY: number): THREE.Color {
+  const color = new THREE.Color(TERRAIN_COLORS[terrain] ?? '#555555');
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  const tileNoise = hash01(q, r, 1) - 0.5;
+  const vertexNoise = hash01(q, r, vertexIndex + 13) - 0.5;
+  const sideShade = normalY > 0.5 ? 1 : terrain === 'mountain' ? 0.58 : terrain === 'forest' ? 0.62 : 0.72;
+  const centerLift = vertexIndex === 0 ? 0.04 : 0;
+  return new THREE.Color().setHSL(
+    THREE.MathUtils.euclideanModulo(hsl.h + tileNoise * 0.018, 1),
+    THREE.MathUtils.clamp(hsl.s + tileNoise * 0.12, 0.05, 0.95),
+    THREE.MathUtils.clamp((hsl.l + vertexNoise * 0.12 + centerLift) * sideShade, 0.08, 0.88),
+  );
+}
+
 export function HexMesh({
   position,
   terrain,
@@ -35,29 +55,37 @@ export function HexMesh({
   const geometry = useMemo(() => {
     // Use buildHexGeometry with a slight inset for visual gaps between hexes
     const hexHeight = Math.max(0.05, elevation + 0.1);
-    return buildHexGeometry({
+    const meshGeometry = buildHexGeometry({
       radius: 0.95, // Slightly smaller to show gaps
       height: hexHeight,
       includeTop: true,
       includeSides: true,
       segments: 1,
     });
-  }, [elevation]);
+    const normals = meshGeometry.getAttribute('normal');
+    const colors: number[] = [];
+    for (let index = 0; index < normals.count; index++) {
+      const color = colorForVertex(terrain, hex.q, hex.r, index, normals.getY(index));
+      colors.push(color.r, color.g, color.b);
+    }
+    meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    return meshGeometry;
+  }, [elevation, hex.q, hex.r, terrain]);
 
   // Use terrainMaterials from rendering utils for the base material
   const baseMaterial = useMemo(() => createTerrainMaterial(terrain), [terrain]);
 
   // Handle hover highlight: brighten the terrain color slightly
   const material = useMemo(() => {
+    const withVertexColors = baseMaterial.clone();
+    withVertexColors.vertexColors = true;
+    withVertexColors.color = new THREE.Color(isHovered || hovered ? '#ffffff' : '#f4f1df');
     if (isHovered || hovered) {
-      // Clone the cached material and adjust for hover
-      const mat = baseMaterial.clone();
-      const baseColor = new THREE.Color(TERRAIN_COLORS[terrain] ?? '#555555');
-      mat.color = baseColor.offsetHSL(0, 0, 0.1);
-      return mat;
+      withVertexColors.emissive = new THREE.Color('#1f2630');
+      withVertexColors.emissiveIntensity = 0.08;
     }
-    return baseMaterial;
-  }, [baseMaterial, terrain, isHovered, hovered]);
+    return withVertexColors;
+  }, [baseMaterial, isHovered, hovered]);
 
   // Handle pointer events
   const handlePointerOver = (e: THREE.Event) => {

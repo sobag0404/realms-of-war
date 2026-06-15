@@ -34,40 +34,46 @@ function getDecorationDefs(terrain: TerrainTypeId): DecorationDef[] {
     case 'forest':
       return [
         {
-          geometry: new THREE.ConeGeometry(0.16, 0.48, 7),
-          color: '#184f2f',
-          yOffset: 0.24,
-          scaleRange: [0.82, 1.22],
+          geometry: new THREE.ConeGeometry(0.22, 0.62, 8),
+          color: '#153f28',
+          yOffset: 0.31,
+          scaleRange: [0.9, 1.34],
           sway: true,
         },
         {
-          geometry: new THREE.ConeGeometry(0.12, 0.34, 7),
-          color: '#2f7b45',
-          yOffset: 0.18,
-          scaleRange: [0.68, 1.04],
+          geometry: new THREE.DodecahedronGeometry(0.18, 0),
+          color: '#2c6d3e',
+          yOffset: 0.26,
+          scaleRange: [0.76, 1.18],
           sway: true,
         },
         {
           // Tree trunk
-          geometry: new THREE.CylinderGeometry(0.035, 0.045, 0.18, 5),
+          geometry: new THREE.CylinderGeometry(0.04, 0.055, 0.22, 5),
           color: '#4b3424',
-          yOffset: 0.09,
-          scaleRange: [0.76, 1.08],
+          yOffset: 0.11,
+          scaleRange: [0.82, 1.16],
         },
       ];
     case 'mountain':
       return [
         {
-          geometry: new THREE.ConeGeometry(0.22, 0.72, 5),
-          color: '#676f78',
-          yOffset: 0.36,
-          scaleRange: [0.72, 1.2],
+          geometry: new THREE.ConeGeometry(0.32, 1.04, 5),
+          color: '#5d6470',
+          yOffset: 0.52,
+          scaleRange: [0.82, 1.34],
         },
         {
-          geometry: new THREE.ConeGeometry(0.14, 0.5, 5),
-          color: '#aeb8c1',
-          yOffset: 0.25,
-          scaleRange: [0.54, 0.92],
+          geometry: new THREE.ConeGeometry(0.18, 0.64, 5),
+          color: '#cbd4d7',
+          yOffset: 0.74,
+          scaleRange: [0.62, 1.02],
+        },
+        {
+          geometry: new THREE.ConeGeometry(0.11, 0.18, 5),
+          color: '#f0f3ec',
+          yOffset: 1.06,
+          scaleRange: [0.5, 0.82],
         },
       ];
     case 'desert':
@@ -143,17 +149,17 @@ function getDecorationDefs(terrain: TerrainTypeId): DecorationDef[] {
       return [
         {
           // Small rock
-          geometry: new THREE.DodecahedronGeometry(0.1, 0),
-          color: '#7d735f',
-          yOffset: 0.07,
-          scaleRange: [0.62, 1.18],
+          geometry: new THREE.DodecahedronGeometry(0.14, 0),
+          color: '#776d58',
+          yOffset: 0.1,
+          scaleRange: [0.7, 1.26],
         },
         {
           // Grass patch
-          geometry: new THREE.BoxGeometry(0.22, 0.035, 0.08),
-          color: '#b28248',
-          yOffset: 0.05,
-          scaleRange: [0.54, 0.98],
+          geometry: new THREE.BoxGeometry(0.32, 0.04, 0.08),
+          color: '#b18b4b',
+          yOffset: 0.08,
+          scaleRange: [0.66, 1.14],
         },
       ];
     case 'water':
@@ -197,7 +203,7 @@ function DecorationInstances({
         for (let i = 0; i < count; i++) {
           // Keep the cell center open for units, cities, resources, and selection rings.
           const angle = rng() * Math.PI * 2;
-          const radius = 0.28 + Math.sqrt(rng()) * 0.42;
+          const radius = 0.34 + Math.sqrt(rng()) * 0.34;
           const px = wx + Math.cos(angle) * radius;
           const pz = wz + Math.sin(angle) * radius;
 

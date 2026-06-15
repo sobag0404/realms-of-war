@@ -180,6 +180,30 @@ The v7 pass protects the richer v2-v6 map presentation across desktop PC camera 
 
 Generated maps may still contain sparse `hasRoad`, `hasFort`, `improvement`, and `hasRiftPortal` data. When a screenshot does not naturally include those fields, the verification note should say so explicitly and separate renderer readiness from future map-generation or scenario-authoring needs. The renderer must use existing schema only and must not invent infrastructure gameplay rules to make prettier screenshots.
 
+## V9 Reference-Driven Art-Quality Gap Pass
+
+The v9 pass responds to a concrete PC 4X reference screenshot supplied outside the repository. The screenshot is used only as a quality benchmark for production traits: angled board readability, rich terrain surfaces, strong relief, integrated water and coast, dense but legible map pieces, warm daylight, atmospheric depth, and HUD restraint. It is not a source for assets, UI language, icons, palette, city labels, unit markers, terrain silhouettes, or branded presentation.
+
+Current gap list against that quality bar:
+
+- The existing map has readable terrain, resources, roads, units, cities, and fog, but much of the terrain still reads as colored hex board state rather than authored miniature 3-D board art.
+- Snow and tundra are not currently durable renderer inputs on `HexTile`; the data model exposes terrain classes such as plains, forest, hills, mountains, desert, swamp, ruins, and water, but not biome or temperature bands for snowline rendering.
+- Rivers, edge masks, and cliff masks are not stored on `HexTile`, so the renderer must not invent river gameplay or precise coast masks from visual heuristics.
+- Mountains, hills, and forests need stronger silhouettes and depth at default camera distance, while still leaving cell centers open for cities, units, resources, selection, and paths.
+- Fog should feel more like an original war-table map veil instead of only a dark overlay, but it must not reveal hidden gameplay information.
+- The current UI/composition work frames the map, but it does not by itself solve the art-quality gap.
+
+Renderer-only v9 rules:
+
+- Add deterministic painterly vertex color bands and shallow top relief directly to local procedural terrain geometry. This keeps screenshots stable and avoids external texture assets.
+- Keep large hexes, visible rims, and gameplay overlays as the readability backbone. Material richness should reinforce terrain identity, not hide board state.
+- Use stronger terrain-specific silhouettes through shared instanced primitives: forests as darker canopy masses, hills as warm contour/rock breaks, mountains as taller angular ridges with light caps, and coasts as layered shallows/foam/sand.
+- Tune the default camera toward an angled desktop strategy board view while preserving orthographic readability and target desktop viewports.
+- Warm key light, cool fill, soft shadows, ACES tone mapping, and modest atmospheric fog should add depth without changing faction or selection colors into ambiguous states.
+- Before/after screenshots for this pass should live outside the repository under `C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\graphics-v9\before` and `...\after`, with 1366x768, 1920x1080, and 2560x1440 captures.
+
+Known limit: a true Civilization-VI-scale visual leap requires an owned asset pipeline beyond renderer tuning: authored terrain texture sets, biome and temperature fields, river/coast/cliff masks, handmade or generated owned props, and showcase scenario data. V9 deliberately does not fake those schema fields or copy external assets.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
