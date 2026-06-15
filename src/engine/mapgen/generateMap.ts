@@ -308,6 +308,7 @@ function buildMapData(
         resource: resourceStr,
         yield: tileYield,
         hasRoad: false,
+        riverMask,
         hasFort: false,
         owningCityId: null,
         improvement: null,
