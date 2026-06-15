@@ -3,10 +3,12 @@
 import { CameraRig } from './CameraRig';
 import { LightingRig } from './LightingRig';
 import { TerrainLayer } from './TerrainLayer';
+import { TerrainDepthLayer } from './TerrainDepthLayer';
 import { TerrainAccentLayer } from './TerrainAccentLayer';
 import { DecorationLayer } from './DecorationLayer';
 import { CoastLayer } from './CoastLayer';
 import { WaterLayer } from './WaterLayer';
+import { RiverLayer } from './RiverLayer';
 import { InfrastructureLayer } from './InfrastructureLayer';
 import { BuildingLayer } from './BuildingLayer';
 import { UnitLayer } from './UnitLayer';
@@ -26,10 +28,12 @@ export function SceneRoot() {
       <CameraRig />
       <LightingRig />
       <TerrainLayer />
+      <TerrainDepthLayer />
       <TerrainAccentLayer />
       <CoastLayer />
       <DecorationLayer />
       <WaterLayer />
+      <RiverLayer />
       <InfrastructureLayer />
       <ResourceLayer />
       <BuildingLayer />

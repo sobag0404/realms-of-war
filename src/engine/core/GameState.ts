@@ -178,6 +178,8 @@ export interface HexTile {
   yield: ResourceYield;
   /** Whether this hex has a road. */
   hasRoad: boolean;
+  /** River edge mask, one bit per hex direction. Visual/content data; 0 means no river edge. */
+  riverMask?: number;
   /** Whether this hex has a fortification. */
   hasFort: boolean;
   /** Owning city ID (null if unclaimed). */

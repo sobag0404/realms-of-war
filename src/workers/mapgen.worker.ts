@@ -25,6 +25,7 @@ type GeneratedTile = {
   resource: string | null;
   yield: Record<string, number>;
   hasRoad: boolean;
+  riverMask: number;
   hasFort: boolean;
   owningCityId: string | null;
   improvement: string | null;
@@ -315,6 +316,7 @@ function generateMap(width: number, height: number, seed: number, playerCount: n
         resource,
         yield: yield_,
         hasRoad: false,
+        riverMask: 0,
         hasFort: false,
         owningCityId: null,
         improvement: null,

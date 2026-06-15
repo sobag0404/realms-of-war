@@ -204,6 +204,31 @@ Renderer-only v9 rules:
 
 Known limit: a true Civilization-VI-scale visual leap requires an owned asset pipeline beyond renderer tuning: authored terrain texture sets, biome and temperature fields, river/coast/cliff masks, handmade or generated owned props, and showcase scenario data. V9 deliberately does not fake those schema fields or copy external assets.
 
+## V10 Terrain Feature And Depth Pipeline Pass
+
+The v10 pass begins the data-backed feature pipeline needed for richer PC 4X board art. It uses existing deterministic map generation data first, instead of adding screenshot-only decoration or inferring gameplay features in the renderer.
+
+V10 closes two specific gaps: river masks were generated and already affected tile yields, but they were not persisted on `HexTile` or visible on the map; and terrain elevation differences existed in materials but did not consistently read as board-piece depth from the default camera. The pass exposes `riverMask` as optional visual/content data, renders a low-profile original river layer from those masks, and adds a deterministic terrain-depth edge layer from existing terrain/elevation adjacency.
+
+- River visuals must come from `HexTile.riverMask`, not from random renderer-only strokes.
+- River strips sit above terrain/water/coast and below infrastructure, resources, cities, units, fog, selection, and path overlays.
+- Riverbeds use a dark grounded underlay, a narrow blue-green water ribbon, and a restrained light glint. Desert-to-desert river mask segments may read as dry beds.
+- The layer stays batched with instanced meshes and has no per-frame animation in this pass.
+- Fog rules match other terrain features: hidden tiles should not reveal river routes; explored/visible known tiles may show known river geometry.
+- The renderer must tolerate old saves or worker-generated maps where `riverMask` is absent by treating it as `0`.
+- Terrain-depth strips must come from existing `HexTile.terrain` plus local elevation constants, not from random renderer-only outlines.
+- Terrain-depth strips sit above terrain and below accents, resources, infrastructure, cities, units, fog, selection, and path overlays.
+- Terrain-depth materials should read as grounded cliff shadows, shore edge shadows, and subtle highland rims; they should increase relief without making every hex border equally loud.
+- Terrain-depth geometry stays batched with instanced meshes and has no per-frame animation.
+
+Remaining pipeline needs after v10:
+
+- Durable biome/temperature/elevation fields for snow, tundra, alpine caps, ice shelves, and seasonal palette rules.
+- River masks integrated into movement and bridge rules only if gameplay design wants that; v10 is visual/content exposure, not a rule change.
+- Coast/cliff masks and edge-aware terrain transitions so water, cliffs, roads, rivers, and snow can share boundaries cleanly.
+- Owned procedural or authored terrain texture/prop generation for higher-density forests, mountain ridges, riverbanks, ice, and wetlands.
+- A deterministic showcase scenario containing coast, river, mountain, forest, snow/tundra, city, units, resources, roads, improvements, ownership, fog, and selection in one camera frame.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
