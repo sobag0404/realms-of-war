@@ -15,6 +15,11 @@ type InfrastructureDef = {
   emissiveIntensity?: number;
   roughness?: number;
   metalness?: number;
+  transparent?: boolean;
+  opacity?: number;
+  depthWrite?: boolean;
+  depthTest?: boolean;
+  renderOrder?: number;
 };
 
 type InfrastructureInstance = {
@@ -32,6 +37,118 @@ type InfrastructureBatch = {
 
 const DIRECTIONS = [0, 1, 2, 3, 4, 5] as const;
 const IMPROVEMENT_TYPES = ['farm', 'mine', 'lumber_mill', 'quarry_improvement', 'mana_focus'] as const;
+const INFRASTRUCTURE_DEFS = {
+  'road-center-shadow': {
+    geometry: new THREE.CylinderGeometry(0.26, 0.31, 0.018, 12),
+    color: '#2c2419',
+    roughness: 0.96,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+    renderOrder: 8,
+  },
+  'road-center-top': {
+    geometry: new THREE.CylinderGeometry(0.21, 0.25, 0.014, 12),
+    color: '#927852',
+    roughness: 0.9,
+    transparent: true,
+    opacity: 0.96,
+    depthWrite: false,
+    renderOrder: 9,
+  },
+  'road-segment-shadow': {
+    geometry: new THREE.BoxGeometry(0.2, 0.016, 0.76),
+    color: '#2c2419',
+    roughness: 0.96,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+    renderOrder: 8,
+  },
+  'road-segment-top': {
+    geometry: new THREE.BoxGeometry(0.14, 0.012, 0.72),
+    color: '#a4895d',
+    roughness: 0.9,
+    transparent: true,
+    opacity: 0.97,
+    depthWrite: false,
+    renderOrder: 9,
+  },
+  'fort-ring': {
+    geometry: new THREE.TorusGeometry(0.34, 0.035, 6, 24),
+    color: '#3b2b22',
+    roughness: 0.82,
+  },
+  'fort-tower': {
+    geometry: new THREE.BoxGeometry(0.16, 0.24, 0.16),
+    color: '#8d7457',
+    roughness: 0.78,
+  },
+  'rift-base': {
+    geometry: new THREE.CylinderGeometry(0.24, 0.28, 0.05, 16),
+    color: '#191426',
+    roughness: 0.7,
+    metalness: 0.08,
+  },
+  'rift-arc': {
+    geometry: new THREE.TorusGeometry(0.19, 0.021, 8, 24),
+    color: '#9c66ff',
+    emissive: '#5d33ca',
+    emissiveIntensity: 0.38,
+    roughness: 0.45,
+  },
+  'farm-strip': {
+    geometry: new THREE.BoxGeometry(0.055, 0.018, 0.42),
+    color: '#d6b866',
+    roughness: 0.93,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+    renderOrder: 10,
+  },
+  'mine-mouth': {
+    geometry: new THREE.ConeGeometry(0.18, 0.24, 5),
+    color: '#3d3b39',
+    roughness: 0.88,
+  },
+  'mine-post': {
+    geometry: new THREE.BoxGeometry(0.08, 0.18, 0.08),
+    color: '#8b673d',
+    roughness: 0.82,
+  },
+  'lumber-log-dark': {
+    geometry: new THREE.CylinderGeometry(0.045, 0.045, 0.34, 8),
+    color: '#7a4d2d',
+    roughness: 0.9,
+  },
+  'lumber-log-light': {
+    geometry: new THREE.CylinderGeometry(0.045, 0.045, 0.34, 8),
+    color: '#a46a3d',
+    roughness: 0.9,
+  },
+  'quarry-stone': {
+    geometry: new THREE.DodecahedronGeometry(0.16, 0),
+    color: '#a49d8e',
+    roughness: 0.86,
+  },
+  'quarry-cut': {
+    geometry: new THREE.BoxGeometry(0.26, 0.055, 0.12),
+    color: '#c8bda7',
+    roughness: 0.82,
+  },
+  'mana-base': {
+    geometry: new THREE.CylinderGeometry(0.15, 0.18, 0.04, 12),
+    color: '#211a36',
+    roughness: 0.7,
+  },
+  'mana-crystal': {
+    geometry: new THREE.OctahedronGeometry(0.13),
+    color: '#9b7dff',
+    emissive: '#5c3de0',
+    emissiveIntensity: 0.34,
+    roughness: 0.42,
+  },
+} satisfies Record<string, InfrastructureDef>;
 
 function hash01(q: number, r: number, salt: number): number {
   const x = Math.sin(q * 127.1 + r * 311.7 + salt * 53.9) * 43758.5453;
@@ -127,22 +244,22 @@ function buildRoadBatches(tiles: HexTile[], tileMap: Record<string, HexTile>): I
   return [
     {
       key: 'road-center-shadow',
-      def: { geometry: new THREE.CylinderGeometry(0.24, 0.29, 0.018, 12), color: '#2c2419', roughness: 0.96 },
+      def: INFRASTRUCTURE_DEFS['road-center-shadow'],
       instances: centerShadow,
     },
     {
       key: 'road-center-top',
-      def: { geometry: new THREE.CylinderGeometry(0.19, 0.23, 0.014, 12), color: '#8a7048', roughness: 0.9 },
+      def: INFRASTRUCTURE_DEFS['road-center-top'],
       instances: centerTop,
     },
     {
       key: 'road-segment-shadow',
-      def: { geometry: new THREE.BoxGeometry(0.18, 0.016, 0.74), color: '#2c2419', roughness: 0.96 },
+      def: INFRASTRUCTURE_DEFS['road-segment-shadow'],
       instances: segmentShadow,
     },
     {
       key: 'road-segment-top',
-      def: { geometry: new THREE.BoxGeometry(0.12, 0.012, 0.7), color: '#9d8358', roughness: 0.9 },
+      def: INFRASTRUCTURE_DEFS['road-segment-top'],
       instances: segmentTop,
     },
   ];
@@ -181,20 +298,12 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
     if (tile.hasFort) {
       const [wx, , wz] = hexToWorld(tile.coord);
       const y = Math.max(0.05, terrainY(tile) + 0.24);
-      pushBatch(batches, 'fort-ring', {
-        geometry: new THREE.TorusGeometry(0.34, 0.035, 6, 24),
-        color: '#3b2b22',
-        roughness: 0.82,
-      }, {
+      pushBatch(batches, 'fort-ring', INFRASTRUCTURE_DEFS['fort-ring'], {
         position: new THREE.Vector3(wx, y, wz),
         rotation: new THREE.Euler(Math.PI / 2, 0, turn),
         scale: new THREE.Vector3(1, 1, 1),
       });
-      pushBatch(batches, 'fort-tower', {
-        geometry: new THREE.BoxGeometry(0.16, 0.24, 0.16),
-        color: '#8d7457',
-        roughness: 0.78,
-      }, {
+      pushBatch(batches, 'fort-tower', INFRASTRUCTURE_DEFS['fort-tower'], {
         position: new THREE.Vector3(wx, y + 0.11, wz),
         rotation: new THREE.Euler(0, turn, 0),
         scale: new THREE.Vector3(1, 1, 1),
@@ -205,23 +314,12 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
       const [wx, , wz] = hexToWorld(tile.coord);
       const y = Math.max(0.06, terrainY(tile) + 0.24);
       const ownerColor = tile.riftPortalOwner ? players[tile.riftPortalOwner]?.color : undefined;
-      pushBatch(batches, 'rift-base', {
-        geometry: new THREE.CylinderGeometry(0.24, 0.28, 0.05, 16),
-        color: '#191426',
-        roughness: 0.7,
-        metalness: 0.08,
-      }, {
+      pushBatch(batches, 'rift-base', INFRASTRUCTURE_DEFS['rift-base'], {
         position: new THREE.Vector3(wx, y, wz),
         rotation: new THREE.Euler(0, turn, 0),
         scale: new THREE.Vector3(1, 1, 1),
       });
-      pushBatch(batches, 'rift-arc', {
-        geometry: new THREE.TorusGeometry(0.19, 0.021, 8, 24),
-        color: '#9c66ff',
-        emissive: '#5d33ca',
-        emissiveIntensity: 0.38,
-        roughness: 0.45,
-      }, {
+      pushBatch(batches, 'rift-arc', INFRASTRUCTURE_DEFS['rift-arc'], {
         position: new THREE.Vector3(wx, y + 0.24, wz),
         rotation: new THREE.Euler(0, turn, 0),
         scale: new THREE.Vector3(1, 1, 1),
@@ -233,11 +331,7 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
       case 'farm': {
         const position = improvementAnchor(tile, 53, 0.26);
         for (let strip = -1; strip <= 1; strip++) {
-          pushBatch(batches, 'farm-strip', {
-            geometry: new THREE.BoxGeometry(0.055, 0.018, 0.42),
-            color: '#d6b866',
-            roughness: 0.93,
-          }, {
+          pushBatch(batches, 'farm-strip', INFRASTRUCTURE_DEFS['farm-strip'], {
             position: new THREE.Vector3(position.x + strip * 0.08, position.y, position.z),
             rotation: new THREE.Euler(0, turn, 0),
             scale: new THREE.Vector3(1, 1, 1),
@@ -247,20 +341,12 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
       }
       case 'mine': {
         const position = improvementAnchor(tile, 59);
-        pushBatch(batches, 'mine-mouth', {
-          geometry: new THREE.ConeGeometry(0.18, 0.24, 5),
-          color: '#3d3b39',
-          roughness: 0.88,
-        }, {
+        pushBatch(batches, 'mine-mouth', INFRASTRUCTURE_DEFS['mine-mouth'], {
           position: new THREE.Vector3(position.x, position.y + 0.05, position.z),
           rotation: new THREE.Euler(0, turn, Math.PI),
           scale: new THREE.Vector3(1, 0.75, 1),
         });
-        pushBatch(batches, 'mine-post', {
-          geometry: new THREE.BoxGeometry(0.08, 0.18, 0.08),
-          color: '#8b673d',
-          roughness: 0.82,
-        }, {
+        pushBatch(batches, 'mine-post', INFRASTRUCTURE_DEFS['mine-post'], {
           position: new THREE.Vector3(position.x, position.y + 0.08, position.z),
           rotation: new THREE.Euler(0, turn, 0),
           scale: new THREE.Vector3(1, 1, 1),
@@ -270,11 +356,8 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
       case 'lumber_mill': {
         const position = improvementAnchor(tile, 61, 0.36);
         for (let log = 0; log < 2; log++) {
-          pushBatch(batches, 'lumber-log', {
-            geometry: new THREE.CylinderGeometry(0.045, 0.045, 0.34, 8),
-            color: log === 0 ? '#7a4d2d' : '#a46a3d',
-            roughness: 0.9,
-          }, {
+          const key = log === 0 ? 'lumber-log-dark' : 'lumber-log-light';
+          pushBatch(batches, key, INFRASTRUCTURE_DEFS[key], {
             position: new THREE.Vector3(position.x, position.y + log * 0.052, position.z + (log - 0.5) * 0.07),
             rotation: new THREE.Euler(Math.PI / 2, 0, turn),
             scale: new THREE.Vector3(1, 1, 1),
@@ -284,20 +367,12 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
       }
       case 'quarry_improvement': {
         const position = improvementAnchor(tile, 67, 0.3);
-        pushBatch(batches, 'quarry-stone', {
-          geometry: new THREE.DodecahedronGeometry(0.16, 0),
-          color: '#a49d8e',
-          roughness: 0.86,
-        }, {
+        pushBatch(batches, 'quarry-stone', INFRASTRUCTURE_DEFS['quarry-stone'], {
           position: new THREE.Vector3(position.x, position.y + 0.04, position.z),
           rotation: new THREE.Euler(0, turn, 0.2),
           scale: new THREE.Vector3(1, 0.68, 1),
         });
-        pushBatch(batches, 'quarry-cut', {
-          geometry: new THREE.BoxGeometry(0.26, 0.055, 0.12),
-          color: '#c8bda7',
-          roughness: 0.82,
-        }, {
+        pushBatch(batches, 'quarry-cut', INFRASTRUCTURE_DEFS['quarry-cut'], {
           position: new THREE.Vector3(position.x + 0.11, position.y + 0.05, position.z - 0.08),
           rotation: new THREE.Euler(0, turn + 0.4, 0),
           scale: new THREE.Vector3(1, 1, 1),
@@ -306,22 +381,12 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
       }
       case 'mana_focus': {
         const position = improvementAnchor(tile, 71, 0.28);
-        pushBatch(batches, 'mana-base', {
-          geometry: new THREE.CylinderGeometry(0.15, 0.18, 0.04, 12),
-          color: '#211a36',
-          roughness: 0.7,
-        }, {
+        pushBatch(batches, 'mana-base', INFRASTRUCTURE_DEFS['mana-base'], {
           position,
           rotation: new THREE.Euler(0, turn, 0),
           scale: new THREE.Vector3(1, 1, 1),
         });
-        pushBatch(batches, 'mana-crystal', {
-          geometry: new THREE.OctahedronGeometry(0.13),
-          color: '#9b7dff',
-          emissive: '#5c3de0',
-          emissiveIntensity: 0.34,
-          roughness: 0.42,
-        }, {
+        pushBatch(batches, 'mana-crystal', INFRASTRUCTURE_DEFS['mana-crystal'], {
           position: new THREE.Vector3(position.x, position.y + 0.18, position.z),
           rotation: new THREE.Euler(0.3, turn, 0.2),
           scale: new THREE.Vector3(1, 1.2, 1),
@@ -361,13 +426,17 @@ function InfrastructureMesh({ def, instances }: { def: InfrastructureDef; instan
   if (instances.length === 0) return null;
 
   return (
-    <instancedMesh ref={meshRef} args={[def.geometry, undefined, instances.length]} castShadow receiveShadow>
+    <instancedMesh ref={meshRef} args={[def.geometry, undefined, instances.length]} castShadow receiveShadow renderOrder={def.renderOrder ?? 0}>
       <meshStandardMaterial
         color="#ffffff"
         emissive={def.emissive ?? '#000000'}
         emissiveIntensity={def.emissiveIntensity ?? 0}
         roughness={def.roughness ?? 0.82}
         metalness={def.metalness ?? 0.04}
+        transparent={def.transparent ?? false}
+        opacity={def.opacity ?? 1}
+        depthWrite={def.depthWrite ?? true}
+        depthTest={def.depthTest ?? true}
         vertexColors
         flatShading
       />

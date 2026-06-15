@@ -6,6 +6,10 @@ import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
 
+const WATER_DEPTH_Y = -0.046;
+const WATER_SURFACE_Y = -0.022;
+const WATER_SHORELINE_Y = -0.012;
+
 /** Create a hexagonal plane for water tiles */
 function createHexGeometry(radius: number): THREE.BufferGeometry {
   const shape = new THREE.Shape();
@@ -58,6 +62,7 @@ export function WaterLayer() {
     clearcoat: 0.36,
     clearcoatRoughness: 0.28,
     side: THREE.FrontSide,
+    depthWrite: false,
   }), []);
   const depthMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#082f48',
@@ -86,18 +91,18 @@ export function WaterLayer() {
       const [wx, , wz] = hexToWorld(tile.coord);
       const turn = ((tile.coord.q * 17 + tile.coord.r * 31) % 6) * 0.018;
 
-      dummy.position.set(wx, -0.185, wz);
+      dummy.position.set(wx, WATER_DEPTH_Y, wz);
       dummy.rotation.set(-Math.PI / 2, 0, turn);
       dummy.scale.setScalar(1);
       dummy.updateMatrix();
       depthMesh.setMatrixAt(index, dummy.matrix);
 
-      dummy.position.set(wx, -0.16, wz);
+      dummy.position.set(wx, WATER_SURFACE_Y, wz);
       dummy.rotation.set(-Math.PI / 2, 0, turn);
       dummy.updateMatrix();
       surfaceMesh.setMatrixAt(index, dummy.matrix);
 
-      dummy.position.set(wx, -0.15, wz);
+      dummy.position.set(wx, WATER_SHORELINE_Y, wz);
       dummy.rotation.set(-Math.PI / 2, 0, turn);
       dummy.updateMatrix();
       shorelineMesh.setMatrixAt(index, dummy.matrix);
@@ -119,9 +124,9 @@ export function WaterLayer() {
 
   return (
     <group ref={groupRef}>
-      <instancedMesh ref={depthRef} args={[depthGeometry, depthMaterial, waterTiles.length]} />
-      <instancedMesh ref={surfaceRef} args={[geometry, waterMaterial, waterTiles.length]} receiveShadow />
-      <instancedMesh ref={shorelineRef} args={[shorelineGeometry, shorelineMaterial, waterTiles.length]} />
+      <instancedMesh ref={depthRef} args={[depthGeometry, depthMaterial, waterTiles.length]} renderOrder={2} />
+      <instancedMesh ref={surfaceRef} args={[geometry, waterMaterial, waterTiles.length]} receiveShadow renderOrder={3} />
+      <instancedMesh ref={shorelineRef} args={[shorelineGeometry, shorelineMaterial, waterTiles.length]} renderOrder={4} />
     </group>
   );
 }

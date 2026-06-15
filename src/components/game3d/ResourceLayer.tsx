@@ -30,6 +30,48 @@ const RESOURCE_MARKER_BASE: MarkerDef = {
   yOffset: -0.024,
   scale: 1,
 };
+const RESOURCE_MARKER_DEFS: Record<ResourceId, MarkerDef[]> = {
+  gold: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.CylinderGeometry(0.13, 0.13, 0.05, 14), color: '#f3c44c', yOffset: 0, scale: 1 },
+    { geometry: new THREE.CylinderGeometry(0.1, 0.1, 0.04, 14), color: '#ffe08a', yOffset: 0.052, scale: 0.86 },
+  ],
+  food: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.ConeGeometry(0.09, 0.28, 5), color: '#d9843b', yOffset: 0.1, scale: 1 },
+    { geometry: new THREE.ConeGeometry(0.055, 0.2, 5), color: '#8fb44c', yOffset: 0.14, scale: 0.85 },
+  ],
+  wood: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.CylinderGeometry(0.045, 0.05, 0.34, 8), color: '#7a4f32', yOffset: 0.08, scale: 1 },
+    { geometry: new THREE.CylinderGeometry(0.04, 0.045, 0.3, 8), color: '#a36a3f', yOffset: 0.13, scale: 0.84 },
+  ],
+  stone: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.DodecahedronGeometry(0.14, 0), color: '#a7a69e', yOffset: 0.06, scale: 1 },
+    { geometry: new THREE.DodecahedronGeometry(0.09, 0), color: '#716f6a', yOffset: 0.11, scale: 0.86 },
+  ],
+  iron: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.ConeGeometry(0.11, 0.28, 5), color: '#596878', yOffset: 0.13, scale: 1 },
+    { geometry: new THREE.OctahedronGeometry(0.09), color: '#b8c2c9', yOffset: 0.26, scale: 0.78 },
+  ],
+  mana: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.OctahedronGeometry(0.16), color: '#8a65ff', yOffset: 0.18, scale: 1, emissive: '#4730a8' },
+    { geometry: new THREE.CylinderGeometry(0.025, 0.05, 0.22, 6), color: '#d8c8ff', yOffset: 0.08, scale: 0.9, emissive: '#6c4dff' },
+  ],
+  progress: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.BoxGeometry(0.24, 0.08, 0.16), color: '#8a7d63', yOffset: 0.08, scale: 1 },
+    { geometry: new THREE.BoxGeometry(0.16, 0.03, 0.2), color: '#d5c28a', yOffset: 0.15, scale: 0.8 },
+  ],
+  science: [
+    RESOURCE_MARKER_BASE,
+    { geometry: new THREE.TorusGeometry(0.11, 0.018, 6, 16), color: '#69b7e8', yOffset: 0.16, scale: 1, emissive: '#1f5d78' },
+    { geometry: new THREE.OctahedronGeometry(0.07), color: '#d3f4ff', yOffset: 0.16, scale: 0.74, emissive: '#4ab5e6' },
+  ],
+};
 
 function hash01(q: number, r: number, salt: number): number {
   const x = Math.sin(q * 91.7 + r * 317.3 + salt * 43.1) * 43758.5453;
@@ -37,58 +79,7 @@ function hash01(q: number, r: number, salt: number): number {
 }
 
 function markerDefs(resource: ResourceId): MarkerDef[] {
-  switch (resource) {
-    case 'gold':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.CylinderGeometry(0.13, 0.13, 0.05, 14), color: '#f3c44c', yOffset: 0, scale: 1 },
-        { geometry: new THREE.CylinderGeometry(0.1, 0.1, 0.04, 14), color: '#ffe08a', yOffset: 0.052, scale: 0.86 },
-      ];
-    case 'food':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.ConeGeometry(0.09, 0.28, 5), color: '#d9843b', yOffset: 0.1, scale: 1 },
-        { geometry: new THREE.ConeGeometry(0.055, 0.2, 5), color: '#8fb44c', yOffset: 0.14, scale: 0.85 },
-      ];
-    case 'wood':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.CylinderGeometry(0.045, 0.05, 0.34, 8), color: '#7a4f32', yOffset: 0.08, scale: 1 },
-        { geometry: new THREE.CylinderGeometry(0.04, 0.045, 0.3, 8), color: '#a36a3f', yOffset: 0.13, scale: 0.84 },
-      ];
-    case 'stone':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.DodecahedronGeometry(0.14, 0), color: '#a7a69e', yOffset: 0.06, scale: 1 },
-        { geometry: new THREE.DodecahedronGeometry(0.09, 0), color: '#716f6a', yOffset: 0.11, scale: 0.86 },
-      ];
-    case 'iron':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.ConeGeometry(0.11, 0.28, 5), color: '#596878', yOffset: 0.13, scale: 1 },
-        { geometry: new THREE.OctahedronGeometry(0.09), color: '#b8c2c9', yOffset: 0.26, scale: 0.78 },
-      ];
-    case 'mana':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.OctahedronGeometry(0.16), color: '#8a65ff', yOffset: 0.18, scale: 1, emissive: '#4730a8' },
-        { geometry: new THREE.CylinderGeometry(0.025, 0.05, 0.22, 6), color: '#d8c8ff', yOffset: 0.08, scale: 0.9, emissive: '#6c4dff' },
-      ];
-    case 'progress':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.BoxGeometry(0.24, 0.08, 0.16), color: '#8a7d63', yOffset: 0.08, scale: 1 },
-        { geometry: new THREE.BoxGeometry(0.16, 0.03, 0.2), color: '#d5c28a', yOffset: 0.15, scale: 0.8 },
-      ];
-    case 'science':
-      return [
-        RESOURCE_MARKER_BASE,
-        { geometry: new THREE.TorusGeometry(0.11, 0.018, 6, 16), color: '#69b7e8', yOffset: 0.16, scale: 1, emissive: '#1f5d78' },
-        { geometry: new THREE.OctahedronGeometry(0.07), color: '#d3f4ff', yOffset: 0.16, scale: 0.74, emissive: '#4ab5e6' },
-      ];
-    default:
-      return [];
-  }
+  return RESOURCE_MARKER_DEFS[resource] ?? [];
 }
 
 function markerAnchor(tile: HexTile, occupied: boolean): THREE.Vector3 {
@@ -198,6 +189,7 @@ export function ResourceLayer() {
   const markerGroups = useMemo(() => {
     return RESOURCE_ORDER.flatMap((resource) => {
       const tiles = resourcesByType.get(resource) ?? [];
+      if (tiles.length === 0) return [];
       return markerDefs(resource).map((def, defIndex) => ({
         key: `${resource}-${defIndex}`,
         def,
