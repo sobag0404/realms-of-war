@@ -19,9 +19,13 @@ A hex-based strategy game built with Next.js 16, Three.js, and a custom determin
 
 ## Windows Playtest
 
+The current unsigned Windows playtest is published as a GitHub pre-release:
+[`v0.2.0-unsigned-playtest.1`](https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.1).
+Player download, install, save, and uninstall steps are documented in
+[`download/README.md`](download/README.md).
+
 Unsigned Windows desktop artifacts are built manually with the `Windows Desktop
-Artifact` GitHub Actions workflow. Player download, install, save, and uninstall
-steps are documented in [`download/README.md`](download/README.md).
+Artifact` GitHub Actions workflow when a fresh handoff is needed.
 
 Players do not need Bun, Node.js, Prisma, or a local development server to run
 the downloaded desktop artifact.
