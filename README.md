@@ -17,6 +17,18 @@ A hex-based strategy game built with Next.js 16, Three.js, and a custom determin
 - [Bun](https://bun.sh/) 1.3.x (`packageManager` is pinned to `bun@1.3.14`)
 - Node.js >= 20.9 for the Next.js/Prisma/Vitest toolchain
 
+## Windows Playtest
+
+Unsigned Windows desktop artifacts are built manually with the `Windows Desktop
+Artifact` GitHub Actions workflow. Player download, install, save, and uninstall
+steps are documented in [`download/README.md`](download/README.md).
+
+Players do not need Bun, Node.js, Prisma, or a local development server to run
+the downloaded desktop artifact.
+
+The desktop playtest is local-first: core gameplay and local saves do not require
+a server or VPS after the artifact has been downloaded.
+
 ## Installation
 
 ```bash
