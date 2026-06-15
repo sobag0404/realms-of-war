@@ -20,7 +20,7 @@ A hex-based strategy game built with Next.js 16, Three.js, and a custom determin
 ## Windows Playtest
 
 The current unsigned Windows playtest is published as a GitHub pre-release:
-[`v0.2.0-unsigned-playtest.1`](https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.1).
+[`v0.2.0-unsigned-playtest.2`](https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.2).
 Player download, install, save, and uninstall steps are documented in
 [`download/README.md`](download/README.md).
 
