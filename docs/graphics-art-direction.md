@@ -180,6 +180,16 @@ The v7 pass protects the richer v2-v6 map presentation across desktop PC camera 
 
 Generated maps may still contain sparse `hasRoad`, `hasFort`, `improvement`, and `hasRiftPortal` data. When a screenshot does not naturally include those fields, the verification note should say so explicitly and separate renderer readiness from future map-generation or scenario-authoring needs. The renderer must use existing schema only and must not invent infrastructure gameplay rules to make prettier screenshots.
 
+## V8 Strategic UI And Map Composition Pass
+
+The v8 pass treats the map and HUD as one desktop strategy composition. Panels should provide command information while leaving the rich hex board, unit/city anchors, roads, resources, selection, and paths readable at 1366x768, 1920x1080, and 2560x1440.
+
+- Top HUD clusters must reserve space for each other. Resource totals should wrap before reaching the turn cluster; the turn cluster should wrap internally rather than covering map controls.
+- Bottom HUD clusters must stay compact and recoverable. Selection details may scroll inside their own frame instead of growing across the board.
+- The minimap can be collapsed, resized, or docked, but if it is docked near the selection panel it must shift away from the panel instead of stacking over it.
+- Small utility controls should sit near their related panel. They should not float deeper into the map than needed at default desktop composition.
+- HUD chrome should remain translucent and restrained, but text, icons, and click targets must keep enough contrast for repeated PC play.
+
 ## V9 Reference-Driven Art-Quality Gap Pass
 
 The v9 pass responds to a concrete PC 4X reference screenshot supplied outside the repository. The screenshot is used only as a quality benchmark for production traits: angled board readability, rich terrain surfaces, strong relief, integrated water and coast, dense but legible map pieces, warm daylight, atmospheric depth, and HUD restraint. It is not a source for assets, UI language, icons, palette, city labels, unit markers, terrain silhouettes, or branded presentation.

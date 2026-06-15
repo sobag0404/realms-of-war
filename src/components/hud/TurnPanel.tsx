@@ -80,10 +80,10 @@ export function TurnPanel() {
   const phaseLabel = PHASE_LABELS[gameState.phase] ?? gameState.phase;
 
   return (
-    <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20 pointer-events-auto">
+    <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20 pointer-events-auto max-w-[calc(100vw-1rem)]">
       <div className="flex flex-col items-end gap-2">
         {/* Turn number & phase */}
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200/15 bg-slate-950/60 px-3 py-1.5 shadow-2xl shadow-black/25 backdrop-blur-md">
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-lg border border-amber-200/15 bg-slate-950/65 px-3 py-1.5 shadow-2xl shadow-black/25 backdrop-blur-md">
           <div className="flex items-center gap-1.5">
             {player && (
               <span
@@ -107,7 +107,7 @@ export function TurnPanel() {
         </div>
 
         {/* Action buttons row */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
           {/* Menu button — back to main menu */}
           <Button
             variant="ghost"

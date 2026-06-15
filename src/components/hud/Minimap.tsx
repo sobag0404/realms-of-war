@@ -45,6 +45,9 @@ export function Minimap() {
   const activePlayerId = useGameStore((s) => s.activePlayerId);
   const cameraTarget = useGameStore((s) => s.cameraTarget);
   const cameraZoom = useGameStore((s) => s.cameraZoom);
+  const selectedEntityId = useGameStore((s) => s.selectedEntityId);
+  const selectedCityId = useGameStore((s) => s.selectedCityId);
+  const selectedHex = useGameStore((s) => s.selectedHex);
   const setCameraTarget = useGameStore((s) => s.setCameraTarget);
 
   // Track mobile vs desktop display without changing the renderer's stable canvas size.
@@ -276,13 +279,17 @@ export function Minimap() {
   if (!gameState) return null;
 
   const displaySize = isCompact ? MOBILE_DISPLAY_SIZE : DESKTOP_DISPLAY_SIZES[desktopSizeMode];
+  const hasSelection = Boolean(selectedEntityId || selectedCityId || selectedHex);
   const dockClass = isCompact || desktopDock === 'right'
     ? 'right-2 sm:right-4'
     : 'left-2 sm:left-4';
+  const bottomClass = !isCompact && desktopDock === 'left' && hasSelection
+    ? 'bottom-[calc(min(48vh,27rem)+2rem)]'
+    : 'bottom-3 sm:bottom-4';
 
   if (!isExpanded) {
     return (
-      <div className={`absolute bottom-3 ${dockClass} z-20 pointer-events-auto`}>
+      <div className={`absolute ${bottomClass} ${dockClass} z-20 pointer-events-auto`}>
         <button
           type="button"
           onClick={() => setIsExpanded(true)}
@@ -297,8 +304,8 @@ export function Minimap() {
   }
 
   return (
-    <div className={`absolute bottom-3 ${dockClass} sm:bottom-4 z-20 pointer-events-auto`}>
-      <div className="relative overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md">
+    <div className={`absolute ${bottomClass} ${dockClass} z-20 pointer-events-auto`}>
+      <div className="relative overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md opacity-90 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100">
         {isCompact && (
           <button
             type="button"
