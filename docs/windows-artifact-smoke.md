@@ -8,6 +8,24 @@ artifact. Player-facing download and uninstall steps live in
 
 ## Artifact Source
 
+Current handoff:
+
+- Release:
+  <https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.1>
+- Commit: `9b91ee2f94d030c1b19efdc230009023bc96fe5b`
+- Main CI: <https://github.com/sobag0404/realms-of-war/actions/runs/27562768897>
+- Windows artifact workflow:
+  <https://github.com/sobag0404/realms-of-war/actions/runs/27562792300>
+- Local inspection path:
+  `C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\main-9b91ee2-run-27562792300`
+
+Current release checksums:
+
+```text
+B30E798F7D2968E5524A2F8FAB630CCB7F614D48B8A2EB9B4EA0120D381D33FD  realms-of-war.exe
+E0B451961CE40B1850C77B579946931F05FF55C923A16464EBEC27CA4B335C26  RealmsOfWar-0.2.0-windows-x64-setup.exe
+```
+
 Use the manual GitHub Actions workflow:
 
 - Workflow: `Windows Desktop Artifact`
@@ -28,6 +46,10 @@ Download artifacts to a directory outside the checkout, for example:
 ```text
 C:\Users\<you>\Documents\STR\realms-of-war-artifacts\<run-id>
 ```
+
+GitHub Actions artifacts can expire. Attach smoke-tested binaries to a clearly
+marked unsigned pre-release when a handoff must remain available after artifact
+retention expires.
 
 ## Expected Artifact Contents
 
