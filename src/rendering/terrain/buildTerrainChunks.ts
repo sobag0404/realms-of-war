@@ -35,8 +35,8 @@ export interface TileData {
 /** Default chunk size in hexes (each chunk covers chunkSize × chunkSize hexes) */
 const DEFAULT_CHUNK_SIZE = 16;
 
-/** Extrusion height for each hex tile */
-const HEX_EXTRUSION_HEIGHT = 0.15;
+/** Base extrusion height for each hex tile. Terrain-specific profiles add board-art relief. */
+const HEX_EXTRUSION_HEIGHT = 0.18;
 
 /** Slight inset for hex gaps (0.95 × radius) */
 const HEX_RENDER_RADIUS = 0.95;
@@ -48,15 +48,29 @@ const TERRAIN_TONE: Record<TerrainTypeId, {
   sideShade: number;
   edgeShade: number;
   centerLift: number;
+  innerLift: number;
+  outerLift: number;
+  relief: number;
 }> = {
-  plains: { hue: -0.014, saturation: 0.1, lightness: 0.1, sideShade: 0.7, edgeShade: 0.94, centerLift: 0.042 },
-  forest: { hue: 0.012, saturation: 0.11, lightness: 0.08, sideShade: 0.54, edgeShade: 0.88, centerLift: 0.022 },
-  mountain: { hue: -0.024, saturation: -0.16, lightness: 0.12, sideShade: 0.58, edgeShade: 0.91, centerLift: 0.052 },
-  water: { hue: -0.016, saturation: 0.12, lightness: 0.1, sideShade: 0.66, edgeShade: 0.96, centerLift: 0.038 },
-  desert: { hue: 0.022, saturation: -0.01, lightness: 0.12, sideShade: 0.72, edgeShade: 0.95, centerLift: 0.046 },
-  swamp: { hue: -0.018, saturation: -0.04, lightness: 0.07, sideShade: 0.52, edgeShade: 0.87, centerLift: 0.018 },
-  hills: { hue: 0.016, saturation: 0.02, lightness: 0.1, sideShade: 0.62, edgeShade: 0.91, centerLift: 0.04 },
-  ruins: { hue: -0.012, saturation: -0.18, lightness: 0.1, sideShade: 0.6, edgeShade: 0.9, centerLift: 0.032 },
+  plains: { hue: -0.014, saturation: 0.12, lightness: 0.12, sideShade: 0.68, edgeShade: 0.92, centerLift: 0.042, innerLift: 0.018, outerLift: -0.012, relief: 0.035 },
+  forest: { hue: 0.012, saturation: 0.13, lightness: 0.1, sideShade: 0.52, edgeShade: 0.86, centerLift: 0.02, innerLift: 0.028, outerLift: -0.024, relief: 0.055 },
+  mountain: { hue: -0.024, saturation: -0.12, lightness: 0.16, sideShade: 0.5, edgeShade: 0.84, centerLift: 0.07, innerLift: 0.09, outerLift: -0.03, relief: 0.12 },
+  water: { hue: -0.016, saturation: 0.12, lightness: 0.1, sideShade: 0.66, edgeShade: 0.96, centerLift: 0.038, innerLift: 0, outerLift: 0, relief: 0 },
+  desert: { hue: 0.022, saturation: -0.01, lightness: 0.14, sideShade: 0.7, edgeShade: 0.93, centerLift: 0.046, innerLift: 0.022, outerLift: -0.014, relief: 0.032 },
+  swamp: { hue: -0.018, saturation: -0.03, lightness: 0.08, sideShade: 0.5, edgeShade: 0.86, centerLift: 0.016, innerLift: -0.006, outerLift: -0.018, relief: 0.026 },
+  hills: { hue: 0.016, saturation: 0.04, lightness: 0.12, sideShade: 0.58, edgeShade: 0.88, centerLift: 0.046, innerLift: 0.068, outerLift: -0.022, relief: 0.082 },
+  ruins: { hue: -0.012, saturation: -0.16, lightness: 0.12, sideShade: 0.58, edgeShade: 0.88, centerLift: 0.032, innerLift: 0.026, outerLift: -0.016, relief: 0.038 },
+};
+
+const TERRAIN_EXTRUSION: Record<TerrainTypeId, number> = {
+  plains: HEX_EXTRUSION_HEIGHT,
+  forest: 0.22,
+  mountain: 0.34,
+  water: 0.06,
+  desert: 0.16,
+  swamp: 0.14,
+  hills: 0.28,
+  ruins: 0.2,
 };
 
 function hash01(q: number, r: number, salt: number): number {
@@ -85,15 +99,31 @@ function getTerrainVertexColor(
   const sideShade = isTop
     ? 1
     : THREE.MathUtils.clamp(tone.sideShade + lightFacing * 0.08, 0.48, 0.82);
-  const edgeShade = isTop && vertexIndex > 0 ? tone.edgeShade : 1;
+  const isOuterTop = isTop && vertexIndex >= 7 && vertexIndex <= 12;
+  const isInnerTop = isTop && vertexIndex >= 1 && vertexIndex <= 6;
+  const edgeShade = isOuterTop ? tone.edgeShade : 1;
   const centerGlow = isTop && vertexIndex === 0 ? tone.centerLift : 0;
-  const lightness = (hsl.l + tone.lightness * vertexNoise + centerGlow) * sideShade * edgeShade;
+  const ringGlow = isInnerTop ? tone.innerLift : isOuterTop ? tone.outerLift : 0;
+  const brush = (hash01(q, r, vertexIndex + 97) - 0.5) * (terrain === 'water' ? 0.02 : 0.06);
+  const lightness = (hsl.l + tone.lightness * vertexNoise + centerGlow + ringGlow + brush) * sideShade * edgeShade;
 
   return new THREE.Color().setHSL(
     THREE.MathUtils.euclideanModulo(hsl.h + tone.hue * tileNoise, 1),
     THREE.MathUtils.clamp(hsl.s + tone.saturation * tileNoise, 0.05, 0.95),
     THREE.MathUtils.clamp(lightness, 0.08, 0.88),
   );
+}
+
+function terrainTopOffset(terrain: TerrainTypeId, q: number, r: number, vertexIndex: number): number {
+  if (terrain === 'water') return 0;
+  const tone = TERRAIN_TONE[terrain];
+  const ringLift = vertexIndex === 0
+    ? tone.centerLift * 0.45
+    : vertexIndex <= 6
+      ? tone.innerLift
+      : tone.outerLift;
+  const ridge = (hash01(q, r, vertexIndex + 131) - 0.5) * tone.relief;
+  return ringLift + ridge;
 }
 
 // ─── Chunk Key Helpers ───────────────────────────────────────────────────────
@@ -167,6 +197,9 @@ function buildHexData(
   worldX: number,
   worldZ: number,
   elevation: number,
+  terrain: TerrainTypeId,
+  q: number,
+  r: number,
   baseIndex: number,
 ): {
   positions: number[];
@@ -180,20 +213,21 @@ function buildHexData(
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  const topY = elevation + HEX_EXTRUSION_HEIGHT;
+  const topBaseY = elevation + TERRAIN_EXTRUSION[terrain];
   const bottomY = elevation;
   const corners = hexCornersXZ(worldX, worldZ, HEX_RENDER_RADIUS);
+  const innerCorners = hexCornersXZ(worldX, worldZ, HEX_RENDER_RADIUS * 0.55);
 
   // ── Top Face (fan from center) ──────────────────────────────────────
   // Center vertex
-  positions.push(worldX, topY, worldZ);
+  positions.push(worldX, topBaseY + terrainTopOffset(terrain, q, r, 0), worldZ);
   normals.push(0, 1, 0);
   uvs.push(0.5, 0.5);
 
-  // Corner vertices
+  // Inner ring vertices
   for (let i = 0; i < 6; i++) {
-    const [cx, cz] = corners[i];
-    positions.push(cx, topY, cz);
+    const [cx, cz] = innerCorners[i];
+    positions.push(cx, topBaseY + terrainTopOffset(terrain, q, r, i + 1), cz);
     normals.push(0, 1, 0);
     uvs.push(
       0.5 + (cx - worldX) / (2 * HEX_RENDER_RADIUS),
@@ -201,18 +235,33 @@ function buildHexData(
     );
   }
 
-  // Fan triangles (center = baseIndex, corners = baseIndex+1..+6)
+  // Outer ring vertices
+  for (let i = 0; i < 6; i++) {
+    const [cx, cz] = corners[i];
+    positions.push(cx, topBaseY + terrainTopOffset(terrain, q, r, i + 7), cz);
+    normals.push(0, 1, 0);
+    uvs.push(
+      0.5 + (cx - worldX) / (2 * HEX_RENDER_RADIUS),
+      0.5 + (cz - worldZ) / (2 * HEX_RENDER_RADIUS),
+    );
+  }
+
+  // Center to inner ring, then inner ring to outer ring.
   for (let i = 0; i < 6; i++) {
     const next = (i + 1) % 6;
     indices.push(baseIndex, baseIndex + 1 + next, baseIndex + 1 + i);
+    indices.push(baseIndex + 1 + i, baseIndex + 1 + next, baseIndex + 7 + i);
+    indices.push(baseIndex + 7 + i, baseIndex + 1 + next, baseIndex + 7 + next);
   }
 
-  let vi = baseIndex + 7; // 1 center + 6 corners
+  let vi = baseIndex + 13; // 1 center + 6 inner + 6 outer vertices
 
   // ── Side Faces ──────────────────────────────────────────────────────
   for (let side = 0; side < 6; side++) {
     const c0 = corners[side];
     const c1 = corners[(side + 1) % 6];
+    const topY0 = topBaseY + terrainTopOffset(terrain, q, r, side + 7);
+    const topY1 = topBaseY + terrainTopOffset(terrain, q, r, ((side + 1) % 6) + 7);
 
     // Outward normal
     const edgeX = c1[0] - c0[0];
@@ -222,11 +271,11 @@ function buildHexData(
     const nz = len > 0 ? edgeX / len : 1;
 
     // 4 vertices: top-left, top-right, bottom-left, bottom-right
-    positions.push(c0[0], topY, c0[1]);
+    positions.push(c0[0], topY0, c0[1]);
     normals.push(nx, 0, nz);
     uvs.push(0, 1);
 
-    positions.push(c1[0], topY, c1[1]);
+    positions.push(c1[0], topY1, c1[1]);
     normals.push(nx, 0, nz);
     uvs.push(1, 1);
 
@@ -299,8 +348,9 @@ export function buildTerrainChunks(
 
     for (const tile of chunkTiles) {
       const [wx, , wz] = hexToWorld(tile.coord);
-      const elevation = TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
-      const hexData = buildHexData(wx, wz, elevation, baseIndex);
+      const terrain = tile.terrain as TerrainTypeId;
+      const elevation = TERRAIN_ELEVATION[terrain] ?? 0;
+      const hexData = buildHexData(wx, wz, elevation, terrain, tile.coord.q, tile.coord.r, baseIndex);
 
       allPositions.push(...hexData.positions);
       allNormals.push(...hexData.normals);
@@ -308,7 +358,6 @@ export function buildTerrainChunks(
       allIndices.push(...hexData.indices);
 
       // Vertex colors add deterministic biome variation and darker side faces.
-      const terrain = tile.terrain as TerrainTypeId;
       const vertexCount = hexData.vertexCount;
       for (let v = 0; v < vertexCount; v++) {
         const color = getTerrainVertexColor(

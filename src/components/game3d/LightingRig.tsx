@@ -3,11 +3,11 @@
 export function LightingRig() {
   return (
     <>
-      <ambientLight color="#d8e7f2" intensity={0.38} />
+      <ambientLight color="#e7edf1" intensity={0.32} />
       <directionalLight
-        color="#ffe0aa"
-        intensity={2.28}
-        position={[24, 38, 18]}
+        color="#ffd89a"
+        intensity={2.55}
+        position={[28, 42, 20]}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -20,16 +20,16 @@ export function LightingRig() {
         shadow-normalBias={0.032}
       />
       <directionalLight
-        color="#a4c9ff"
-        intensity={0.52}
-        position={[-22, 22, -26]}
+        color="#a9cdf8"
+        intensity={0.44}
+        position={[-24, 24, -28]}
       />
       <directionalLight
-        color="#fff0d0"
-        intensity={0.2}
+        color="#fff2cf"
+        intensity={0.24}
         position={[-14, 12, 20]}
       />
-      <hemisphereLight args={['#d8ecff', '#6d5842', 0.92]} />
+      <hemisphereLight args={['#dceeff', '#756044', 0.82]} />
     </>
   );
 }

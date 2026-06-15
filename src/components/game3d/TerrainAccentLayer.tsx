@@ -33,22 +33,22 @@ function accentDefs(terrain: TerrainTypeId): AccentDef[] {
     case 'plains':
       return [
         {
-          geometry: new THREE.BoxGeometry(0.42, 0.012, 0.045),
-          color: '#d0c86e',
-          opacity: 0.42,
-          scaleRange: [0.86, 1.34],
-          count: [2, 3],
+          geometry: new THREE.BoxGeometry(0.52, 0.012, 0.05),
+          color: '#d6cf75',
+          opacity: 0.48,
+          scaleRange: [0.92, 1.48],
+          count: [3, 4],
           yOffset: 0.19,
         },
       ];
     case 'desert':
       return [
         {
-          geometry: new THREE.BoxGeometry(0.54, 0.012, 0.038),
+          geometry: new THREE.BoxGeometry(0.68, 0.012, 0.04),
           color: '#f1d486',
-          opacity: 0.52,
-          scaleRange: [0.92, 1.42],
-          count: [2, 3],
+          opacity: 0.58,
+          scaleRange: [1.0, 1.6],
+          count: [3, 4],
           yOffset: 0.19,
         },
       ];
@@ -66,34 +66,34 @@ function accentDefs(terrain: TerrainTypeId): AccentDef[] {
     case 'hills':
       return [
         {
-          geometry: new THREE.BoxGeometry(0.48, 0.026, 0.07),
-          color: '#c79957',
-          opacity: 0.46,
-          scaleRange: [0.82, 1.24],
-          count: [2, 3],
-          yOffset: 0.2,
+          geometry: new THREE.BoxGeometry(0.58, 0.032, 0.078),
+          color: '#c49555',
+          opacity: 0.54,
+          scaleRange: [0.9, 1.34],
+          count: [3, 4],
+          yOffset: 0.24,
         },
       ];
     case 'mountain':
       return [
         {
-          geometry: new THREE.ConeGeometry(0.11, 0.11, 5),
+          geometry: new THREE.ConeGeometry(0.14, 0.18, 5),
           color: '#e7eef0',
           opacity: 0.86,
           scaleRange: [0.78, 1.22],
-          count: [2, 3],
-          yOffset: 0.28,
+          count: [3, 4],
+          yOffset: 0.42,
         },
       ];
     case 'forest':
       return [
         {
-          geometry: new THREE.CylinderGeometry(0.18, 0.22, 0.012, 10),
-          color: '#0e3822',
-          opacity: 0.4,
-          scaleRange: [0.86, 1.28],
-          count: [2, 3],
-          yOffset: 0.184,
+          geometry: new THREE.CylinderGeometry(0.24, 0.28, 0.014, 10),
+          color: '#0b2e1e',
+          opacity: 0.46,
+          scaleRange: [0.92, 1.34],
+          count: [3, 4],
+          yOffset: 0.22,
         },
       ];
     case 'ruins':
