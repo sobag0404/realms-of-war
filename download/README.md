@@ -103,6 +103,11 @@ The Windows desktop app writes saves under:
 Each save is stored as a local JSON file. These saves are not uploaded to a
 server.
 
+Builds with local save recovery enabled keep a backup copy next to the primary
+desktop save file. If the load menu shows `Backup available`, use `Recover` to
+load the backup copy. Corrupt or unsupported saves stay visible in the load menu
+so you can delete them; unsupported saves require a newer compatible game build.
+
 ## Portable Cleanup
 
 If you used the portable executable, there is no Windows uninstall entry. Close

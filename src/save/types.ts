@@ -1,12 +1,22 @@
 import type { SaveFile } from '@/engine/save/saveGame';
 
+export type SaveRepositoryKind = 'browser-local' | 'server' | 'tauri-fs';
+
+export type SaveHealth = 'available' | 'recoverable' | 'corrupt' | 'unsupported';
+
 export interface SaveSummary {
   id: string;
   name: string;
   turn: number;
   players: string;
+  map?: string;
   createdAt: string;
   updatedAt: string;
+  source?: SaveRepositoryKind;
+  health?: SaveHealth;
+  healthMessage?: string;
+  saveVersion?: number;
+  storageVersion?: number;
 }
 
 export interface SaveWriteInput {
@@ -22,7 +32,7 @@ export interface LoadedSave {
 }
 
 export interface SaveRepository {
-  readonly kind: 'browser-local' | 'server' | 'tauri-fs';
+  readonly kind: SaveRepositoryKind;
   list(): Promise<SaveSummary[]>;
   load(id: string): Promise<LoadedSave>;
   save(input: SaveWriteInput): Promise<SaveSummary>;
@@ -35,6 +45,8 @@ export class SaveRepositoryError extends Error {
     readonly code:
       | 'not-found'
       | 'corrupt'
+      | 'unsupported'
+      | 'too-large'
       | 'storage-unavailable'
       | 'network'
       | 'invalid-response',

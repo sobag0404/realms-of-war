@@ -62,12 +62,12 @@ export function TurnPanel() {
   }, [setOpenPanel]);
 
   const handleSave = useCallback(async () => {
-    const success = await saveGame();
+    const result = await saveGame();
     setIsMobileActionsOpen(false);
     addNotification({
-      type: success ? 'success' : 'error',
-      title: success ? 'Сохранено' : 'Ошибка',
-      message: success ? 'Игра сохранена' : 'Не удалось сохранить игру',
+      type: result.success ? 'success' : 'error',
+      title: result.success ? 'Saved' : 'Save failed',
+      message: result.success ? 'Game saved' : (result.error ?? 'Failed to save game'),
       duration: 3000,
     });
   }, [saveGame, addNotification]);

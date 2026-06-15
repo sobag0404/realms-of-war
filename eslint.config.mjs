@@ -6,7 +6,22 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
+const generatedIgnores = [
+  "node_modules/**",
+  ".next/**",
+  ".next-desktop/**",
+  ".desktop-static-smoke-*/**",
+  "out/**",
+  "build/**",
+  "src-tauri/target/**",
+  "next-env.d.ts",
+  "examples/**",
+  "skills/**",
+];
+
+const eslintConfig = [{
+  ignores: generatedIgnores,
+}, ...nextCoreWebVitals, ...nextTypescript, {
   languageOptions: {
     globals: {
       React: "readonly",
@@ -50,8 +65,6 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-unreachable": "error",
     "no-useless-escape": "off",
   },
-}, {
-  ignores: ["node_modules/**", ".next/**", ".next-desktop/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
 }];
 
 export default eslintConfig;

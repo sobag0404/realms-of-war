@@ -50,7 +50,7 @@ export interface SessionSlice {
   loadGame: (state: GameState) => void;
   /** Load from a validated SaveFile — the proper, full-featured load path. */
   loadSaveFile: (saveFile: SaveFile) => void;
-  saveGame: (name?: string) => Promise<boolean>;
+  saveGame: (name?: string) => Promise<SaveGameResult>;
   dispatchCommand: (command: GameCommand) => void;
   endTurn: () => void;
   resetGame: () => void;
@@ -65,6 +65,11 @@ const ERROR_CODES = {
   INVALID_COMMAND: 'INVALID_COMMAND',
   ENGINE_ERROR: 'ENGINE_ERROR',
 } as const;
+
+export interface SaveGameResult {
+  success: boolean;
+  error?: string;
+}
 
 // ─── Slice Creator ────────────────────────────────────────────────────────────
 
@@ -351,10 +356,18 @@ export const createSessionSlice: StateCreator<
 
   saveGame: async (name?: string) => {
     const { engine, gameState } = get();
-    if (!gameState || !engine) return false;
+    if (!gameState || !engine) {
+      const message = 'No active game to save';
+      set(
+        { lastError: { message, code: ERROR_CODES.NO_ENGINE } },
+        false,
+        'session/saveGameError',
+      );
+      return { success: false, error: message };
+    }
 
     try {
-      const saveName = name ?? `Автосохранение — Ход ${gameState.turn}`;
+      const saveName = name ?? `Autosave - Turn ${gameState.turn}`;
       const playerNames = Object.values(gameState.players)
         .map((p) => p.name)
         .join(', ');
@@ -381,9 +394,15 @@ export const createSessionSlice: StateCreator<
         players: playerNames,
         saveFile,
       });
-      return true;
-    } catch {
-      return false;
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save game';
+      set(
+        { lastError: { message, code: ERROR_CODES.ENGINE_ERROR } },
+        false,
+        'session/saveGameError',
+      );
+      return { success: false, error: message };
     }
   },
 

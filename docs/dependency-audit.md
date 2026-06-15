@@ -1,6 +1,6 @@
 # Dependency Audit
 
-Date: 2026-06-13
+Date: 2026-06-15
 
 ## Current Policy
 
@@ -23,10 +23,12 @@ This alpha keeps `bun audit` green without adding gameplay features or auth chan
 
 The following transitive packages are pinned in `package.json` because the direct parent packages have not yet released dependency ranges that select the patched versions automatically:
 
+- `@babel/core`
 - `brace-expansion`
 - `defu`
 - `effect`
 - `flatted`
+- `js-yaml`
 - `minimatch`
 - `picomatch`
 - `postcss`

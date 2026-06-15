@@ -6,6 +6,7 @@ import type { GameState } from '@/engine/core/GameState';
 import { BrowserLocalSaveRepository } from '@/save/browserLocalSaveRepository';
 import { TauriFilesystemSaveRepository } from '@/save/tauriFilesystemSaveRepository';
 import { SaveRepositoryError } from '@/save/types';
+import { serializeSaveWithChecksum } from '@/lib/saveService';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -209,5 +210,103 @@ describe('TauriFilesystemSaveRepository', () => {
     await expect(repository.load('desktop-corrupt-save')).rejects.toMatchObject({
       code: 'corrupt',
     });
+  });
+
+  it('loads the backup copy when desktop primary data is corrupted', async () => {
+    const { data, checksum } = serializeSaveWithChecksum(makeSaveFile('Backup Save'));
+    const repository = new TauriFilesystemSaveRepository({
+      invoke: async (command) => {
+        if (command === 'desktop_save_load') {
+          return {
+            storageVersion: 1,
+            id: 'desktop-recoverable-save',
+            name: 'Backup Save',
+            turn: 3,
+            players: 'Player 1',
+            createdAt: '2026-06-14T00:00:00.000Z',
+            updatedAt: '2026-06-14T00:00:00.000Z',
+            data: data.replace('Backup Save', 'Tampered Save'),
+            checksum,
+            backupData: data,
+            backupChecksum: checksum,
+          } as never;
+        }
+        throw new Error(`unexpected command ${command}`);
+      },
+    });
+
+    const loaded = await repository.load('desktop-recoverable-save');
+    expect(loaded.summary).toMatchObject({
+      id: 'desktop-recoverable-save',
+      health: 'recoverable',
+      source: 'tauri-fs',
+    });
+    expect(loaded.saveFile.name).toBe('Backup Save');
+  });
+
+  it('marks future desktop storage versions as unsupported', async () => {
+    const { data, checksum } = serializeSaveWithChecksum(makeSaveFile('Future Save'));
+    const record = {
+      storageVersion: 99,
+      id: 'desktop-future-save',
+      name: 'Future Save',
+      turn: 3,
+      players: 'Player 1',
+      createdAt: '2026-06-14T00:00:00.000Z',
+      updatedAt: '2026-06-14T00:00:00.000Z',
+      data,
+      checksum,
+    };
+    const repository = new TauriFilesystemSaveRepository({
+      invoke: async (command) => {
+        if (command === 'desktop_save_list') return [record] as never;
+        if (command === 'desktop_save_load') return record as never;
+        throw new Error(`unexpected command ${command}`);
+      },
+    });
+
+    await expect(repository.list()).resolves.toMatchObject([
+      { id: 'desktop-future-save', health: 'unsupported' },
+    ]);
+    await expect(repository.load('desktop-future-save')).rejects.toMatchObject({
+      code: 'unsupported',
+    });
+  });
+
+  it('wraps desktop load invoke failures as corrupt save errors', async () => {
+    const repository = new TauriFilesystemSaveRepository({
+      invoke: async (command) => {
+        if (command === 'desktop_save_load') {
+          throw new Error('failed to read save file');
+        }
+        throw new Error(`unexpected command ${command}`);
+      },
+    });
+
+    await expect(repository.load('desktop-read-error')).rejects.toMatchObject({
+      code: 'corrupt',
+      message: 'failed to read save file',
+    });
+  });
+
+  it('rejects oversized desktop saves before invoking filesystem writes', async () => {
+    let invoked = false;
+    const repository = new TauriFilesystemSaveRepository({
+      idFactory: () => 'desktop-too-large-save',
+      invoke: async () => {
+        invoked = true;
+        return undefined as never;
+      },
+    });
+    const saveFile = makeSaveFile('Large Save');
+    saveFile.name = 'x'.repeat(2_000_100);
+
+    await expect(repository.save({
+      name: 'Large Save',
+      turn: 3,
+      players: 'Player 1',
+      saveFile,
+    })).rejects.toMatchObject({ code: 'too-large' });
+    expect(invoked).toBe(false);
   });
 });

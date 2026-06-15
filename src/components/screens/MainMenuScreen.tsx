@@ -8,6 +8,33 @@ import { useGameStore } from '@/store/useGameStore';
 import { getSaveRepository, SaveRepositoryError } from '@/save/repository';
 import type { SaveSummary } from '@/save/repository';
 
+function formatSaveDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function sourceLabel(source?: SaveSummary['source']): string {
+  if (source === 'tauri-fs') return 'Desktop file';
+  if (source === 'browser-local') return 'Browser local';
+  if (source === 'server') return 'Server';
+  return 'Local save';
+}
+
+function healthLabel(save: SaveSummary): string | null {
+  if (!save.health || save.health === 'available') return null;
+  if (save.health === 'recoverable') return 'Backup available';
+  if (save.health === 'unsupported') return 'Unsupported version';
+  return 'Corrupt save';
+}
+
+function canLoadSave(save: SaveSummary): boolean {
+  return !save.health || save.health === 'available' || save.health === 'recoverable';
+}
+
 // ─── Save Entry ──────────────────────────────────────────────────────────────
 
 /**
@@ -25,6 +52,7 @@ export function MainMenuScreen() {
   const [showLoadPanel, setShowLoadPanel] = useState(false);
   const [saves, setSaves] = useState<SaveSummary[]>([]);
   const [loadingSaves, setLoadingSaves] = useState(false);
+  const [loadPanelError, setLoadPanelError] = useState<string | null>(null);
 
   useEffect(() => {
     // Trigger fade-in animation on mount
@@ -34,10 +62,15 @@ export function MainMenuScreen() {
 
   const fetchSaves = useCallback(async () => {
     setLoadingSaves(true);
+    setLoadPanelError(null);
     try {
       setSaves(await getSaveRepository().list());
     } catch (error) {
+      const message = error instanceof SaveRepositoryError
+        ? error.message
+        : 'Failed to list saves';
       setSaves([]);
+      setLoadPanelError(message);
       addNotification({
         type: 'error',
         title: 'РћС€РёР±РєР°',
@@ -62,10 +95,13 @@ export function MainMenuScreen() {
         const loaded = await getSaveRepository().load(saveId);
         loadSaveFileIntoStore(loaded.saveFile);
         setShowLoadPanel(false);
+        const loadedFromBackup = loaded.summary.health === 'recoverable';
         addNotification({
           type: 'success',
-          title: 'Загрузка',
-          message: `Игра "${loaded.summary.name}" загружена (ход ${loaded.summary.turn})`,
+          title: loadedFromBackup ? 'Recovered save' : 'Loaded',
+          message: loadedFromBackup
+            ? `Loaded backup copy for "${loaded.summary.name}" (turn ${loaded.summary.turn})`
+            : `Loaded "${loaded.summary.name}" (turn ${loaded.summary.turn})`,
           duration: 3000,
         });
       } catch (error) {
@@ -83,14 +119,21 @@ export function MainMenuScreen() {
   );
 
   const handleDeleteSave = useCallback(
-    async (saveId: string, saveName: string) => {
+    async (save: SaveSummary) => {
+      if (
+        typeof window !== 'undefined' &&
+        !window.confirm(`Delete "${save.name}" from ${formatSaveDate(save.updatedAt)}?`)
+      ) {
+        return;
+      }
+
       try {
-        await getSaveRepository().delete(saveId);
-        setSaves((prev) => prev.filter((s) => s.id !== saveId));
+        await getSaveRepository().delete(save.id);
+        setSaves((prev) => prev.filter((s) => s.id !== save.id));
         addNotification({
           type: 'info',
-          title: 'Удалено',
-          message: `Сохранение "${saveName}" удалено`,
+          title: 'Deleted',
+          message: `Deleted "${save.name}"`,
           duration: 3000,
         });
       } catch (error) {
@@ -195,42 +238,78 @@ export function MainMenuScreen() {
             </div>
             <ScrollArea className="max-h-96">
               <div className="p-4 space-y-2">
+                {loadPanelError && (
+                  <div className="rounded-md border border-red-500/40 bg-red-950/30 p-3 text-sm text-red-100">
+                    <div className="mb-2">{loadPanelError}</div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-3 text-red-100 hover:bg-red-900/40 hover:text-white"
+                      onClick={fetchSaves}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
                 {loadingSaves ? (
                   <div className="text-zinc-500 text-sm py-8 text-center">
                     Загрузка...
                   </div>
-                ) : saves.length === 0 ? (
+                ) : saves.length === 0 && !loadPanelError ? (
                   <div className="text-zinc-500 text-sm py-8 text-center">
                     Нет сохранений
                   </div>
                 ) : (
                   saves.map((save) => (
-                    <Card key={save.id} className="bg-zinc-800/50 border-zinc-700" data-testid="save-list-entry">
+                    <Card
+                      key={save.id}
+                      className={`bg-zinc-800/50 ${canLoadSave(save) ? 'border-zinc-700' : 'border-red-900/60'}`}
+                      data-testid="save-list-entry"
+                    >
                       <CardContent className="p-3 flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="text-white text-sm font-medium truncate">
                             {save.name}
                           </div>
-                          <div className="text-zinc-500 text-xs">
-                            Ход {save.turn} · {new Date(save.updatedAt).toLocaleDateString('ru-RU')}
+                          <div className="text-zinc-400 text-xs">
+                            Turn {save.turn} | {formatSaveDate(save.updatedAt)}
                           </div>
+                          <div className="text-zinc-500 text-xs">
+                            {sourceLabel(save.source)} | v{save.saveVersion ?? '?'}
+                            {save.map ? ` | ${save.map}` : ''}
+                          </div>
+                          <div className="text-zinc-500 text-xs truncate">
+                            {save.players}
+                          </div>
+                          {healthLabel(save) && (
+                            <div
+                              className={`text-xs ${canLoadSave(save) ? 'text-amber-300' : 'text-red-300'}`}
+                              title={save.healthMessage}
+                            >
+                              {healthLabel(save)}
+                            </div>
+                          )}
                         </div>
                         <Button
                           size="sm"
-                          className="bg-amber-700 hover:bg-amber-600 text-white text-xs"
+                          className="bg-amber-700 hover:bg-amber-600 text-white text-xs disabled:cursor-not-allowed disabled:opacity-50"
                           onClick={() => handleLoadSave(save.id)}
+                          disabled={!canLoadSave(save)}
+                          title={save.healthMessage}
                           data-testid="save-list-load"
                         >
-                          Загрузить
+                          {save.health === 'recoverable' ? 'Recover' : 'Load'}
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-zinc-500 hover:text-red-400 text-xs"
-                          onClick={() => handleDeleteSave(save.id, save.name)}
+                          className="text-zinc-400 hover:text-red-300 text-xs"
+                          onClick={() => handleDeleteSave(save)}
+                          aria-label={`Delete ${save.name}`}
+                          title={`Delete ${save.name}`}
                           data-testid="save-list-delete"
                         >
-                          🗑
+                          Delete
                         </Button>
                       </CardContent>
                     </Card>

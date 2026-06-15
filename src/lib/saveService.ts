@@ -15,7 +15,7 @@ import {
   calculateChecksum,
   type SaveFile,
 } from '@/engine/save/saveGame';
-import { deserializeSave, validateSave, loadGame } from '@/engine/save/loadGame';
+import { deserializeSave, loadGame } from '@/engine/save/loadGame';
 import type { GameState } from '@/engine/core/GameState';
 import type { GameConfig } from '@/engine/core/GameConfig';
 import type { GameCommand } from '@/engine/core/CommandQueue';
@@ -23,7 +23,7 @@ import type { GameCommand } from '@/engine/core/CommandQueue';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** Maximum allowed save file size in bytes (≈2 MB). */
-const MAX_SAVE_BYTES = 2_000_000;
+export const MAX_SAVE_BYTES = 2_000_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +96,10 @@ export function serializeSaveWithChecksum(saveFile: SaveFile): {
   return { data, checksum };
 }
 
+export function isSaveDataWithinSizeLimit(data: string): boolean {
+  return data.length <= MAX_SAVE_BYTES;
+}
+
 // ─── Load ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -111,42 +115,24 @@ export function serializeSaveWithChecksum(saveFile: SaveFile): {
  * @returns A LoadResult with either the valid SaveFile or an error message
  */
 export function loadSaveFile(data: string): LoadResult {
-  // 1. Size check
-  if (data.length > MAX_SAVE_BYTES) {
+  if (!isSaveDataWithinSizeLimit(data)) {
     return {
       success: false,
-      error: 'Файл сохранения слишком большой',
+      error: 'Save file is too large',
     };
   }
 
   try {
-    // 2. Quick JSON parse to get the raw object
-    const raw = JSON.parse(data);
-
-    // 3. Validate the structure before attempting migration
-    const validation = validateSave(raw);
-    if (!validation.valid) {
-      const firstError = validation.errors[0] ?? 'Неизвестная ошибка формата';
-      return {
-        success: false,
-        error: `Неверный формат сохранения: ${firstError}`,
-      };
-    }
-
-    // 4. Deserialize (applies migrations + re-validates)
     const saveFile = deserializeSave(data);
-
     return { success: true, saveFile };
   } catch (e) {
-    const message =
-      e instanceof Error ? e.message : 'Неизвестная ошибка';
+    const message = e instanceof Error ? e.message : 'Unknown error';
     return {
       success: false,
-      error: `Не удалось загрузить сохранение: ${message}`,
+      error: `Failed to load save: ${message}`,
     };
   }
 }
-
 /**
  * Verify a checksum for a given save data string.
  *
