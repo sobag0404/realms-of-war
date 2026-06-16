@@ -329,6 +329,26 @@ Remaining reference gap after v14:
 - Production-quality water still needs an owned shader/texture pipeline or generated normal/flow maps; v14 uses cheap geometry strokes only.
 - Fog/map-edge art should eventually be authored as a complete exploration presentation, including minimap and scenario composition, rather than renderer-only boundary strips.
 
+## V15 Settlement And Improvement World-Detail Composition
+
+The v15 pass makes existing settlement, road, improvement, fort, portal, ownership, and resource-adjacent data feel more integrated with the world. It remains a renderer-only composition layer using original procedural Three geometry and existing game state; it does not add rules, import assets, or imitate Civilization VI city, district, improvement, banner, or road language.
+
+V15 composition rules:
+
+- Cities remain the strongest owned strategic anchors. Extra settlement detail is low and peripheral: annex huts, supply pieces, gate posts, footprints, and owner pennants support the city plinth without competing with the main city model, selection ring, unit base, or resource marker.
+- Settlement details are deterministic from city hex, city level, buildings, walls, and owner color. They should scale with city importance but stay inside the strategic footprint so city tiles do not become cluttered mini-dioramas.
+- Roads stay low-profile route information, but short connector spurs may visually tie road tiles to adjacent cities, forts, portals, resources, and improvements when those targets are already known through visible/explored map state.
+- Improvements, forts, and portals get dark grounded pads plus restrained owner-colored stones or pennants when ownership data exists. These are scale cues, not new gameplay signals.
+- Resource markers keep priority over support detail. Any world-detail element near a resource should frame or ground the marker, not replace it or hide its silhouette.
+- The vertical priority remains: terrain and atmosphere first, infrastructure and settlement detail next, resources and city/unit gameplay markers above them, then fog, selection, attack, and path overlays.
+- The implementation must stay static and instanced. New settlement and infrastructure detail should add bounded batches and no per-frame work.
+
+Remaining reference gap after v15:
+
+- A true polished PC 4X settlement pipeline needs owned city/improvement mesh variants, biome-specific district footprints, authored scenario data with mature improvements, and explicit rules for multi-tile landmarks.
+- Generated opening maps can still be sparse in roads, forts, built improvements, and portals. The renderer now composes those fields where present, but future showcase maps should deliberately place them for art validation.
+- Ownership presentation would benefit from faction-specific architecture and banner kits once faction art direction is defined.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.

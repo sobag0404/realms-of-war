@@ -18,6 +18,7 @@ export { WaterLayer } from './WaterLayer';
 export { RiverLayer } from './RiverLayer';
 export { AtmosphereLayer } from './AtmosphereLayer';
 export { InfrastructureLayer } from './InfrastructureLayer';
+export { SettlementDetailLayer } from './SettlementDetailLayer';
 export { UnitLayer } from './UnitLayer';
 export { BuildingLayer } from './BuildingLayer';
 export { FogLayer } from './FogLayer';
