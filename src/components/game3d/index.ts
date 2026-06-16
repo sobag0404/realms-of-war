@@ -10,6 +10,7 @@ export { CameraRig } from './CameraRig';
 export { LightingRig } from './LightingRig';
 export { TerrainLayer } from './TerrainLayer';
 export { TerrainDepthLayer } from './TerrainDepthLayer';
+export { TerrainMaterialPatternLayer } from './TerrainMaterialPatternLayer';
 export { TerrainFeatureLayer } from './TerrainFeatureLayer';
 export { HexMesh } from './HexMesh';
 export { WaterLayer } from './WaterLayer';

@@ -3,9 +3,10 @@
 import { useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import type { HexCoord, TerrainTypeId } from '@/engine/core/types';
-import { TERRAIN_COLORS, TERRAIN_ELEVATION } from '@/data/terrain';
+import { TERRAIN_ELEVATION } from '@/data/terrain';
 import { buildHexGeometry } from '@/rendering/terrain/buildHexGeometry';
 import { createTerrainMaterial, createSelectionMaterial, createHoverMaterial } from '@/rendering/terrain/terrainMaterials';
+import { getTerrainSurfaceVertexColor } from '@/rendering/terrain/terrainSurfacePatterns';
 
 interface HexMeshProps {
   position: [number, number, number];
@@ -16,26 +17,6 @@ interface HexMeshProps {
   isHovered?: boolean;
   onClick?: (hex: HexCoord) => void;
   onHover?: (hex: HexCoord | null) => void;
-}
-
-function hash01(q: number, r: number, salt: number): number {
-  const x = Math.sin(q * 127.1 + r * 311.7 + salt * 74.7) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-function colorForVertex(terrain: TerrainTypeId, q: number, r: number, vertexIndex: number, normalY: number): THREE.Color {
-  const color = new THREE.Color(TERRAIN_COLORS[terrain] ?? '#555555');
-  const hsl = { h: 0, s: 0, l: 0 };
-  color.getHSL(hsl);
-  const tileNoise = hash01(q, r, 1) - 0.5;
-  const vertexNoise = hash01(q, r, vertexIndex + 13) - 0.5;
-  const sideShade = normalY > 0.5 ? 1 : terrain === 'mountain' ? 0.58 : terrain === 'forest' ? 0.62 : 0.72;
-  const centerLift = vertexIndex === 0 ? 0.04 : 0;
-  return new THREE.Color().setHSL(
-    THREE.MathUtils.euclideanModulo(hsl.h + tileNoise * 0.018, 1),
-    THREE.MathUtils.clamp(hsl.s + tileNoise * 0.12, 0.05, 0.95),
-    THREE.MathUtils.clamp((hsl.l + vertexNoise * 0.12 + centerLift) * sideShade, 0.08, 0.88),
-  );
 }
 
 export function HexMesh({
@@ -65,7 +46,15 @@ export function HexMesh({
     const normals = meshGeometry.getAttribute('normal');
     const colors: number[] = [];
     for (let index = 0; index < normals.count; index++) {
-      const color = colorForVertex(terrain, hex.q, hex.r, index, normals.getY(index));
+      const color = getTerrainSurfaceVertexColor(
+        terrain,
+        hex.q,
+        hex.r,
+        index,
+        normals.getX(index),
+        normals.getY(index),
+        normals.getZ(index),
+      );
       colors.push(color.r, color.g, color.b);
     }
     meshGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
