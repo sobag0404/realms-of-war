@@ -96,12 +96,39 @@ function coastEdge(tile: HexTile, direction: number): { center: THREE.Vector3; a
   };
 }
 
-function addForestCluster(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexTile) {
-  const count = 3 + Math.floor(hash01(tile.coord.q, tile.coord.r, 11) * 3);
+function neighborTerrainCount(tile: HexTile, tiles: Record<string, HexTile>, terrains: TerrainTypeId[]): number {
+  return HEX_DIRECTIONS.reduce((count, dir) => {
+    const neighbor = tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
+    return neighbor && terrains.includes(neighbor.terrain as TerrainTypeId) ? count + 1 : count;
+  }, 0);
+}
+
+function highlandYaw(tile: HexTile, tiles: Record<string, HexTile>): number {
+  let vx = 0;
+  let vz = 0;
+  for (const dir of HEX_DIRECTIONS) {
+    const neighbor = tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
+    if (!neighbor) continue;
+    if (neighbor.terrain !== 'mountain' && neighbor.terrain !== 'hills') continue;
+    const [nx, , nz] = hexToWorld(neighbor.coord);
+    const [tx, , tz] = hexToWorld(tile.coord);
+    vx += nx - tx;
+    vz += nz - tz;
+  }
+  if (Math.abs(vx) + Math.abs(vz) < 0.001) {
+    return hash01(tile.coord.q, tile.coord.r, 101) * Math.PI * 2;
+  }
+  return Math.atan2(vz, vx) + Math.PI / 2;
+}
+
+function addForestCluster(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexTile, tiles: Record<string, HexTile>) {
+  const forestNeighbors = neighborTerrainCount(tile, tiles, ['forest']);
+  const interiorBoost = THREE.MathUtils.clamp(forestNeighbors / 4, 0, 1);
+  const count = 2 + Math.floor(interiorBoost * 2) + Math.floor(hash01(tile.coord.q, tile.coord.r, 11) * 3);
   for (let index = 0; index < count; index++) {
     const anchor = offsetOnTile(tile, 20 + index, 0.4, 0.74);
-    const trunkScale = 0.82 + hash01(tile.coord.q, tile.coord.r, 30 + index) * 0.32;
-    const canopyScale = 0.88 + hash01(tile.coord.q, tile.coord.r, 40 + index) * 0.42;
+    const trunkScale = 0.78 + interiorBoost * 0.22 + hash01(tile.coord.q, tile.coord.r, 30 + index) * 0.3;
+    const canopyScale = 0.84 + interiorBoost * 0.24 + hash01(tile.coord.q, tile.coord.r, 40 + index) * 0.38;
     anchor.y = baseY(tile);
 
     pushFeature(groups, 'forestTrunk', {
@@ -117,32 +144,38 @@ function addForestCluster(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexT
   }
 }
 
-function addMountainRidge(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexTile) {
-  const count = 2 + Math.floor(hash01(tile.coord.q, tile.coord.r, 70) * 3);
+function addMountainRidge(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexTile, tiles: Record<string, HexTile>) {
+  const highlandNeighbors = neighborTerrainCount(tile, tiles, ['mountain', 'hills']);
+  const chainBoost = THREE.MathUtils.clamp(highlandNeighbors / 4, 0, 1);
+  const ridgeYaw = highlandYaw(tile, tiles);
+  const count = 2 + Math.floor(chainBoost * 2) + Math.floor(hash01(tile.coord.q, tile.coord.r, 70) * 2);
   for (let index = 0; index < count; index++) {
     const anchor = offsetOnTile(tile, 80 + index, 0.2, 0.64);
-    const s = 0.9 + hash01(tile.coord.q, tile.coord.r, 90 + index) * 0.54;
+    const s = 0.88 + chainBoost * 0.22 + hash01(tile.coord.q, tile.coord.r, 90 + index) * 0.5;
     anchor.y = baseY(tile);
+    const yaw = ridgeYaw + (hash01(tile.coord.q, tile.coord.r, 100 + index) - 0.5) * 0.62;
     pushFeature(groups, 'mountainRidge', {
       position: new THREE.Vector3(anchor.x, anchor.y + 0.44 * s, anchor.z),
-      rotation: rotation(tile, 100 + index, 0.16),
-      scale: scale3(s * 0.82, s * 1.14, s),
+      rotation: new THREE.Euler(0.16, yaw, 0.07),
+      scale: scale3(s * 0.72, s * (1.12 + chainBoost * 0.12), s * 1.08),
     });
     if (index < 2) {
       pushFeature(groups, 'mountainSnowCap', {
         position: new THREE.Vector3(anchor.x, anchor.y + 0.82 * s, anchor.z),
-        rotation: rotation(tile, 110 + index, 0.08),
+        rotation: new THREE.Euler(0.08, yaw, 0.04),
         scale: scale3(s * 0.46, s * 0.36, s * 0.46),
       });
     }
   }
 }
 
-function addHillCluster(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexTile) {
-  const count = 2 + Math.floor(hash01(tile.coord.q, tile.coord.r, 120) * 3);
+function addHillCluster(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexTile, tiles: Record<string, HexTile>) {
+  const highlandNeighbors = neighborTerrainCount(tile, tiles, ['mountain', 'hills']);
+  const ridgeBoost = THREE.MathUtils.clamp(highlandNeighbors / 5, 0, 0.65);
+  const count = 2 + Math.floor(ridgeBoost * 2) + Math.floor(hash01(tile.coord.q, tile.coord.r, 120) * 2);
   for (let index = 0; index < count; index++) {
     const anchor = offsetOnTile(tile, 130 + index, 0.34, 0.7);
-    const s = 0.78 + hash01(tile.coord.q, tile.coord.r, 140 + index) * 0.44;
+    const s = 0.74 + ridgeBoost * 0.18 + hash01(tile.coord.q, tile.coord.r, 140 + index) * 0.4;
     anchor.y = baseY(tile);
     pushFeature(groups, 'hillTerrace', {
       position: new THREE.Vector3(anchor.x, anchor.y + 0.17 * s, anchor.z),
@@ -281,13 +314,13 @@ function buildFeatureGroups(
 
     switch (tile.terrain) {
       case 'forest':
-        addForestCluster(groups, tile);
+        addForestCluster(groups, tile, tiles);
         break;
       case 'mountain':
-        addMountainRidge(groups, tile);
+        addMountainRidge(groups, tile, tiles);
         break;
       case 'hills':
-        addHillCluster(groups, tile);
+        addHillCluster(groups, tile, tiles);
         break;
       case 'swamp':
         addSwampCluster(groups, tile);

@@ -15,6 +15,10 @@ type DepthSegment = {
   length: number;
 };
 
+type DepthFaceSegment = DepthSegment & {
+  height: number;
+};
+
 function hexKey(q: number, r: number): string {
   return `${q},${r}`;
 }
@@ -45,10 +49,12 @@ function elevationOf(tile: HexTile): number {
 
 function buildDepthSegments(tiles: Record<string, HexTile>, knownHexes: Set<string> | null): {
   cliff: DepthSegment[];
+  face: DepthFaceSegment[];
   rim: DepthSegment[];
   shore: DepthSegment[];
 } {
   const cliff: DepthSegment[] = [];
+  const face: DepthFaceSegment[] = [];
   const rim: DepthSegment[] = [];
   const shore: DepthSegment[] = [];
 
@@ -84,10 +90,20 @@ function buildDepthSegments(tiles: Record<string, HexTile>, knownHexes: Set<stri
         cliff.push(segment);
         if (tile.terrain === 'mountain' || tile.terrain === 'hills') rim.push(segment);
       }
+
+      if (delta >= 0.12 || neighbor.terrain === 'water') {
+        const faceHeight = THREE.MathUtils.clamp((neighbor.terrain === 'water' ? tileY + 0.18 : delta) * 0.42, 0.055, 0.22);
+        face.push({
+          position: new THREE.Vector3(edge.center.x, Math.max(tileY, 0) + 0.24 - faceHeight * 0.5, edge.center.z),
+          rotationY: edge.rotationY,
+          length: edge.length,
+          height: faceHeight,
+        });
+      }
     }
   }
 
-  return { cliff, rim, shore };
+  return { cliff, face, rim, shore };
 }
 
 function InstancedDepthStrips({
@@ -129,6 +145,40 @@ function InstancedDepthStrips({
   return <instancedMesh ref={meshRef} args={[geometry, material, segments.length]} renderOrder={8} />;
 }
 
+function InstancedDepthFaces({
+  segments,
+  material,
+  width,
+}: {
+  segments: DepthFaceSegment[];
+  material: THREE.Material;
+  width: number;
+}) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const geometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const dummy = new THREE.Object3D();
+
+    for (let index = 0; index < segments.length; index++) {
+      const segment = segments[index];
+      dummy.position.copy(segment.position);
+      dummy.rotation.set(0, segment.rotationY, 0);
+      dummy.scale.set(segment.length * 0.88, segment.height, width);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [segments, width]);
+
+  if (segments.length === 0) return null;
+
+  return <instancedMesh ref={meshRef} args={[geometry, material, segments.length]} renderOrder={7} />;
+}
+
 export function TerrainDepthLayer() {
   const gameState = useGameStore((s) => s.gameState);
   const showFog = useGameStore((s) => s.showFog);
@@ -142,7 +192,7 @@ export function TerrainDepthLayer() {
   }, [activePlayerId, gameState, showFog]);
 
   const segments = useMemo(() => {
-    if (!gameState) return { cliff: [], rim: [], shore: [] };
+    if (!gameState) return { cliff: [], face: [], rim: [], shore: [] };
     return buildDepthSegments(gameState.map.tiles, knownHexes);
   }, [gameState, knownHexes]);
 
@@ -150,6 +200,12 @@ export function TerrainDepthLayer() {
     color: '#171b17',
     transparent: true,
     opacity: 0.34,
+    depthWrite: false,
+  }), []);
+  const faceMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#10150f',
+    transparent: true,
+    opacity: 0.22,
     depthWrite: false,
   }), []);
   const rimMaterial = useMemo(() => new THREE.MeshBasicMaterial({
@@ -166,11 +222,12 @@ export function TerrainDepthLayer() {
   }), []);
 
   if (!gameState) return null;
-  const total = segments.cliff.length + segments.rim.length + segments.shore.length;
+  const total = segments.cliff.length + segments.face.length + segments.rim.length + segments.shore.length;
   if (total === 0) return null;
 
   return (
     <group>
+      <InstancedDepthFaces segments={segments.face} material={faceMaterial} width={0.07} />
       <InstancedDepthStrips segments={segments.cliff} material={cliffMaterial} width={0.09} height={0.018} />
       <InstancedDepthStrips segments={segments.rim} material={rimMaterial} width={0.035} height={0.01} yOffset={0.012} />
       <InstancedDepthStrips segments={segments.shore} material={shoreCliffMaterial} width={0.12} height={0.016} yOffset={-0.004} />

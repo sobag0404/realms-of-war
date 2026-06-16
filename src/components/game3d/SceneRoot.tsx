@@ -5,6 +5,7 @@ import { LightingRig } from './LightingRig';
 import { TerrainLayer } from './TerrainLayer';
 import { TerrainDepthLayer } from './TerrainDepthLayer';
 import { TerrainMaterialPatternLayer } from './TerrainMaterialPatternLayer';
+import { StrategicDepthCueLayer } from './StrategicDepthCueLayer';
 import { TerrainAccentLayer } from './TerrainAccentLayer';
 import { TerrainFeatureLayer } from './TerrainFeatureLayer';
 import { DecorationLayer } from './DecorationLayer';
@@ -32,6 +33,7 @@ export function SceneRoot() {
       <TerrainLayer />
       <TerrainDepthLayer />
       <TerrainMaterialPatternLayer />
+      <StrategicDepthCueLayer />
       <TerrainAccentLayer />
       <TerrainFeatureLayer />
       <CoastLayer />
