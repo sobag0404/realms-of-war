@@ -16,6 +16,7 @@ export { TerrainFeatureLayer } from './TerrainFeatureLayer';
 export { HexMesh } from './HexMesh';
 export { WaterLayer } from './WaterLayer';
 export { RiverLayer } from './RiverLayer';
+export { AtmosphereLayer } from './AtmosphereLayer';
 export { InfrastructureLayer } from './InfrastructureLayer';
 export { UnitLayer } from './UnitLayer';
 export { BuildingLayer } from './BuildingLayer';

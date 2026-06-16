@@ -12,6 +12,7 @@ import { DecorationLayer } from './DecorationLayer';
 import { CoastLayer } from './CoastLayer';
 import { WaterLayer } from './WaterLayer';
 import { RiverLayer } from './RiverLayer';
+import { AtmosphereLayer } from './AtmosphereLayer';
 import { InfrastructureLayer } from './InfrastructureLayer';
 import { BuildingLayer } from './BuildingLayer';
 import { UnitLayer } from './UnitLayer';
@@ -40,6 +41,7 @@ export function SceneRoot() {
       <DecorationLayer />
       <WaterLayer />
       <RiverLayer />
+      <AtmosphereLayer />
       <InfrastructureLayer />
       <ResourceLayer />
       <BuildingLayer />

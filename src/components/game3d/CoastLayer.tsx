@@ -93,6 +93,20 @@ export function CoastLayer() {
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
+  const rockyShoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#4f5f59',
+    transparent: true,
+    opacity: 0.26,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
+  const coldShoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#d8eee8',
+    transparent: true,
+    opacity: 0.22,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }), []);
   const edgeFoamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#f7fff6',
     transparent: true,
@@ -159,6 +173,11 @@ export function CoastLayer() {
       {shoreLandTiles.map((tile) => {
         const [wx, , wz] = hexToWorld(tile.coord);
         const terrainY = TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
+        const shoreMaterial = tile.terrain === 'mountain'
+          ? coldShoreMaterial
+          : terrainY >= 0.2
+            ? rockyShoreMaterial
+            : landShoreMaterial;
         return (
           <mesh
             key={`shore-land-${tile.coord.q},${tile.coord.r}`}
@@ -166,7 +185,7 @@ export function CoastLayer() {
             rotation={[-Math.PI / 2, 0, 0]}
             position={[wx, terrainY + 0.17, wz]}
           >
-            <primitive object={landShoreMaterial} attach="material" />
+            <primitive object={shoreMaterial} attach="material" />
           </mesh>
         );
       })}
