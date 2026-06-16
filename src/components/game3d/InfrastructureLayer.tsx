@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { TERRAIN_ELEVATION } from '@/data/terrain';
 import { hexToWorld } from '@/engine/hex/coordinates';
-import { HEX_DIRECTIONS, type HexCoord, type TerrainTypeId } from '@/engine/core/types';
+import { HEX_DIRECTIONS, type HexCoord } from '@/engine/core/types';
 import type { GameState, HexTile } from '@/engine/core/GameState';
 import { useGameStore } from '@/store/useGameStore';
+import { coordKey, detailHash, terrainY as terrainBaseY, tileKey } from './worldDetailLayout';
 
 type InfrastructureDef = {
   geometry: THREE.BufferGeometry;
@@ -73,6 +73,44 @@ const INFRASTRUCTURE_DEFS = {
     opacity: 0.97,
     depthWrite: false,
     renderOrder: 9,
+  },
+  'road-spur-shadow': {
+    geometry: new THREE.BoxGeometry(0.18, 0.014, 0.48),
+    color: '#211b13',
+    roughness: 0.96,
+    transparent: true,
+    opacity: 0.76,
+    depthWrite: false,
+    renderOrder: 8,
+  },
+  'road-spur-top': {
+    geometry: new THREE.BoxGeometry(0.11, 0.01, 0.42),
+    color: '#b69a6a',
+    roughness: 0.9,
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
+    renderOrder: 9,
+  },
+  'improvement-ground': {
+    geometry: new THREE.CylinderGeometry(0.36, 0.43, 0.018, 6),
+    color: '#1a140e',
+    roughness: 0.98,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+    renderOrder: 7,
+  },
+  'owner-marker-stone': {
+    geometry: new THREE.BoxGeometry(0.08, 0.075, 0.08),
+    color: '#e3cf9b',
+    roughness: 0.82,
+  },
+  'owner-marker-cloth': {
+    geometry: new THREE.ConeGeometry(0.08, 0.14, 3),
+    color: '#ffffff',
+    roughness: 0.62,
+    metalness: 0.04,
   },
   'fort-ring': {
     geometry: new THREE.TorusGeometry(0.34, 0.035, 6, 24),
@@ -151,20 +189,11 @@ const INFRASTRUCTURE_DEFS = {
 } satisfies Record<string, InfrastructureDef>;
 
 function hash01(q: number, r: number, salt: number): number {
-  const x = Math.sin(q * 127.1 + r * 311.7 + salt * 53.9) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-function tileKey(tile: HexTile): string {
-  return `${tile.coord.q},${tile.coord.r}`;
-}
-
-function coordKey(coord: HexCoord): string {
-  return `${coord.q},${coord.r}`;
+  return detailHash(q, r, salt);
 }
 
 function terrainY(tile: HexTile): number {
-  return TERRAIN_ELEVATION[tile.terrain as TerrainTypeId] ?? 0;
+  return terrainBaseY(tile);
 }
 
 function neighborCoord(coord: HexCoord, direction: number): HexCoord {
@@ -191,13 +220,30 @@ function visibleInfrastructureTiles(gameState: GameState, activePlayerId: string
   ));
 }
 
-function buildRoadBatches(tiles: HexTile[], tileMap: Record<string, HexTile>): InfrastructureBatch[] {
+function isWorldDetailTarget(tile: HexTile, cityKeys: Set<string>): boolean {
+  return (
+    cityKeys.has(tileKey(tile)) ||
+    tile.hasFort ||
+    tile.hasRiftPortal ||
+    Boolean(tile.resource) ||
+    Boolean(tile.improvement && tile.improvement !== 'road')
+  );
+}
+
+function buildRoadBatches(
+  tiles: HexTile[],
+  tileMap: Record<string, HexTile>,
+  cityKeys: Set<string>,
+): InfrastructureBatch[] {
   const roadTiles = tiles.filter((tile) => tile.hasRoad || tile.improvement === 'road');
   const roadKeys = new Set(roadTiles.map(tileKey));
+  const visibleKeys = new Set(tiles.map(tileKey));
   const centerShadow: InfrastructureInstance[] = [];
   const centerTop: InfrastructureInstance[] = [];
   const segmentShadow: InfrastructureInstance[] = [];
   const segmentTop: InfrastructureInstance[] = [];
+  const spurShadow: InfrastructureInstance[] = [];
+  const spurTop: InfrastructureInstance[] = [];
 
   for (const tile of roadTiles) {
     const [wx, , wz] = hexToWorld(tile.coord);
@@ -219,6 +265,16 @@ function buildRoadBatches(tiles: HexTile[], tileMap: Record<string, HexTile>): I
       const neighbor = tileMap[coordKey(neighborCoord(tile.coord, direction))];
       return neighbor && neighbor.terrain !== 'water' && roadKeys.has(tileKey(neighbor));
     });
+    const targetDirections = DIRECTIONS.filter((direction) => {
+      const neighbor = tileMap[coordKey(neighborCoord(tile.coord, direction))];
+      return (
+        neighbor &&
+        neighbor.terrain !== 'water' &&
+        visibleKeys.has(tileKey(neighbor)) &&
+        !roadKeys.has(tileKey(neighbor)) &&
+        isWorldDetailTarget(neighbor, cityKeys)
+      );
+    }).slice(0, 2);
     const fallbackDirection = Math.floor(hash01(tile.coord.q, tile.coord.r, 31) * 6);
     const visualDirections = connected.length > 0 ? connected : [fallbackDirection, (fallbackDirection + 3) % 6];
 
@@ -237,6 +293,23 @@ function buildRoadBatches(tiles: HexTile[], tileMap: Record<string, HexTile>): I
         position: new THREE.Vector3(base.x, base.y + 0.006, base.z),
         rotation,
         scale: new THREE.Vector3(0.82, 1, lengthScale * 0.92),
+      });
+    }
+
+    for (const direction of targetDirections) {
+      const vector = directionVector(tile, direction);
+      const rotation = new THREE.Euler(0, Math.atan2(vector.x, vector.z), 0);
+      const base = new THREE.Vector3(wx, y + 0.01, wz).addScaledVector(vector, 0.28);
+
+      spurShadow.push({
+        position: base,
+        rotation,
+        scale: new THREE.Vector3(1.08, 1, 0.86),
+      });
+      spurTop.push({
+        position: new THREE.Vector3(base.x, base.y + 0.006, base.z),
+        rotation,
+        scale: new THREE.Vector3(0.9, 1, 0.82),
       });
     }
   }
@@ -261,6 +334,16 @@ function buildRoadBatches(tiles: HexTile[], tileMap: Record<string, HexTile>): I
       key: 'road-segment-top',
       def: INFRASTRUCTURE_DEFS['road-segment-top'],
       instances: segmentTop,
+    },
+    {
+      key: 'road-spur-shadow',
+      def: INFRASTRUCTURE_DEFS['road-spur-shadow'],
+      instances: spurShadow,
+    },
+    {
+      key: 'road-spur-top',
+      def: INFRASTRUCTURE_DEFS['road-spur-top'],
+      instances: spurTop,
     },
   ];
 }
@@ -289,11 +372,54 @@ function improvementAnchor(tile: HexTile, salt: number, radius = 0.32): THREE.Ve
   );
 }
 
-function buildImprovementBatches(tiles: HexTile[], players: GameState['players']): InfrastructureBatch[] {
+function ownerColorForTile(tile: HexTile, gameState: GameState): THREE.Color | undefined {
+  if (tile.riftPortalOwner && gameState.players[tile.riftPortalOwner]) {
+    return new THREE.Color(gameState.players[tile.riftPortalOwner].color);
+  }
+  if (!tile.owningCityId) return undefined;
+  const city = gameState.cities[tile.owningCityId];
+  if (!city) return undefined;
+  const player = gameState.players[city.ownerId];
+  return player ? new THREE.Color(player.color) : undefined;
+}
+
+function pushGroundAndOwner(
+  batches: Map<string, InfrastructureBatch>,
+  tile: HexTile,
+  gameState: GameState,
+): void {
+  const [wx, , wz] = hexToWorld(tile.coord);
+  const y = Math.max(0.04, terrainY(tile) + 0.12);
+  const turn = hash01(tile.coord.q, tile.coord.r, 47) * Math.PI * 2;
+  pushBatch(batches, 'improvement-ground', INFRASTRUCTURE_DEFS['improvement-ground'], {
+    position: new THREE.Vector3(wx, y, wz),
+    rotation: new THREE.Euler(0, turn, 0),
+    scale: new THREE.Vector3(1, 1, 0.72),
+  });
+
+  const ownerColor = ownerColorForTile(tile, gameState);
+  if (!ownerColor) return;
+
+  const anchor = improvementAnchor(tile, 83, 0.52);
+  pushBatch(batches, 'owner-marker-stone', INFRASTRUCTURE_DEFS['owner-marker-stone'], {
+    position: new THREE.Vector3(anchor.x, anchor.y - 0.02, anchor.z),
+    rotation: new THREE.Euler(0, turn, 0),
+    scale: new THREE.Vector3(0.78, 1, 0.78),
+  });
+  pushBatch(batches, 'owner-marker-cloth', INFRASTRUCTURE_DEFS['owner-marker-cloth'], {
+    position: new THREE.Vector3(anchor.x, anchor.y + 0.08, anchor.z),
+    rotation: new THREE.Euler(0, turn + 0.3, 0.18),
+    scale: new THREE.Vector3(0.9, 0.82, 0.9),
+    color: ownerColor,
+  });
+}
+
+function buildImprovementBatches(tiles: HexTile[], gameState: GameState): InfrastructureBatch[] {
   const batches = new Map<string, InfrastructureBatch>();
 
   for (const tile of tiles) {
     const turn = hash01(tile.coord.q, tile.coord.r, 41) * Math.PI * 2;
+    pushGroundAndOwner(batches, tile, gameState);
 
     if (tile.hasFort) {
       const [wx, , wz] = hexToWorld(tile.coord);
@@ -313,7 +439,7 @@ function buildImprovementBatches(tiles: HexTile[], players: GameState['players']
     if (tile.hasRiftPortal) {
       const [wx, , wz] = hexToWorld(tile.coord);
       const y = Math.max(0.06, terrainY(tile) + 0.24);
-      const ownerColor = tile.riftPortalOwner ? players[tile.riftPortalOwner]?.color : undefined;
+      const ownerColor = tile.riftPortalOwner ? gameState.players[tile.riftPortalOwner]?.color : undefined;
       pushBatch(batches, 'rift-base', INFRASTRUCTURE_DEFS['rift-base'], {
         position: new THREE.Vector3(wx, y, wz),
         rotation: new THREE.Euler(0, turn, 0),
@@ -459,8 +585,12 @@ export function InfrastructureLayer() {
     ));
 
     return [
-      ...buildRoadBatches(tiles, gameState.map.tiles),
-      ...buildImprovementBatches(improvementTiles, gameState.players),
+      ...buildRoadBatches(
+        tiles,
+        gameState.map.tiles,
+        new Set(Object.values(gameState.cities).map((city) => coordKey(city.hex))),
+      ),
+      ...buildImprovementBatches(improvementTiles, gameState),
     ].filter((batch) => batch.instances.length > 0);
   }, [activePlayerId, gameState, showFog]);
 
