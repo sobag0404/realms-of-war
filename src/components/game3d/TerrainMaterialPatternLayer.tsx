@@ -18,6 +18,8 @@ type PatternKey =
   | 'swampWetPatch'
   | 'hillStrata'
   | 'mountainScree'
+  | 'alpineFrost'
+  | 'hillSnowTrace'
   | 'ruinCrack'
   | 'coastDamp'
   | 'waterSheen';
@@ -195,6 +197,31 @@ function addCoastPatterns(groups: Map<PatternKey, PatternInstance[]>, tile: HexT
   }
 }
 
+function addHighlandFrostPatterns(groups: Map<PatternKey, PatternInstance[]>, tile: HexTile, tiles: Record<string, HexTile>) {
+  const terrain = tile.terrain as TerrainTypeId;
+  if (terrain !== 'mountain' && terrain !== 'hills') return;
+
+  const highlandNeighbors = HEX_DIRECTIONS.reduce((count, dir) => {
+    const neighbor = tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
+    return neighbor && (neighbor.terrain === 'mountain' || neighbor.terrain === 'hills') ? count + 1 : count;
+  }, 0);
+  if (terrain === 'hills' && highlandNeighbors < 3) return;
+
+  const patchCount = terrain === 'mountain' ? 2 : 1;
+  for (let index = 0; index < patchCount; index++) {
+    if (terrainSurfaceHash(tile.coord.q, tile.coord.r, 300 + index) < (terrain === 'mountain' ? 0.18 : 0.42)) continue;
+    const a = anchor(tile, 310 + index, 0.22, 0.7);
+    const s = terrain === 'mountain'
+      ? 0.58 + terrainSurfaceHash(tile.coord.q, tile.coord.r, 320 + index) * 0.34
+      : 0.42 + terrainSurfaceHash(tile.coord.q, tile.coord.r, 330 + index) * 0.22;
+    pushPattern(groups, terrain === 'mountain' ? 'alpineFrost' : 'hillSnowTrace', {
+      position: a,
+      rotationY: terrainSurfaceHash(tile.coord.q, tile.coord.r, 340 + index) * Math.PI * 2,
+      scale: new THREE.Vector3(s, 0.014, s * (terrain === 'mountain' ? 0.3 : 0.16)),
+    });
+  }
+}
+
 function buildPatterns(tiles: Record<string, HexTile>, knownHexes: Set<string> | null): Map<PatternKey, PatternInstance[]> {
   const groups = new Map<PatternKey, PatternInstance[]>();
   for (const tile of Object.values(tiles)) {
@@ -202,6 +229,7 @@ function buildPatterns(tiles: Record<string, HexTile>, knownHexes: Set<string> |
     if (knownHexes && !knownHexes.has(key)) continue;
     addGenericPatterns(groups, tile);
     addCoastPatterns(groups, tile, tiles);
+    addHighlandFrostPatterns(groups, tile, tiles);
   }
   return groups;
 }
@@ -215,6 +243,8 @@ function buildPatternDefs(): Record<PatternKey, PatternDef> {
     swampWetPatch: { geometry: new THREE.CylinderGeometry(0.42, 0.5, 1, 12), color: '#102f32', opacity: 0.38 },
     hillStrata: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#c79c5b', opacity: 0.32 },
     mountainScree: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d2d6d0', opacity: 0.28 },
+    alpineFrost: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#ecf4e8', opacity: 0.34 },
+    hillSnowTrace: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d9e8d7', opacity: 0.22 },
     ruinCrack: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#393530', opacity: 0.3 },
     coastDamp: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#2f5d5b', opacity: 0.3 },
     waterSheen: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#baf7f1', opacity: 0.24 },

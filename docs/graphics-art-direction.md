@@ -310,6 +310,25 @@ Remaining reference gap after v13:
 - Terrain elevation would benefit from durable height/biome/coast/cliff masks rather than renderer-only adjacency inference.
 - A future pipeline pass should introduce owned mesh/texture variants with authoring rules for ridges, forests, coast cliffs, ruins, and snow/ice biomes.
 
+## V14 Water, Snow, Fog, And Atmosphere Integration
+
+The v14 pass integrates atmospheric terrain transitions without changing gameplay state. Water gets deterministic low-opacity shimmer strokes, shore treatment becomes more elevation-aware, highlands get renderer-derived frost traces, ambient mist is separated into `AtmosphereLayer`, and fog-of-war boundaries gain soft edge strips while preserving visibility rules.
+
+V14 atmosphere rules:
+
+- Water, coast, frost, and mist are original local procedural geometry only. They must not sample or recreate Civilization VI water, ice, fog, palette, shoreline shapes, or UI treatment.
+- `WaterLayer` owns water body depth, surface, and subtle in-water shimmer. `CoastLayer` owns land/water transition color: low coasts read sandy-wet, high coasts read rocky, and mountain shores can show restrained icy edging.
+- Snow and frost are terrain-detail cues only. They are renderer-derived from mountain/hill context until durable snow/ice biome data exists, and they must remain broken, off-center, and below gameplay markers.
+- `AtmosphereLayer` is ambient terrain mist, not fog-of-war. It stays before infrastructure, resources, cities, units, and tactical overlays.
+- `FogLayer` remains the information-state overlay. Boundary feathering can soften map edges, but hidden/explored opacity and tactical readability remain primary.
+- All atmosphere work stays static or shared-batched; no per-frame per-tile updates beyond the existing shared water bob.
+
+Remaining reference gap after v14:
+
+- True icy coast, snowfield, and seasonal material rules need biome, temperature, moisture, snow/ice, and coast/cliff masks in map data.
+- Production-quality water still needs an owned shader/texture pipeline or generated normal/flow maps; v14 uses cheap geometry strokes only.
+- Fog/map-edge art should eventually be authored as a complete exploration presentation, including minimap and scenario composition, rather than renderer-only boundary strips.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
