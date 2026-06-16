@@ -9,12 +9,12 @@ server, VPS, or network connection.
 Preferred current handoff:
 
 - Release:
-  <https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.6>
-- Source commit: `4b77eb5abbd7ed957f9b9fc4324ac2ef2f3504a0`
+  <https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.7>
+- Source commit: `1b5633656720d7b8bcad7e410b9438eed14213b7`
 - Main CI:
-  <https://github.com/sobag0404/realms-of-war/actions/runs/27648346636>
+  <https://github.com/sobag0404/realms-of-war/actions/runs/27649570366>
 - Windows artifact workflow:
-  <https://github.com/sobag0404/realms-of-war/actions/runs/27648478063>
+  <https://github.com/sobag0404/realms-of-war/actions/runs/27650115373>
 
 Release assets:
 
@@ -27,8 +27,8 @@ SHA256SUMS.txt
 SHA256:
 
 ```text
-2E4886017686390E7445DC04981883CEBAE697FD302C35F5003277E63753C4B8  realms-of-war.exe
-246C9B9F35CAE7361290874C0FC24E35719A6C357BE8F8C436A003913A3E1233  RealmsOfWar-0.2.0-windows-x64-setup.exe
+5E82599D68B1AEE82B2040FAFDA792C2A32244B5A84535DB5A79D6BE4A0F5D8A  realms-of-war.exe
+D24DCA2EB95912D425091772B5F18613ACDEA53F30B18866D5A55C9A06169D50  RealmsOfWar-0.2.0-windows-x64-setup.exe
 ```
 
 Fallback Actions artifact path:
@@ -59,7 +59,7 @@ realms-of-war.exe
 The app should open a `Realms of War` desktop window. From the main menu, choose
 `New game`, keep the default setup, and start the game.
 
-The current `.6` handoff was smoke-checked by launching the portable executable
+The current `.7` handoff was smoke-checked by launching the portable executable
 and by installing, launching, and uninstalling the NSIS installer from a
 temporary test directory.
 
