@@ -239,6 +239,35 @@ Remaining pipeline needs after v10:
 - Owned procedural or authored terrain texture/prop generation for higher-density forests, mountain ridges, riverbanks, ice, and wetlands.
 - A deterministic showcase scenario containing coast, river, mountain, forest, snow/tundra, city, units, resources, roads, improvements, ownership, fog, and selection in one camera frame.
 
+## V11 Original Terrain Asset-Kit Vertical Slice
+
+The v11 pass adds the first reusable local terrain asset kit. It is still procedural Three geometry, not imported art, but it should read more like authored board pieces: clustered forests, ridge-like mountains, hill terraces, swamp pools, ruins fragments, broken coast rocks, and small resource support props.
+
+V11 kit rules:
+
+- Placement must be deterministic from existing map state: tile coordinate, terrain, resource, known/visible fog state, neighbor terrain, and city/unit occupancy. It must not use runtime randomness or screenshot-only decoration.
+- Feature clusters must preserve a center-clear lane for units, cities, resource markers, selection rings, and path previews. The center remains gameplay space; props orbit around it.
+- Forests read as canopy masses first and individual trees second. Use varied low-poly crowns and trunks near tile edges instead of filling the whole hex.
+- Mountains read as ridgelines. Peaks and caps should align into chains through neighbor-aware placement over time, but v11 keeps the first slice local to each tile.
+- Coast rocks and foam must come from actual land-water adjacency. They should be broken and directional, never a continuous copied-looking shoreline ring.
+- Ruins use compact original silhouettes: broken pillars, slabs, and plinth fragments. Landmark-scale ruins still need future schema before they become multi-tile authored objects.
+- Resource support props reinforce the existing readable resource marker; they never replace, hide, or outshine it.
+- The layer stays batched as shared instanced meshes, with no per-frame animation in this pass. Target budget is low double-digit draw calls and bounded per-tile feature counts.
+
+V11 vertical priority:
+
+- Terrain relief and water remain the base.
+- Terrain depth, coast, river, terrain accents, and terrain feature kit sit below infrastructure and resources.
+- Resource support props remain below resource markers.
+- Cities, units, health/owner markers, fog, selection, attack, and path overlays keep gameplay priority over the asset kit.
+
+Remaining reference gap after v11:
+
+- True snow/tundra/ice biomes need durable biome, temperature, snow/ice, or elevation-band fields rather than renderer-only guesses.
+- Production-quality coast and cliff dressing need explicit coast/cliff masks so rocks, foam, rivers, roads, and elevation transitions can share boundaries cleanly.
+- Landmark-quality ruins, portals, wonders, and multi-tile points of interest need authored categories, footprints, explored state, and scenario data.
+- A larger Civ-like quality leap still requires an owned asset pipeline for hand-authored or generated texture sets, mesh variants, and showcase map composition.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
