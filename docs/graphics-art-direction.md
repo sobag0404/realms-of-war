@@ -291,6 +291,25 @@ Remaining reference gap after v12:
 - The worker map generator still exposes sparse or unused feature fields in some paths, including river masks that do not yet act as a full gameplay/content river system.
 - A larger Civ-like art-quality leap still requires owned texture/mesh asset generation rules, biome-specific material variants, and authored showcase composition beyond this local procedural slice.
 
+## V13 Strategic Depth And Readability Pass
+
+The v13 pass strengthens scene depth hierarchy without adding gameplay rules or imported assets. It adds static strategic depth cues under terrain features, adds vertical drop-face bands to terrain elevation edges, and makes forest, hill, and mountain feature clusters more neighbor-aware so terrain reads as masses and ridgelines from the default PC camera.
+
+V13 depth/readability rules:
+
+- Depth cues are terrain-only. They must sit below resources, roads, cities, units, fog, selection, attack, and path overlays.
+- Cast shadows and grounding cues should explain height and mass, not darken the whole board. Keep opacity modest and avoid center-lane clutter.
+- Mountain ridges may become taller and better aligned when adjacent to hills or other mountains; isolated hills stay lower.
+- Forest interiors may read as denser canopy mass, while edge forests remain more open for scanability.
+- Coast drops and cliff faces should come from actual water/elevation adjacency and should not become continuous decorative borders.
+- All new depth work must stay static and batched with instanced geometry. No per-frame texture generation, no gameplay schema changes, and no external art sources.
+
+Remaining reference gap after v13:
+
+- True landmark scale still needs authored landmark categories, footprints, visibility rules, and showcase map composition.
+- Terrain elevation would benefit from durable height/biome/coast/cliff masks rather than renderer-only adjacency inference.
+- A future pipeline pass should introduce owned mesh/texture variants with authoring rules for ridges, forests, coast cliffs, ruins, and snow/ice biomes.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
