@@ -268,6 +268,29 @@ Remaining reference gap after v11:
 - Landmark-quality ruins, portals, wonders, and multi-tile points of interest need authored categories, footprints, explored state, and scenario data.
 - A larger Civ-like quality leap still requires an owned asset pipeline for hand-authored or generated texture sets, mesh variants, and showcase map composition.
 
+## V12 Biome Material And Texture-Depth Vertical Slice
+
+The v12 pass enriches terrain surfaces rather than adding more gameplay props. It centralizes deterministic surface color and relief rules in `terrainSurfacePatterns.ts`, then adds a static `TerrainMaterialPatternLayer` for low-profile procedural surface marks: grass mottling, forest leaf mats, desert cracks and dust, swamp wet patches, hill strata, mountain scree, ruin cracks, damp coast edges, and water sheen.
+
+V12 material rules:
+
+- Surface variation must be deterministic from tile coordinate, terrain, vertex normal, vertex index, and local surface hashes. It must not use runtime randomness, external textures, or screenshot-only decoration.
+- Material marks stay below terrain accents, terrain feature props, roads, resources, cities, units, fog, selection, attack, and path overlays. They add material depth without claiming gameplay priority.
+- Plains use low-contrast yellow-green mottling and soft grass strokes with broad negative space.
+- Forest tiles use dark under-canopy leaf mats and cooler ground shadows while preserving a clear center lane.
+- Desert tiles use pale dune dust plus thin cracks that must not read as roads, rivers, or path previews.
+- Swamps use dark wet patches and muted olive edges without glossy or noisy specular treatment.
+- Hills and mountains use contour, strata, scree, and subtle light caps. True snow caps still need durable biome, snow, ice, or elevation-band data.
+- Ruins use compact geometric cracks and broken-stone surface language; landmark-scale ruins still need authored schema.
+- Water and coast use broad water sheen and adjacency-backed damp coast strips, not continuous decorative shoreline rings.
+- The layer remains static and batched with low double-digit instanced draw calls. It does not generate textures or noise per frame.
+
+Remaining reference gap after v12:
+
+- Durable biome, temperature, moisture, snow, ice, coast, and cliff masks are still needed before surfaces can graduate from renderer-derived hints to a true material pipeline.
+- The worker map generator still exposes sparse or unused feature fields in some paths, including river masks that do not yet act as a full gameplay/content river system.
+- A larger Civ-like art-quality leap still requires owned texture/mesh asset generation rules, biome-specific material variants, and authored showcase composition beyond this local procedural slice.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.
