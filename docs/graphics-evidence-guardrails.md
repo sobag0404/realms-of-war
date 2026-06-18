@@ -43,6 +43,26 @@ Graphics passes should keep the renderer predictable at desktop PC viewports:
 
 Visual scripts may collect extra observations when available, such as frame-sample timing, renderer info, layer counts, or draw-call counts. These are guardrails, not acceptance theater: document exact blockers instead of fabricating metrics.
 
+## Repeatable Evidence Script
+
+After `bun run desktop:static:build`, run `bun run graphics:evidence` to capture the current static desktop map at the three required PC viewports. The script writes outside the repository by default:
+
+`C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\graphics-evidence`
+
+Set `REALMS_GRAPHICS_EVIDENCE_DIR` to choose a pass-specific folder, for example:
+
+`REALMS_GRAPHICS_EVIDENCE_DIR=C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\graphics-v17\after`
+
+The script records:
+
+- screenshot PNGs for `1366x768`, `1920x1080`, and `2560x1440`;
+- `graphics-evidence-report.json` with pixel brightness/variance checks;
+- critical HUD control bounds for the turn menu/save controls;
+- critical control offscreen/overlap failures;
+- a short `requestAnimationFrame` timing sample with average, p95, max, and over-50ms counts for approximate render stability.
+
+The frame sample is an early warning signal, not a benchmark. Use it to spot regressions or unstable captures, then document exact hardware/browser/context before making performance claims.
+
 ## Reference Boundary
 
 Civilization VI and similar PC 4X screenshots are quality references only. Evidence should discuss production traits such as readability, lighting depth, terrain integration, and composition. Do not copy, trace, sample, extract, or recreate protected assets, UI, icons, palettes, silhouettes, city/district language, labels, or map dressing.
