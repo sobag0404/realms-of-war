@@ -74,6 +74,25 @@ export interface GameEventMap {
     hex: HexCoord;
   };
 
+  AiPressureChanged: {
+    playerId: PlayerId;
+    pressureScore: number;
+    primaryFocus: string;
+    cityCount: number;
+    militaryUnitCount: number;
+    activeProductionCount: number;
+    queuedUnitCount: number;
+    queuedBuildingCount: number;
+    gold: number;
+    goldIncome: number;
+    nearestEnemyDistance: number | null;
+    plannedProduction: Array<{
+      cityId: CityId;
+      kind: 'unit' | 'building';
+      id: string;
+    }>;
+  };
+
   TechnologyCompleted: {
     playerId: PlayerId;
     techId: string;
