@@ -18,6 +18,7 @@ import { ResearchSystem } from './ResearchSystem';
 import { CitySystem } from './CitySystem';
 import { VisionSystem } from './VisionSystem';
 import { StatusEffectSystem } from './StatusEffectSystem';
+import { ObjectiveSystem } from './ObjectiveSystem';
 import { hasWon, isPlayerAlive, eliminatePlayer } from '../../rules/victoryRules';
 
 // ─── TurnSystem ────────────────────────────────────────────────────────────────
@@ -182,6 +183,11 @@ export class TurnSystem {
 
     // 8. Update science per turn
     newState = TurnSystem.updateSciencePerTurn(newState, playerId);
+
+    const objectiveReport = ObjectiveSystem.createObjectiveReport(newState, playerId);
+    if (objectiveReport) {
+      eventBus.emit('StrategicObjectiveUpdated', objectiveReport);
+    }
 
     return newState;
   }

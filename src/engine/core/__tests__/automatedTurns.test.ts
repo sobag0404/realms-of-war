@@ -352,3 +352,59 @@ describe('AiSystem city production generation', () => {
     expect(pressureEvents[0].payload.plannedProduction).toHaveLength(1);
   });
 });
+
+describe('Strategic objective pressure feedback', () => {
+  it('emits objective progress across AI production turns without persisting save fields', () => {
+    const state = makeState(['human', 'ai-1'], 'human', ['ai-1']);
+    state.map.tiles[hexKey({ q: 0, r: 1 })] = makeTile({ q: 0, r: 1 });
+    state.map.tiles[hexKey({ q: 0, r: 1 })].yield = { food: 2, gold: 2, progress: 2 };
+    state.cities = {
+      'human-city': makeCity('human-city', 'human', { q: 0, r: 0 }),
+      'ai-city-1': makeCity('ai-city-1', 'ai-1', { q: 0, r: 1 }, {
+        workedHexes: [hexKey({ q: 0, r: 1 })],
+        productionPerTurn: 2,
+        productionQueue: [{ id: 'spearman', kind: 'unit', progress: 0, cost: 2 }],
+      }),
+    };
+    state.entities = {
+      'human-unit': makeUnit('human-unit', 'human', { q: 0, r: 0 }),
+      'ai-unit': makeUnit('ai-unit', 'ai-1', { q: 2, r: 0 }),
+    };
+    state.nextEntitySeq = 10;
+    const engine = makeEngine(state);
+
+    engine.endTurn('human');
+    const afterFirstAiStart = engine.getState();
+    expect(afterFirstAiStart.entities['entity-10']?.typeId).toBe('spearman');
+
+    engine.resolveAutomatedTurns(['human']);
+    engine.endTurn('human');
+
+    const aiObjectiveEvents = engine.getEventBus()
+      .getEventsByType('StrategicObjectiveUpdated')
+      .filter((event) => event.payload.playerId === 'ai-1');
+    const productionCommands = engine.getCommandLog().filter(
+      (command) => command.type === 'BuildBuilding' || command.type === 'RecruitUnit',
+    );
+
+    expect(aiObjectiveEvents).toHaveLength(2);
+    expect(aiObjectiveEvents[0].payload).toMatchObject({
+      playerId: 'ai-1',
+      turn: 1,
+      activeObjectiveId: expect.any(String),
+    });
+    expect(aiObjectiveEvents[1].payload.turn).toBe(2);
+    expect(aiObjectiveEvents[1].payload.overallProgress)
+      .toBeGreaterThanOrEqual(aiObjectiveEvents[0].payload.overallProgress);
+    expect(aiObjectiveEvents[0].payload.objectives.find((objective) => objective.id === 'field_defense_force'))
+      .toMatchObject({ progress: 2, target: 3 });
+    expect(aiObjectiveEvents[1].payload.objectives.find((objective) => objective.id === 'stabilize_war_economy')?.progress)
+      .toBeGreaterThanOrEqual(
+        aiObjectiveEvents[0].payload.objectives.find((objective) => objective.id === 'stabilize_war_economy')?.progress ?? 0,
+      );
+    expect(productionCommands).toHaveLength(1);
+    expect(engine.getState().cities['ai-city-1'].productionQueue).toHaveLength(1);
+    expect((engine.getState() as Record<string, unknown>).strategicObjectives).toBeUndefined();
+    expect((engine.getState() as Record<string, unknown>).objectiveReports).toBeUndefined();
+  });
+});
