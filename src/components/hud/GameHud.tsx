@@ -29,6 +29,9 @@ export function GameHud() {
       className="absolute inset-0 z-10 pointer-events-none"
       aria-label="Game HUD overlay"
     >
+      <div className="hud-edge-scrim-top absolute inset-x-0 top-0 h-24" aria-hidden="true" />
+      <div className="hud-edge-scrim-bottom absolute inset-x-0 bottom-0 h-48" aria-hidden="true" />
+
       {/* Top: Resource bar */}
       <ResourceBar />
 

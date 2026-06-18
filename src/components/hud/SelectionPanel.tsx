@@ -81,13 +81,13 @@ export function SelectionPanel() {
 
   return (
     <div
-      className={`absolute bottom-3 left-2 sm:bottom-4 sm:left-4 z-20 pointer-events-auto
+      className={`absolute bottom-16 left-2 sm:bottom-20 sm:left-4 z-20 pointer-events-auto
         transition-all duration-200 ease-out
         ${hasContent ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'}`}
     >
-      <div className="min-w-[220px] max-w-[280px] max-h-[min(48vh,27rem)] overflow-y-auto rounded-lg border border-amber-200/15 bg-slate-950/70 p-3 shadow-2xl shadow-black/30 backdrop-blur-md sm:max-w-[320px] sm:p-4">
+      <div className="hud-panel hud-panel-strong min-w-[240px] max-w-[300px] max-h-[min(50vh,29rem)] overflow-y-auto p-3 sm:max-w-[360px] sm:p-3.5">
         {/* Close button */}
-        <div className="flex justify-end mb-1">
+        <div className="mb-1 flex justify-end border-b border-white/10 pb-1">
           <Button
             variant="ghost"
             size="icon"

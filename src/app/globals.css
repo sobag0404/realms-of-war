@@ -122,3 +122,127 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .hud-panel {
+    @apply rounded-lg border border-amber-100/20 bg-slate-950/78 text-stone-100 shadow-2xl shadow-black/35 backdrop-blur-md;
+    box-shadow:
+      0 20px 48px rgb(0 0 0 / 0.34),
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
+      inset 0 -1px 0 rgb(0 0 0 / 0.26);
+  }
+
+  .hud-panel-strong {
+    @apply border-amber-100/30 bg-slate-950/86;
+  }
+
+  .hud-chip {
+    @apply rounded-md border border-white/10 bg-white/10 shadow-inner shadow-white/5;
+  }
+
+  .hud-control {
+    @apply rounded-lg border border-white/10 bg-slate-950/72 text-white/70 shadow-lg shadow-black/25 backdrop-blur-md transition-colors hover:bg-white/12 hover:text-white;
+  }
+
+  .hud-command-button {
+    @apply rounded-lg border border-amber-200/35 bg-amber-600 text-white shadow-lg shadow-amber-950/40 transition-all duration-200 hover:bg-amber-500;
+  }
+
+  .hud-edge-scrim-top {
+    background:
+      linear-gradient(180deg, rgb(2 6 12 / 0.66) 0%, rgb(2 6 12 / 0.28) 48%, transparent 100%),
+      linear-gradient(90deg, rgb(2 6 12 / 0.38) 0%, transparent 28%, transparent 72%, rgb(2 6 12 / 0.38) 100%);
+  }
+
+  .hud-edge-scrim-bottom {
+    background:
+      linear-gradient(0deg, rgb(2 6 12 / 0.7) 0%, rgb(2 6 12 / 0.3) 48%, transparent 100%),
+      linear-gradient(90deg, rgb(2 6 12 / 0.34) 0%, transparent 34%, transparent 66%, rgb(2 6 12 / 0.34) 100%);
+  }
+
+  .strategic-label {
+    position: relative;
+    min-width: max-content;
+    color: rgb(255 255 255 / 0.94);
+    font-family: var(--font-ui-sans);
+    letter-spacing: 0;
+    text-shadow:
+      0 1px 0 rgb(0 0 0 / 0.78),
+      0 2px 8px rgb(0 0 0 / 0.72);
+    user-select: none;
+    transform: translateY(-2px);
+  }
+
+  .city-nameplate {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid rgb(255 255 255 / 0.16);
+    border-left: 3px solid var(--owner-color, #f5d06f);
+    border-radius: 6px;
+    background: linear-gradient(180deg, rgb(7 12 18 / 0.82), rgb(2 5 10 / 0.74));
+    padding: 0.16rem 0.46rem 0.16rem 0.36rem;
+    box-shadow:
+      0 10px 18px rgb(0 0 0 / 0.36),
+      inset 0 1px 0 rgb(255 255 255 / 0.08);
+  }
+
+  .city-nameplate__name {
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .city-nameplate__meta {
+    color: rgb(226 232 240 / 0.7);
+    font-size: 0.56rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .resource-nameplate,
+  .selected-resource-nameplate {
+    border: 1px solid color-mix(in srgb, var(--resource-color, #e8c766) 56%, transparent);
+    border-radius: 999px;
+    background: rgb(3 7 12 / 0.72);
+    color: color-mix(in srgb, var(--resource-color, #e8c766) 72%, white);
+    padding: 0.1rem 0.36rem;
+    font-size: 0.56rem;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 8px 14px rgb(0 0 0 / 0.32);
+  }
+
+  .selected-resource-nameplate {
+    background: rgb(3 7 12 / 0.86);
+    font-size: 0.64rem;
+  }
+
+  .unit-nameplate {
+    display: grid;
+    gap: 0.08rem;
+    border: 1px solid rgb(255 230 130 / 0.36);
+    border-radius: 6px;
+    background: rgb(5 8 13 / 0.82);
+    padding: 0.18rem 0.44rem;
+    text-align: center;
+    box-shadow: 0 10px 18px rgb(0 0 0 / 0.4);
+  }
+
+  .unit-nameplate > span:first-child {
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .unit-nameplate__stats {
+    color: rgb(226 232 240 / 0.72);
+    font-size: 0.52rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+}

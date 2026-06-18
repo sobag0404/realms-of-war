@@ -326,15 +326,21 @@ export class MinimapRenderer {
     const size = baseSize + level * 0.5;
 
     this.ctx.globalAlpha = alpha;
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx, cy - size * 0.72);
+    this.ctx.lineTo(cx + size * 0.72, cy);
+    this.ctx.lineTo(cx, cy + size * 0.72);
+    this.ctx.lineTo(cx - size * 0.72, cy);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.strokeStyle = '#f7f0d0';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.stroke();
     this.ctx.fillStyle = playerColor;
     this.ctx.beginPath();
-    this.ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+    this.ctx.arc(cx, cy, Math.max(2, size * 0.32), 0, Math.PI * 2);
     this.ctx.fill();
-
-    // White border
-    this.ctx.strokeStyle = '#ffffff';
-    this.ctx.lineWidth = 1;
-    this.ctx.stroke();
     this.ctx.globalAlpha = 1.0;
   }
 
@@ -347,6 +353,8 @@ export class MinimapRenderer {
 
     const size = Math.max(2, HEX_RADIUS * this.scale * 0.3);
 
+    this.ctx.fillStyle = '#05070a';
+    this.ctx.fillRect(cx - size / 2 - 1, cy - size / 2 - 1, size + 2, size + 2);
     this.ctx.fillStyle = playerColor;
     this.ctx.beginPath();
     this.ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);

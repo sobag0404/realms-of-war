@@ -17,6 +17,7 @@ import { InfrastructureLayer } from './InfrastructureLayer';
 import { SettlementDetailLayer } from './SettlementDetailLayer';
 import { BuildingLayer } from './BuildingLayer';
 import { UnitLayer } from './UnitLayer';
+import { StrategicLabelLayer } from './StrategicLabelLayer';
 import { ResourceLayer } from './ResourceLayer';
 import { FogLayer } from './FogLayer';
 import { SelectionHighlights } from './SelectionHighlights';
@@ -48,6 +49,7 @@ export function SceneRoot() {
       <ResourceLayer />
       <BuildingLayer />
       <UnitLayer />
+      <StrategicLabelLayer />
       <FogLayer />
       <SelectionHighlights />
       <PathPreview />

@@ -305,7 +305,7 @@ export function Minimap() {
 
   return (
     <div className={`absolute ${bottomClass} ${dockClass} z-20 pointer-events-auto`}>
-      <div className="relative overflow-hidden rounded-lg border border-amber-200/15 bg-slate-950/60 shadow-2xl shadow-black/30 backdrop-blur-md opacity-90 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100">
+      <div className="hud-panel relative overflow-hidden opacity-95 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100">
         {isCompact && (
           <button
             type="button"
@@ -369,11 +369,20 @@ export function Minimap() {
           ref={canvasRef}
           width={CANVAS_SIZE}
           height={CANVAS_SIZE}
-          className="cursor-crosshair"
+          className="cursor-crosshair border-b border-white/10"
           style={{ width: displaySize, height: displaySize }}
           onClick={handleClick}
           aria-label="Minimap — click to move camera"
         />
+        {!isCompact && (
+          <div className="flex h-6 items-center justify-between gap-2 px-2 text-[10px] font-semibold uppercase tracking-wide text-white/55">
+            <span>Map</span>
+            <span className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-white" />Unit</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rotate-45 rounded-[1px] border border-white/80" />City</span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -412,8 +421,11 @@ function drawViewportOverlay(
   const vpX = viewCenterX - viewW / 2;
   const vpY = viewCenterY - viewH / 2;
 
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(vpX, vpY, viewW, viewH);
+  ctx.strokeStyle = '#fff4bf';
+  ctx.lineWidth = 2;
   ctx.strokeRect(vpX, vpY, viewW, viewH);
 }
 

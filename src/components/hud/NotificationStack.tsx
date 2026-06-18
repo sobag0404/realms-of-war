@@ -16,7 +16,7 @@ import type { UiNotification } from '@/store/slices/uiSlice';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const MAX_VISIBLE = 5;
+const MAX_VISIBLE = 3;
 const DEFAULT_DURATION = 4000;
 
 // ─── Icon Map ─────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function NotificationItem({
 
   return (
     <Card
-      className={`flex items-start gap-2 px-3 py-2 bg-black/70 backdrop-blur-sm border ${NOTIFICATION_BORDERS[notification.type]} shadow-lg animate-in slide-in-from-right-2 fade-in duration-200`}
+      className={`hud-panel flex items-start gap-2 px-3 py-2 border ${NOTIFICATION_BORDERS[notification.type]} animate-in slide-in-from-right-2 fade-in duration-200`}
     >
       <span className="mt-0.5 shrink-0" aria-hidden="true">
         {NOTIFICATION_ICONS[notification.type]}
@@ -102,7 +102,7 @@ export function NotificationStack() {
   if (visibleNotifications.length === 0) return null;
 
   return (
-    <div className="absolute top-20 sm:top-24 right-2 sm:right-4 z-40 pointer-events-auto flex flex-col gap-2 w-64 sm:w-72">
+    <div className="absolute top-24 sm:top-28 right-2 sm:right-4 z-40 pointer-events-auto flex w-60 flex-col gap-2 sm:w-64">
       {visibleNotifications.map((notif) => (
         <NotificationItem
           key={notif.id}
