@@ -5,8 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useGameStore } from '@/store/useGameStore';
-import { RESOURCES } from '@/data/resources';
+import { BUILDINGS } from '@/data/buildings';
+import { UNIT_TYPES } from '@/data/units';
 import type { ResourceId } from '@/engine/core/types';
+import type { ProductionItem } from '@/engine/core/GameState';
+import type { BuildingId } from '@/data/buildings';
+import type { UnitTypeId } from '@/data/units';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +24,15 @@ const RESOURCE_LABELS: Record<string, string> = {
   progress: '⚙️ Прогресс',
   science: '📚 Наука',
 };
+
+function getProductionItemName(item: ProductionItem): string {
+  if (item.kind === 'building') {
+    const building = BUILDINGS[item.id as BuildingId];
+    return building?.nameRu ?? building?.name ?? item.id;
+  }
+  const unit = UNIT_TYPES[item.id as UnitTypeId];
+  return unit?.nameRu ?? unit?.name ?? item.id;
+}
 
 /**
  * EndTurnSummaryScreen — modal overlay showing a summary of the turn.
@@ -70,12 +83,48 @@ export function EndTurnSummaryScreen() {
     };
   }, [player]);
 
+  const citySummary = useMemo(() => {
+    if (!gameState) return [];
+    return Object.values(gameState.cities)
+      .filter((city) => city.ownerId === activePlayerId)
+      .map((city) => {
+        const current = city.productionQueue[0] ?? null;
+        const turnsLeft =
+          current && city.productionPerTurn > 0
+            ? Math.max(1, Math.ceil((current.cost - current.progress) / city.productionPerTurn))
+            : current
+            ? '?'
+            : null;
+        return { city, current, turnsLeft };
+      });
+  }, [activePlayerId, gameState]);
+
+  const ownedUnits = useMemo(() => {
+    if (!gameState) return [];
+    return Object.values(gameState.entities).filter((entity) => entity.ownerId === activePlayerId);
+  }, [activePlayerId, gameState]);
+
+  const nextActions = useMemo(() => {
+    const actions: string[] = [];
+    const idleUnitCount = ownedUnits.filter((entity) => !entity.hasActed && entity.movementPoints > 0).length;
+    const idleCityCount = citySummary.filter(({ city }) => city.productionQueue.length === 0).length;
+    const negativeNets = incomeSummary.filter((item) => item.value < 0);
+
+    if (idleUnitCount > 0) actions.push(`${idleUnitCount} unit${idleUnitCount === 1 ? '' : 's'} can still act.`);
+    if (idleCityCount > 0) actions.push(`${idleCityCount} city${idleCityCount === 1 ? '' : 'ies'} need production.`);
+    if (player && !player.currentResearch) actions.push('Choose a research project.');
+    if (negativeNets.length > 0) actions.push(`Resource pressure: ${negativeNets.map((item) => item.label).join(', ')}.`);
+    if (actions.length === 0) actions.push('No urgent advisor items.');
+
+    return actions.slice(0, 4);
+  }, [citySummary, incomeSummary, ownedUnits, player]);
+
   if (modal?.type !== 'endTurnSummary') return null;
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <Card className="w-full max-w-[500px] mx-4 bg-zinc-900/95 border-amber-900/30 shadow-2xl">
-        <CardContent className="p-6 space-y-4">
+      <Card className="w-full max-w-[640px] mx-4 bg-zinc-900/95 border-amber-900/30 shadow-2xl">
+        <CardContent className="max-h-[82vh] overflow-y-auto p-5 space-y-4">
           {/* Header */}
           <div className="text-center">
             <h2 className="text-xl font-semibold text-amber-400">
@@ -85,6 +134,24 @@ export function EndTurnSummaryScreen() {
               {player?.name ?? 'Игрок'}
             </p>
           </div>
+
+          <Separator className="bg-zinc-800" />
+
+          <section>
+            <h3 className="text-zinc-300 text-sm font-semibold mb-2">
+              Advisor checklist
+            </h3>
+            <div className="grid gap-1.5">
+              {nextActions.map((action) => (
+                <div
+                  key={action}
+                  className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-xs text-zinc-300"
+                >
+                  {action}
+                </div>
+              ))}
+            </div>
+          </section>
 
           <Separator className="bg-zinc-800" />
 
@@ -163,8 +230,11 @@ export function EndTurnSummaryScreen() {
                             </span>
                             {city.productionQueue.length > 0 && (
                               <span className="text-amber-400">
-                                ⚒️ {city.productionQueue[0].id}
+                                Producing: {getProductionItemName(city.productionQueue[0])}
                               </span>
+                            )}
+                            {city.productionQueue.length === 0 && (
+                              <span className="text-red-300">No production</span>
                             )}
                           </div>
                         </div>
@@ -186,11 +256,13 @@ export function EndTurnSummaryScreen() {
                 <div className="text-sm text-zinc-400">
                   Всего:{' '}
                   <span className="text-white">
-                    {
-                      Object.values(gameState.entities).filter(
-                        (e) => e.ownerId === activePlayerId,
-                      ).length
-                    }
+                    {ownedUnits.length}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                  Ready for orders:{' '}
+                  <span className="text-amber-300">
+                    {ownedUnits.filter((entity) => !entity.hasActed && entity.movementPoints > 0).length}
                   </span>
                 </div>
               </section>

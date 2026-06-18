@@ -7,6 +7,7 @@
 export { GameHud } from './GameHud';
 export { ResourceBar } from './ResourceBar';
 export { TurnPanel } from './TurnPanel';
+export { AdvisorPanel } from './AdvisorPanel';
 export { SelectionPanel } from './SelectionPanel';
 export { UnitPanel } from './UnitPanel';
 export { CityPanel } from './CityPanel';

@@ -45,6 +45,15 @@ function getProductionItemName(item: ProductionItem): string {
   return unit?.nameRu ?? item.id;
 }
 
+function renderYieldBrief(items: Array<{ key: ResourceId; value: number }>): string {
+  return items
+    .map((item) => {
+      const icon = YIELD_ICONS[item.key] ?? '';
+      return `${icon} +${item.value}`;
+    })
+    .join('  ');
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface CityPanelProps {
@@ -109,6 +118,8 @@ export function CityPanel({ city }: CityPanelProps) {
       .filter((item) => item.value !== 0);
   }, [cityYield]);
 
+  const earningLine = renderYieldBrief(keyYields);
+
   const handleManage = useCallback(() => {
     setOpenPanel('city');
   }, [setOpenPanel]);
@@ -147,6 +158,7 @@ export function CityPanel({ city }: CityPanelProps) {
           <div className="flex justify-between gap-3 text-[11px] text-white/70">
             <span className="min-w-0 truncate font-bold text-amber-100">
               {currentProduction.kind === 'building' ? '🏗️' : '⚔️'}{' '}
+              <span className="text-white/45">Producing:</span>{' '}
               {getProductionItemName(currentProduction)}
             </span>
             <span className="shrink-0 tabular-nums">
@@ -165,6 +177,20 @@ export function CityPanel({ city }: CityPanelProps) {
               +{city.productionQueue.length - 1} в очереди
             </div>
           )}
+        </div>
+      )}
+
+      {!currentProduction && isOwnedByActive && (
+        <div className="hud-chip border-amber-400/30 bg-amber-500/10 px-2 py-2 text-[11px] text-amber-100">
+          <div className="font-bold">No production assigned</div>
+          <div className="mt-0.5 text-amber-100/65">Open city management to queue a building or unit.</div>
+        </div>
+      )}
+
+      {earningLine && (
+        <div className="hud-chip flex items-center justify-between gap-2 px-2 py-1.5 text-[10px]">
+          <span className="font-bold uppercase tracking-[0.14em] text-white/45">Earning</span>
+          <span className="truncate text-white/75">{earningLine}</span>
         </div>
       )}
 

@@ -10,7 +10,7 @@
 import { useCallback, useState } from 'react';
 import { useGameStore } from '@/store/useGameStore';
 import { Button } from '@/components/ui/button';
-import { Loader2, Settings, Menu, RotateCw, FlaskConical, Swords, Save } from 'lucide-react';
+import { ClipboardList, Loader2, Settings, Menu, RotateCw, FlaskConical, Swords, Save } from 'lucide-react';
 
 // ─── Phase Labels ─────────────────────────────────────────────────────────────
 
@@ -35,6 +35,7 @@ export function TurnPanel() {
   const endTurn = useGameStore((s) => s.endTurn);
   const saveGame = useGameStore((s) => s.saveGame);
   const addNotification = useGameStore((s) => s.addNotification);
+  const openModal = useGameStore((s) => s.openModal);
   const setOpenPanel = useGameStore((s) => s.setOpenPanel);
   const resetGame = useGameStore((s) => s.resetGame);
   const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
@@ -71,6 +72,11 @@ export function TurnPanel() {
       duration: 3000,
     });
   }, [saveGame, addNotification]);
+
+  const handleReport = useCallback(() => {
+    openModal('endTurnSummary');
+    setIsMobileActionsOpen(false);
+  }, [openModal]);
 
   if (!gameState) return null;
 
@@ -158,6 +164,18 @@ export function TurnPanel() {
             <Save className="h-4 w-4" />
           </Button>
 
+          {/* Turn report button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hud-control hidden h-8 w-8 hover:bg-sky-900/25 hover:text-sky-200 sm:inline-flex sm:h-9 sm:w-9"
+            onClick={handleReport}
+            aria-label="Turn report"
+            title="Turn report"
+          >
+            <ClipboardList className="h-4 w-4" />
+          </Button>
+
           {/* Settings button */}
           <Button
             variant="ghost"
@@ -237,6 +255,15 @@ export function TurnPanel() {
               aria-label="Save game"
             >
               <Save className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-md text-white/75 hover:bg-sky-900/25 hover:text-sky-200"
+              onClick={handleReport}
+              aria-label="Turn report"
+            >
+              <ClipboardList className="h-4 w-4" />
             </Button>
           </div>
         )}

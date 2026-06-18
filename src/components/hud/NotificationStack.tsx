@@ -102,7 +102,7 @@ export function NotificationStack() {
   if (visibleNotifications.length === 0) return null;
 
   return (
-    <div className="absolute top-24 sm:top-28 right-2 sm:right-4 z-40 pointer-events-auto flex w-60 flex-col gap-2 sm:w-64">
+    <div className="absolute top-[21rem] right-2 z-40 flex w-60 flex-col gap-2 pointer-events-auto sm:right-4 sm:w-64">
       {visibleNotifications.map((notif) => (
         <NotificationItem
           key={notif.id}
