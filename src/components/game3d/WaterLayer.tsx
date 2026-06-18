@@ -52,11 +52,11 @@ export function WaterLayer() {
   const shorelineGeometry = useMemo(() => new THREE.RingGeometry(0.84, 0.97, 6), []);
   const shimmerGeometry = useMemo(() => new THREE.BoxGeometry(0.62, 0.01, 0.05), []);
   const waterMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: '#2c93a8',
-    emissive: '#062a3f',
-    emissiveIntensity: 0.1,
+    color: '#258aa0',
+    emissive: '#041f35',
+    emissiveIntensity: 0.12,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.84,
     roughness: 0.18,
     metalness: 0.05,
     transmission: 0.04,
@@ -67,23 +67,23 @@ export function WaterLayer() {
     depthWrite: false,
   }), []);
   const depthMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#05283d',
+    color: '#031f34',
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.6,
     side: THREE.FrontSide,
     depthWrite: false,
   }), []);
   const shorelineMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#dff8ee',
+    color: '#e9fff1',
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.36,
     side: THREE.FrontSide,
     depthWrite: false,
   }), []);
   const shimmerMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#c7fff2',
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.26,
     depthWrite: false,
   }), []);
 

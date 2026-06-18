@@ -127,8 +127,8 @@ function addForestCluster(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexT
   const count = 2 + Math.floor(interiorBoost * 2) + Math.floor(hash01(tile.coord.q, tile.coord.r, 11) * 3);
   for (let index = 0; index < count; index++) {
     const anchor = offsetOnTile(tile, 20 + index, 0.4, 0.74);
-    const trunkScale = 0.78 + interiorBoost * 0.22 + hash01(tile.coord.q, tile.coord.r, 30 + index) * 0.3;
-    const canopyScale = 0.84 + interiorBoost * 0.24 + hash01(tile.coord.q, tile.coord.r, 40 + index) * 0.38;
+    const trunkScale = 0.86 + interiorBoost * 0.26 + hash01(tile.coord.q, tile.coord.r, 30 + index) * 0.34;
+    const canopyScale = 0.94 + interiorBoost * 0.3 + hash01(tile.coord.q, tile.coord.r, 40 + index) * 0.42;
     anchor.y = baseY(tile);
 
     pushFeature(groups, 'forestTrunk', {
@@ -148,22 +148,22 @@ function addMountainRidge(groups: Map<FeatureKey, FeatureInstance[]>, tile: HexT
   const highlandNeighbors = neighborTerrainCount(tile, tiles, ['mountain', 'hills']);
   const chainBoost = THREE.MathUtils.clamp(highlandNeighbors / 4, 0, 1);
   const ridgeYaw = highlandYaw(tile, tiles);
-  const count = 2 + Math.floor(chainBoost * 2) + Math.floor(hash01(tile.coord.q, tile.coord.r, 70) * 2);
+  const count = 3 + Math.floor(chainBoost * 2) + Math.floor(hash01(tile.coord.q, tile.coord.r, 70) * 2);
   for (let index = 0; index < count; index++) {
     const anchor = offsetOnTile(tile, 80 + index, 0.2, 0.64);
-    const s = 0.88 + chainBoost * 0.22 + hash01(tile.coord.q, tile.coord.r, 90 + index) * 0.5;
+    const s = 1 + chainBoost * 0.3 + hash01(tile.coord.q, tile.coord.r, 90 + index) * 0.54;
     anchor.y = baseY(tile);
     const yaw = ridgeYaw + (hash01(tile.coord.q, tile.coord.r, 100 + index) - 0.5) * 0.62;
     pushFeature(groups, 'mountainRidge', {
-      position: new THREE.Vector3(anchor.x, anchor.y + 0.44 * s, anchor.z),
+      position: new THREE.Vector3(anchor.x, anchor.y + 0.5 * s, anchor.z),
       rotation: new THREE.Euler(0.16, yaw, 0.07),
-      scale: scale3(s * 0.72, s * (1.12 + chainBoost * 0.12), s * 1.08),
+      scale: scale3(s * 0.78, s * (1.2 + chainBoost * 0.16), s * 1.12),
     });
     if (index < 2) {
       pushFeature(groups, 'mountainSnowCap', {
-        position: new THREE.Vector3(anchor.x, anchor.y + 0.82 * s, anchor.z),
+        position: new THREE.Vector3(anchor.x, anchor.y + 0.94 * s, anchor.z),
         rotation: new THREE.Euler(0.08, yaw, 0.04),
-        scale: scale3(s * 0.46, s * 0.36, s * 0.46),
+        scale: scale3(s * 0.52, s * 0.42, s * 0.52),
       });
     }
   }
@@ -352,15 +352,15 @@ function buildFeatureDefs(): Record<FeatureKey, FeatureDef> {
     },
     forestCanopy: {
       geometry: new THREE.DodecahedronGeometry(0.27, 0),
-      color: '#123b24',
+      color: '#0d351f',
     },
     forestCanopyLight: {
       geometry: new THREE.IcosahedronGeometry(0.24, 0),
-      color: '#2f6f3f',
+      color: '#347a43',
     },
     mountainRidge: {
       geometry: new THREE.ConeGeometry(0.34, 0.98, 5),
-      color: '#636a72',
+      color: '#6d747a',
     },
     mountainSnowCap: {
       geometry: new THREE.ConeGeometry(0.22, 0.26, 5),

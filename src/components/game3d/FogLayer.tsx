@@ -122,29 +122,29 @@ export function FogLayer() {
   const geometry = useMemo(() => createHexPlane(0.96), []);
   const edgeGeometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
   const hiddenMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#3a3325',
+    color: '#332d21',
     transparent: true,
-    opacity: 0.68,
+    opacity: 0.62,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const exploredMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#6d6a55',
+    color: '#756f57',
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.18,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const hiddenEdgeMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#d0bd86',
+    color: '#e0ca8b',
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.22,
     depthWrite: false,
   }), []);
   const exploredEdgeMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#d6d0a8',
+    color: '#e1dbad',
     transparent: true,
-    opacity: 0.1,
+    opacity: 0.13,
     depthWrite: false,
   }), []);
 
