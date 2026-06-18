@@ -22,6 +22,18 @@ function createHexOverlay(radius: number): THREE.BufferGeometry {
   return new THREE.ShapeGeometry(shape);
 }
 
+function createChevronOverlay(): THREE.BufferGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.16);
+  shape.lineTo(0.14, -0.12);
+  shape.lineTo(0.04, -0.08);
+  shape.lineTo(0, -0.02);
+  shape.lineTo(-0.04, -0.08);
+  shape.lineTo(-0.14, -0.12);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
 export function SelectionHighlights() {
   const gameState = useGameStore((s) => s.gameState);
   const selectedHex = useGameStore((s) => s.selectedHex);
@@ -32,6 +44,8 @@ export function SelectionHighlights() {
   const fillGeometry = useMemo(() => createHexOverlay(0.9), []);
   const innerRingGeometry = useMemo(() => new THREE.RingGeometry(0.72, 0.86, 6), []);
   const outerRingGeometry = useMemo(() => new THREE.RingGeometry(0.9, 1.0, 6), []);
+  const chevronGeometry = useMemo(() => createChevronOverlay(), []);
+  const pipGeometry = useMemo(() => new THREE.CircleGeometry(0.055, 12), []);
 
   if (!gameState) return null;
 
@@ -81,9 +95,9 @@ export function SelectionHighlights() {
         switch (type) {
           case 'selected':
             color = '#ffdd00';
-            fillOpacity = 0.16;
-            ringOpacity = 0.92;
-            yOffset = 0.12;
+            fillOpacity = 0.18;
+            ringOpacity = 0.96;
+            yOffset = 0.14;
             break;
           case 'hovered':
             color = '#ffffff';
@@ -92,16 +106,16 @@ export function SelectionHighlights() {
             yOffset = 0.1;
             break;
           case 'reachable':
-            color = '#4db2ff';
-            fillOpacity = 0.12;
-            ringOpacity = 0.58;
-            yOffset = 0.09;
+            color = '#67cfff';
+            fillOpacity = 0.07;
+            ringOpacity = 0.66;
+            yOffset = 0.1;
             break;
           case 'attackable':
-            color = '#ff4d3f';
-            fillOpacity = 0.16;
-            ringOpacity = 0.82;
-            yOffset = 0.13;
+            color = '#ff5d45';
+            fillOpacity = 0.2;
+            ringOpacity = 0.92;
+            yOffset = 0.15;
             break;
           default:
             color = '#ffffff';
@@ -125,6 +139,39 @@ export function SelectionHighlights() {
               <mesh geometry={innerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]} renderOrder={43 + i}>
                 <meshBasicMaterial color={color} transparent opacity={ringOpacity * 0.7} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
               </mesh>
+            )}
+            {type === 'reachable' && (
+              <group>
+                {[0, 2, 4].map((side) => {
+                  const angle = (Math.PI / 180) * (60 * side - 30);
+                  return (
+                    <mesh
+                      key={`reachable-pip-${side}`}
+                      geometry={pipGeometry}
+                      rotation={[-Math.PI / 2, 0, 0]}
+                      position={[0.58 * Math.cos(angle), 0.024, 0.58 * Math.sin(angle)]}
+                      renderOrder={44 + i}
+                    >
+                      <meshBasicMaterial color="#d5f5ff" transparent opacity={0.82} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
+                    </mesh>
+                  );
+                })}
+              </group>
+            )}
+            {type === 'attackable' && (
+              <group>
+                {[0, (Math.PI * 2) / 3, (Math.PI * 4) / 3].map((angle) => (
+                  <mesh
+                    key={`attack-chevron-${angle}`}
+                    geometry={chevronGeometry}
+                    rotation={[-Math.PI / 2, 0, -angle]}
+                    position={[0.7 * Math.sin(angle), 0.032, 0.7 * Math.cos(angle)]}
+                    renderOrder={45 + i}
+                  >
+                    <meshBasicMaterial color="#ffd5c8" transparent opacity={0.94} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
+                  </mesh>
+                ))}
+              </group>
             )}
           </group>
         );
