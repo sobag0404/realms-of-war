@@ -114,8 +114,11 @@ export function ResourceBar() {
     : RESOURCE_DISPLAYS;
 
   return (
-    <div className="absolute top-2 left-2 right-2 sm:left-4 sm:right-auto z-10 pointer-events-auto max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-28rem)] xl:max-w-[calc(100vw-34rem)]">
-      <div className="flex max-w-full flex-wrap items-center gap-1.5 sm:gap-2 rounded-lg border border-amber-200/15 bg-slate-950/65 px-2 py-1.5 shadow-2xl shadow-black/25 backdrop-blur-md">
+    <div className="absolute top-2 left-2 right-2 sm:left-4 sm:right-auto sm:top-4 z-10 pointer-events-auto max-w-[calc(100vw-1rem)] sm:max-w-[calc(100vw-30rem)] xl:max-w-[calc(100vw-36rem)]">
+      <div className="hud-panel flex max-w-full flex-wrap items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-2.5">
+        <div className="mr-1 hidden h-7 items-center border-r border-white/10 pr-2 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200/70 lg:flex">
+          Realm
+        </div>
         {/* Resource items */}
         {visibleResources.map((res) => {
           const amount = resources[res.id] ?? 0;
@@ -157,19 +160,19 @@ export function ResourceBar() {
             <Tooltip key={res.id}>
               <TooltipTrigger asChild>
                 <div
-                  className="flex h-7 items-center gap-1 rounded-md border border-white/10 bg-white/10 px-1.5 py-0.5 shadow-inner shadow-white/5 transition-colors hover:border-amber-200/20 hover:bg-white/20 sm:px-2"
+                  className="hud-chip flex h-7 min-w-[4.4rem] items-center justify-between gap-1 px-1.5 py-0.5 transition-colors hover:border-amber-200/25 hover:bg-white/18 sm:min-w-[4.8rem] sm:px-2"
                   aria-label={`${res.labelRu}: ${amount}, ${netIncome >= 0 ? '+' : ''}${netIncome} за ход`}
                 >
-                  <span className="text-sm leading-none sm:text-base" role="img" aria-hidden="true">
+                  <span className="text-sm leading-none" role="img" aria-hidden="true">
                     {res.icon}
                   </span>
-                  <span className="text-xs font-semibold tabular-nums text-stone-50 sm:text-sm">
+                  <span className="text-xs font-bold tabular-nums text-stone-50 sm:text-[13px]">
                     {amount}
                   </span>
                   {netIncome !== 0 && (
                     <span
-                      className={`text-[10px] sm:text-xs tabular-nums font-medium ${
-                        netIncome > 0 ? 'text-emerald-400' : 'text-red-400'
+                      className={`text-[10px] tabular-nums font-bold ${
+                        netIncome > 0 ? 'text-emerald-300' : 'text-red-300'
                       }`}
                     >
                       {netIncome > 0 ? '+' : ''}

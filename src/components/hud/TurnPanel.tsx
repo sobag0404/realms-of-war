@@ -81,9 +81,9 @@ export function TurnPanel() {
 
   return (
     <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-20 pointer-events-auto max-w-[calc(100vw-1rem)]">
-      <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-col items-end gap-1.5">
         {/* Turn number & phase */}
-        <div className="flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 rounded-lg border border-amber-200/15 bg-slate-950/65 px-3 py-1.5 shadow-2xl shadow-black/25 backdrop-blur-md">
+        <div className="hud-panel flex max-w-full flex-wrap items-center justify-end gap-x-2 gap-y-1 px-3 py-1.5">
           <div className="flex items-center gap-1.5">
             {player && (
               <span
@@ -107,12 +107,12 @@ export function TurnPanel() {
         </div>
 
         {/* Action buttons row */}
-        <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+        <div className="hud-panel hud-panel-strong flex max-w-full flex-wrap items-center justify-end gap-1.5 p-1.5">
           {/* Menu button — back to main menu */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:h-9 sm:w-9"
+            className="hud-control h-8 w-8 sm:h-9 sm:w-9"
             onClick={handleMenu}
             aria-label="Back to menu"
             data-testid="turn-back-to-menu"
@@ -125,7 +125,7 @@ export function TurnPanel() {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-amber-900/25 hover:text-amber-300 sm:inline-flex sm:h-9 sm:w-9"
+            className="hud-control hidden h-8 w-8 hover:bg-amber-900/25 hover:text-amber-300 sm:inline-flex sm:h-9 sm:w-9"
             onClick={handleTechTree}
             aria-label="Technology tree"
             title="Дерево технологий"
@@ -137,7 +137,7 @@ export function TurnPanel() {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-emerald-900/25 hover:text-emerald-300 sm:inline-flex sm:h-9 sm:w-9"
+            className="hud-control hidden h-8 w-8 hover:bg-emerald-900/25 hover:text-emerald-300 sm:inline-flex sm:h-9 sm:w-9"
             onClick={handleDiplomacy}
             aria-label="Diplomacy"
             title="Дипломатия"
@@ -149,7 +149,7 @@ export function TurnPanel() {
           <Button
             variant="ghost"
             size="icon"
-            className="hidden h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-amber-900/25 hover:text-amber-300 sm:inline-flex sm:h-9 sm:w-9"
+            className="hud-control hidden h-8 w-8 hover:bg-amber-900/25 hover:text-amber-300 sm:inline-flex sm:h-9 sm:w-9"
             onClick={handleSave}
             aria-label="Save game"
             data-testid="turn-save-game"
@@ -162,7 +162,7 @@ export function TurnPanel() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:h-9 sm:w-9"
+            className="hud-control h-8 w-8 sm:h-9 sm:w-9"
             onClick={handleSettings}
             aria-label="Settings"
             title="Настройки"
@@ -173,7 +173,7 @@ export function TurnPanel() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg border border-white/10 bg-slate-950/60 text-white/70 shadow-lg shadow-black/20 backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white sm:hidden"
+            className="hud-control h-8 w-8 sm:hidden"
             onClick={() => setIsMobileActionsOpen((open) => !open)}
             aria-label="More actions"
             aria-expanded={isMobileActionsOpen}
@@ -187,9 +187,9 @@ export function TurnPanel() {
           <Button
             onClick={handleEndTurn}
             disabled={!canEndTurn}
-            className={`h-8 min-w-[4.5rem] px-2 sm:h-9 sm:px-4 rounded-lg font-bold text-xs sm:text-sm transition-all duration-200 ${
+            className={`h-8 min-w-[4.8rem] px-2 sm:h-9 sm:min-w-[8.25rem] sm:px-4 font-bold text-xs sm:text-sm ${
               canEndTurn
-                ? 'border border-amber-200/30 bg-amber-600 hover:bg-amber-500 text-white shadow-lg shadow-amber-900/35'
+                ? 'hud-command-button'
                 : 'border border-white/10 bg-white/10 text-white/30 cursor-not-allowed'
             }`}
             aria-label="End turn"
@@ -209,7 +209,7 @@ export function TurnPanel() {
         {isMobileActionsOpen && (
           <div
             id="mobile-turn-actions"
-            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-950/75 p-1.5 shadow-xl shadow-black/25 backdrop-blur-md sm:hidden"
+            className="hud-panel flex items-center gap-1.5 p-1.5 sm:hidden"
           >
             <Button
               variant="ghost"

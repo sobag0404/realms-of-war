@@ -37,9 +37,9 @@ export function ControlsHelp() {
   }, []);
 
   return (
-    <div className="absolute bottom-[144px] sm:bottom-[184px] right-2 sm:right-4 z-20 pointer-events-auto">
+    <div className="absolute bottom-[172px] sm:bottom-[224px] right-2 sm:right-4 z-20 pointer-events-auto">
       {expanded ? (
-        <div className="bg-black/60 backdrop-blur-sm rounded-lg border border-white/10 p-3 min-w-[200px] animate-in fade-in slide-in-from-bottom-1 duration-200">
+        <div className="hud-panel min-w-[210px] p-3 animate-in fade-in slide-in-from-bottom-1 duration-200">
           {/* Header */}
           <div className="flex items-center justify-between mb-2">
             <span className="text-white/80 text-xs font-semibold">
@@ -77,7 +77,7 @@ export function ControlsHelp() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-full bg-black/50 backdrop-blur-sm text-white/40 hover:text-white hover:bg-white/10 border border-white/10 transition-colors"
+          className="hud-control h-8 w-8 rounded-full text-white/50"
           onClick={toggleExpanded}
           aria-label="Show controls"
           aria-expanded={expanded}

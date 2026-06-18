@@ -118,9 +118,9 @@ export function CityPanel({ city }: CityPanelProps) {
   }, [setOpenPanel]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {/* Header: City name + level + owner */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
         {owner && (
           <span
             className="w-3 h-3 rounded-full border border-white/30 shrink-0"
@@ -128,7 +128,7 @@ export function CityPanel({ city }: CityPanelProps) {
             aria-label={`Владелец: ${owner.name}`}
           />
         )}
-        <h3 className="text-white text-sm font-semibold truncate">
+        <h3 className="text-white text-sm font-bold truncate">
           {city.name}
         </h3>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-300 border-amber-500/30 bg-amber-500/10">
@@ -140,6 +140,33 @@ export function CityPanel({ city }: CityPanelProps) {
           </Badge>
         )}
       </div>
+
+      {/* Production Queue - current item */}
+      {currentProduction && (
+        <div className="hud-chip space-y-1 px-2 py-2">
+          <div className="flex justify-between gap-3 text-[11px] text-white/70">
+            <span className="min-w-0 truncate font-bold text-amber-100">
+              {currentProduction.kind === 'building' ? '🏗️' : '⚔️'}{' '}
+              {getProductionItemName(currentProduction)}
+            </span>
+            <span className="shrink-0 tabular-nums">
+              {Math.floor(currentProduction.progress)}/{currentProduction.cost}
+              {turnsLeft && typeof turnsLeft === 'number' && (
+                <span className="text-amber-200/70"> · {turnsLeft} ход.</span>
+              )}
+            </span>
+          </div>
+          <Progress
+            value={productionRatio * 100}
+            className="h-2 bg-white/10 [&>div]:bg-amber-500"
+          />
+          {city.productionQueue.length > 1 && (
+            <div className="text-[10px] text-zinc-400">
+              +{city.productionQueue.length - 1} в очереди
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Population + growth */}
       <div className="space-y-0.5">
@@ -191,34 +218,6 @@ export function CityPanel({ city }: CityPanelProps) {
         )}
       </div>
 
-      {/* Production Queue — current item */}
-      {currentProduction && (
-        <div className="space-y-0.5">
-          <div className="flex justify-between text-[10px] text-white/60">
-            <span>
-              {currentProduction.kind === 'building' ? '🏗️' : '⚔️'}{' '}
-              {getProductionItemName(currentProduction)}
-            </span>
-            <span className="tabular-nums">
-              {Math.floor(currentProduction.progress)}/{currentProduction.cost}
-              {turnsLeft && typeof turnsLeft === 'number' && (
-                <span className="text-zinc-500"> ({turnsLeft} ход.)</span>
-              )}
-            </span>
-          </div>
-          <Progress
-            value={productionRatio * 100}
-            className="h-1.5 bg-white/10 [&>div]:bg-amber-500"
-          />
-          {/* Show queue count if more items */}
-          {city.productionQueue.length > 1 && (
-            <div className="text-[9px] text-zinc-500">
-              +{city.productionQueue.length - 1} в очереди
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Per-turn yields — compact */}
       <div className="flex gap-2 text-[10px] text-white/60 flex-wrap">
         {keyYields.map((item) => {
@@ -267,11 +266,11 @@ export function CityPanel({ city }: CityPanelProps) {
       {isOwnedByActive && (
         <>
           <Separator className="bg-white/10" />
-          <div className="flex gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             <Button
               size="sm"
               variant="secondary"
-              className="h-7 text-xs flex-1"
+              className="h-8 text-xs font-bold bg-amber-500/90 text-slate-950 hover:bg-amber-400"
               onClick={handleManage}
             >
               Управление
@@ -279,7 +278,7 @@ export function CityPanel({ city }: CityPanelProps) {
             <Button
               size="sm"
               variant="secondary"
-              className="h-7 text-xs flex-1"
+              className="h-8 text-xs font-bold"
               onClick={handleRecruit}
             >
               Найм

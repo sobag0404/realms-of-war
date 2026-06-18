@@ -95,9 +95,9 @@ export function UnitPanel({ entity }: UnitPanelProps) {
   }, [isOwnedByActive]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {/* Header: Unit name + owner */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
         {owner && (
           <span
             className="w-3 h-3 rounded-full border border-white/30 shrink-0"
@@ -105,7 +105,7 @@ export function UnitPanel({ entity }: UnitPanelProps) {
             aria-label={`Owner: ${owner.name}`}
           />
         )}
-        <h3 className="text-white text-sm font-semibold truncate">
+        <h3 className="text-white text-sm font-bold truncate">
           {unitType?.nameRu ?? unitType?.name ?? entity.typeId}
         </h3>
         {unitType?.isEnemy && (
@@ -136,7 +136,7 @@ export function UnitPanel({ entity }: UnitPanelProps) {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-4 gap-1.5">
         <StatBox label="ATK" value={entity.attack} />
         <StatBox label="DEF" value={entity.defense} />
         <StatBox label="RNG" value={entity.range} />
@@ -172,6 +172,39 @@ export function UnitPanel({ entity }: UnitPanelProps) {
         />
       </div>
 
+      {/* Action buttons */}
+      {isOwnedByActive && (
+        <div className="grid grid-cols-2 gap-1.5 border-y border-white/10 py-2">
+          {isFortified ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-8 text-xs font-bold"
+              onClick={handleWake}
+            >
+              Wake
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-8 text-xs font-bold bg-amber-500/90 text-slate-950 hover:bg-amber-400"
+              onClick={handleFortify}
+            >
+              Fortify
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10"
+            onClick={handleWait}
+          >
+            Wait
+          </Button>
+        </div>
+      )}
+
       {/* Abilities */}
       {entity.abilities.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -206,42 +239,6 @@ export function UnitPanel({ entity }: UnitPanelProps) {
           </div>
         </>
       )}
-
-      {/* Action buttons */}
-      {isOwnedByActive && (
-        <>
-          <Separator className="bg-white/10" />
-          <div className="flex gap-1.5">
-            {isFortified ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7 text-xs flex-1"
-                onClick={handleWake}
-              >
-                Wake
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7 text-xs flex-1"
-                onClick={handleFortify}
-              >
-                Fortify
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs flex-1 text-white/60 hover:text-white"
-              onClick={handleWait}
-            >
-              Wait
-            </Button>
-          </div>
-        </>
-      )}
     </div>
   );
 }
@@ -258,9 +255,9 @@ function StatBox({
   max?: number;
 }) {
   return (
-    <div className="flex flex-col items-center px-1 py-1 rounded bg-white/5">
-      <span className="text-[9px] text-white/40 uppercase">{label}</span>
-      <span className="text-xs text-white font-medium tabular-nums">
+    <div className="hud-chip flex flex-col items-center px-1 py-1">
+      <span className="text-[10px] text-white/45 uppercase">{label}</span>
+      <span className="text-[13px] text-white font-bold tabular-nums">
         {value}
         {max !== undefined && (
           <span className="text-white/30">/{max}</span>
