@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GameEngine } from '@/engine/core/GameEngine';
 import { createDefaultConfig } from '@/engine/core/GameConfig';
-import type { GameState, EntityData, HexTile, PlayerState } from '@/engine/core/GameState';
+import type { CityState, GameState, EntityData, HexTile, PlayerState } from '@/engine/core/GameState';
 import type { HexCoord, PlayerId } from '@/engine/core/types';
 import { hexDistance, hexKey } from '@/engine/core/types';
 import { AiSystem } from '@/engine/ecs/systems/AiSystem';
@@ -76,6 +76,32 @@ function makeUnit(id: string, ownerId: PlayerId, hex: HexCoord, overrides: Parti
     upkeep: {},
     abilities: [],
     statusEffects: [],
+    ...overrides,
+  };
+}
+
+function makeCity(id: string, ownerId: PlayerId, hex: HexCoord, overrides: Partial<CityState> = {}): CityState {
+  return {
+    id,
+    name: id,
+    hex,
+    ownerId,
+    level: 1,
+    population: 1,
+    hp: 100,
+    maxHp: 125,
+    wallHp: 0,
+    maxWallHp: 0,
+    buildings: ['city_center'],
+    growthProgress: 0,
+    growthTarget: 10,
+    workedHexes: [hexKey(hex)],
+    productionQueue: [],
+    productionPerTurn: 1,
+    foodPerTurn: 2,
+    territory: [hexKey(hex)],
+    isUnderSiege: false,
+    foundedTurn: 1,
     ...overrides,
   };
 }
@@ -189,5 +215,99 @@ describe('AiSystem movement generation', () => {
     for (let i = 1; i < move.path.length; i++) {
       expect(hexDistance(move.path[i - 1], move.path[i])).toBe(1);
     }
+  });
+});
+
+describe('AiSystem city production generation', () => {
+  it('queues affordable production for idle AI cities using a shared resource budget', () => {
+    const state = makeState(['human', 'ai-1'], 'ai-1', ['ai-1']);
+    state.players['ai-1'].resources = {
+      gold: 15,
+      food: 50,
+      wood: 15,
+      stone: 0,
+      iron: 0,
+      mana: 0,
+      progress: 0,
+      science: 0,
+    };
+    state.cities = {
+      'ai-city-1': makeCity('ai-city-1', 'ai-1', { q: 0, r: 1 }),
+      'ai-city-2': makeCity('ai-city-2', 'ai-1', { q: 1, r: 1 }),
+    };
+
+    const commands = AiSystem.generateTurn(state, 'ai-1', makeEngine(state).getEventBus());
+    const productionCommands = commands.filter(
+      (command) => command.type === 'BuildBuilding' || command.type === 'RecruitUnit',
+    );
+
+    expect(productionCommands).toEqual([
+      {
+        type: 'BuildBuilding',
+        playerId: 'ai-1',
+        cityId: 'ai-city-1',
+        buildingTypeId: 'granary',
+      },
+    ]);
+  });
+
+  it('does not generate unaffordable or busy-city production commands', () => {
+    const state = makeState(['human', 'ai-1'], 'ai-1', ['ai-1']);
+    state.players['ai-1'].resources = {
+      gold: 0,
+      food: 0,
+      wood: 0,
+      stone: 0,
+      iron: 0,
+      mana: 0,
+      progress: 0,
+      science: 0,
+    };
+    state.cities = {
+      'ai-city-1': makeCity('ai-city-1', 'ai-1', { q: 0, r: 1 }),
+      'ai-city-2': makeCity('ai-city-2', 'ai-1', { q: 1, r: 1 }, {
+        productionQueue: [{ id: 'granary', kind: 'building', progress: 1, cost: 10 }],
+      }),
+    };
+
+    const commands = AiSystem.generateTurn(state, 'ai-1', makeEngine(state).getEventBus());
+
+    expect(commands.some((command) => command.type === 'BuildBuilding')).toBe(false);
+    expect(commands.some((command) => command.type === 'RecruitUnit')).toBe(false);
+    expect(commands.at(-1)).toEqual({ type: 'EndTurn', playerId: 'ai-1' });
+  });
+
+  it('progresses AI production on turn start and queues the next idle-city order without invalid spam', () => {
+    const state = makeState(['human', 'ai-1'], 'human', ['ai-1']);
+    state.map.tiles[hexKey({ q: 0, r: 1 })] = makeTile({ q: 0, r: 1 });
+    state.map.tiles[hexKey({ q: 0, r: 1 })].yield = { food: 2, progress: 2 };
+    state.map.tiles[hexKey({ q: 2, r: 0 })] = makeTile({ q: 2, r: 0 });
+    state.cities = {
+      'human-city': makeCity('human-city', 'human', { q: 0, r: 0 }),
+      'ai-city-1': makeCity('ai-city-1', 'ai-1', { q: 0, r: 1 }, {
+        workedHexes: [hexKey({ q: 0, r: 1 })],
+        productionQueue: [{ id: 'spearman', kind: 'unit', progress: 0, cost: 2 }],
+      }),
+    };
+    state.entities = {
+      'human-unit': makeUnit('human-unit', 'human', { q: 0, r: 0 }),
+      'ai-unit': makeUnit('ai-unit', 'ai-1', { q: 2, r: 0 }),
+    };
+    state.nextEntitySeq = 10;
+    const engine = makeEngine(state);
+
+    engine.endTurn('human');
+    const afterAiStart = engine.getState();
+    expect(afterAiStart.entities['entity-10']?.typeId).toBe('spearman');
+
+    const afterAutomation = engine.resolveAutomatedTurns(['human']);
+    const productionCommands = engine.getCommandLog().filter(
+      (command) => command.type === 'BuildBuilding' || command.type === 'RecruitUnit',
+    );
+
+    expect(afterAutomation.activePlayerId).toBe('human');
+    expect(productionCommands).toHaveLength(1);
+    expect(['BuildBuilding', 'RecruitUnit']).toContain(productionCommands[0].type);
+    expect(afterAutomation.cities['ai-city-1'].productionQueue).toHaveLength(1);
   });
 });

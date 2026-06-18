@@ -12,7 +12,7 @@
  * - Otherwise → research or expand
  */
 
-import type { PlayerId, HexCoord } from '../../core/types';
+import type { PlayerId, HexCoord, ResourceId, ResourceYield } from '../../core/types';
 import type { GameState, EntityData } from '../../core/GameState';
 import type { GameCommand, MoveUnitCommand, AttackCommand, FoundCityCommand, BuildBuildingCommand, RecruitUnitCommand, ResearchTechnologyCommand, EndTurnCommand } from '../../core/CommandQueue';
 import type { EventBus } from '../../core/EventBus';
@@ -24,6 +24,8 @@ import { getRecruitableUnits } from '../../rules/recruitmentRules';
 import { getAvailableTechs } from '../../rules/researchRules';
 import { calculateMovementCost } from '../../rules/movementRules';
 import { TERRAIN_TYPES } from '../../../data/terrain';
+import { BUILDINGS } from '../../../data/buildings';
+import { UNIT_TYPES } from '../../../data/units';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,9 +65,8 @@ export class AiSystem {
     const sorted = [...priorities].sort((a, b) => b.weight - a.weight);
 
     // Track what we've done this turn
-    let hasBuilt = false;
     let hasResearched = false;
-    let hasRecruited = false;
+    let hasPlannedProduction = false;
 
     // Process each priority
     for (const priority of sorted) {
@@ -157,57 +158,17 @@ export class AiSystem {
             }
           }
 
-          // Recruit military units in cities
-          const playerCities = Object.values(state.cities).filter(
-            (c) => c.ownerId === playerId,
-          );
-
-          for (const city of playerCities) {
-            const recruitable = getRecruitableUnits(state, city.id);
-            // Prefer military units (not settler/worker)
-            const militaryUnits = recruitable.filter(
-              (id) => id !== 'settler' && id !== 'worker' && id !== 'scout',
-            );
-            const unitToRecruit = militaryUnits[0] ?? recruitable[0];
-
-            if (unitToRecruit && !hasRecruited) {
-              const recruitCmd: RecruitUnitCommand = {
-                type: 'RecruitUnit',
-                playerId,
-                cityId: city.id,
-                unitTypeId: unitToRecruit,
-              };
-              commands.push(recruitCmd);
-              hasRecruited = true;
-              break; // Only recruit once per turn
-            }
+          if (!hasPlannedProduction) {
+            commands.push(...AiSystem.planIdleCityProduction(state, playerId, 'military'));
+            hasPlannedProduction = true;
           }
           break;
         }
 
         case 'economy': {
-          // Build income-generating buildings
-          const playerCities = Object.values(state.cities).filter(
-            (c) => c.ownerId === playerId,
-          );
-
-          for (const city of playerCities) {
-            const available = getAvailableBuildings(state, city.id);
-            // Prefer economy buildings
-            const economyBuildings = ['granary', 'market', 'bank', 'workshop', 'guild_hall'];
-            const preferred = available.find((b) => economyBuildings.includes(b));
-
-            if (preferred && !hasBuilt) {
-              const buildCmd: BuildBuildingCommand = {
-                type: 'BuildBuilding',
-                playerId,
-                cityId: city.id,
-                buildingTypeId: preferred,
-              };
-              commands.push(buildCmd);
-              hasBuilt = true;
-              break; // Only build once per turn
-            }
+          if (!hasPlannedProduction) {
+            commands.push(...AiSystem.planIdleCityProduction(state, playerId, 'economy'));
+            hasPlannedProduction = true;
           }
           break;
         }
@@ -274,6 +235,10 @@ export class AiSystem {
           break;
         }
       }
+    }
+
+    if (!hasPlannedProduction) {
+      commands.push(...AiSystem.planIdleCityProduction(state, playerId, 'balanced'));
     }
 
     // Always end turn
@@ -536,6 +501,128 @@ export class AiSystem {
     }
 
     return true;
+  }
+
+  private static planIdleCityProduction(
+    state: GameState,
+    playerId: PlayerId,
+    focus: 'military' | 'economy' | 'balanced',
+  ): Array<BuildBuildingCommand | RecruitUnitCommand> {
+    const player = state.players[playerId];
+    if (!player) return [];
+
+    const commands: Array<BuildBuildingCommand | RecruitUnitCommand> = [];
+    const budget: ResourceYield = { ...player.resources };
+    const cities = Object.values(state.cities)
+      .filter((city) => city.ownerId === playerId && city.productionQueue.length === 0)
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    const militaryCount = Object.values(state.entities).filter(
+      (entity) => entity.ownerId === playerId &&
+        entity.typeId !== 'settler' &&
+        entity.typeId !== 'worker',
+    ).length;
+
+    for (const city of cities) {
+      const shouldRecruit = focus === 'military' ||
+        (focus === 'balanced' && militaryCount + commands.filter((c) => c.type === 'RecruitUnit').length < cities.length * 2);
+
+      const firstChoice = shouldRecruit
+        ? AiSystem.pickAffordableUnit(state, city.id, budget, focus)
+        : AiSystem.pickAffordableBuilding(state, city.id, budget, focus);
+      const fallback = shouldRecruit
+        ? AiSystem.pickAffordableBuilding(state, city.id, budget, focus)
+        : AiSystem.pickAffordableUnit(state, city.id, budget, focus);
+      const choice = firstChoice ?? fallback;
+
+      if (!choice) continue;
+
+      AiSystem.deductBudget(budget, choice.cost);
+      if (choice.kind === 'unit') {
+        commands.push({
+          type: 'RecruitUnit',
+          playerId,
+          cityId: city.id,
+          unitTypeId: choice.id,
+        });
+      } else {
+        commands.push({
+          type: 'BuildBuilding',
+          playerId,
+          cityId: city.id,
+          buildingTypeId: choice.id,
+        });
+      }
+    }
+
+    return commands;
+  }
+
+  private static pickAffordableBuilding(
+    state: GameState,
+    cityId: string,
+    budget: ResourceYield,
+    focus: 'military' | 'economy' | 'balanced',
+  ): { kind: 'building'; id: string; cost: ResourceYield } | null {
+    const available = getAvailableBuildings(state, cityId);
+    const priority = focus === 'military'
+      ? ['barracks', 'watchtower', 'walls', 'granary', 'workshop', 'market']
+      : ['granary', 'workshop', 'market', 'barracks', 'watchtower', 'walls'];
+
+    for (const buildingId of priority) {
+      if (!available.includes(buildingId)) continue;
+      const building = BUILDINGS[buildingId as keyof typeof BUILDINGS];
+      if (!building || !AiSystem.canAfford(budget, building.cost as ResourceYield)) continue;
+      return { kind: 'building', id: buildingId, cost: building.cost as ResourceYield };
+    }
+
+    for (const buildingId of available) {
+      const building = BUILDINGS[buildingId as keyof typeof BUILDINGS];
+      if (!building || !AiSystem.canAfford(budget, building.cost as ResourceYield)) continue;
+      return { kind: 'building', id: buildingId, cost: building.cost as ResourceYield };
+    }
+
+    return null;
+  }
+
+  private static pickAffordableUnit(
+    state: GameState,
+    cityId: string,
+    budget: ResourceYield,
+    focus: 'military' | 'economy' | 'balanced',
+  ): { kind: 'unit'; id: string; cost: ResourceYield } | null {
+    const recruitable = getRecruitableUnits(state, cityId);
+    const priority = focus === 'economy'
+      ? ['worker', 'scout', 'spearman', 'settler']
+      : ['spearman', 'scout', 'worker', 'settler'];
+
+    for (const unitId of priority) {
+      if (!recruitable.includes(unitId)) continue;
+      const unit = UNIT_TYPES[unitId as keyof typeof UNIT_TYPES];
+      if (!unit || !AiSystem.canAfford(budget, unit.cost as ResourceYield)) continue;
+      return { kind: 'unit', id: unitId, cost: unit.cost as ResourceYield };
+    }
+
+    for (const unitId of recruitable) {
+      const unit = UNIT_TYPES[unitId as keyof typeof UNIT_TYPES];
+      if (!unit || !AiSystem.canAfford(budget, unit.cost as ResourceYield)) continue;
+      return { kind: 'unit', id: unitId, cost: unit.cost as ResourceYield };
+    }
+
+    return null;
+  }
+
+  private static canAfford(resources: ResourceYield, cost: ResourceYield): boolean {
+    for (const key of Object.keys(cost) as ResourceId[]) {
+      if ((resources[key] ?? 0) < (cost[key] ?? 0)) return false;
+    }
+    return true;
+  }
+
+  private static deductBudget(resources: ResourceYield, cost: ResourceYield): void {
+    for (const key of Object.keys(cost) as ResourceId[]) {
+      resources[key] = (resources[key] ?? 0) - (cost[key] ?? 0);
+    }
   }
 
   private static findMovementPathToward(
