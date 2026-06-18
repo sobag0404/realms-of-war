@@ -18,7 +18,7 @@
  * rules/ for the actual state transitions and emit events on the bus).
  */
 
-import type { PlayerId } from './types';
+import type { PlayerId, ResourceId } from './types';
 import type { GameConfig } from './GameConfig';
 import type { GameState } from './GameState';
 import { createInitialGameState } from './GameState';
@@ -46,6 +46,7 @@ import { CitySystem } from '../ecs/systems/CitySystem';
 import { ResearchSystem } from '../ecs/systems/ResearchSystem';
 import { TurnSystem } from '../ecs/systems/TurnSystem';
 import { AiSystem } from '../ecs/systems/AiSystem';
+import { BUILDINGS } from '../../data/buildings';
 
 // ─── Rules imports (validation only) ───────────────────────────────────────────
 
@@ -361,6 +362,27 @@ export class GameEngine {
     const available = getAvailableBuildings(this.state, command.cityId);
     if (!available.includes(command.buildingTypeId)) {
       return { valid: false, error: 'Building not available for construction' };
+    }
+    const currentBuildingProduction = city.productionQueue.find(
+      (item) => item.kind === 'building',
+    );
+    if (currentBuildingProduction) {
+      return { valid: false, error: 'City is already constructing a building' };
+    }
+    const building = BUILDINGS[command.buildingTypeId as keyof typeof BUILDINGS];
+    if (!building) {
+      return { valid: false, error: 'Unknown building type' };
+    }
+    const player = this.state.players[command.playerId];
+    if (!player) {
+      return { valid: false, error: 'Player not found' };
+    }
+    for (const key of Object.keys(building.cost) as ResourceId[]) {
+      const required = building.cost[key] ?? 0;
+      const availableAmount = player.resources[key] ?? 0;
+      if (availableAmount < required) {
+        return { valid: false, error: 'Insufficient resources' };
+      }
     }
     return { valid: true };
   }
