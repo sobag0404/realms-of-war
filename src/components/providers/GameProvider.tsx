@@ -263,7 +263,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     // ── Attack Started (separate subscription for unit killed) ──────────────
-    const unsubUnitKilled = eventBus.on('UnitKilled', (_event) => {
+    const unsubUnitKilled = eventBus.on('UnitKilled', (event) => {
+      addOptimisticEvent(event);
       const mapping = EVENT_NOTIFICATION_MAP.UnitKilled;
       if (mapping) {
         addNotification({

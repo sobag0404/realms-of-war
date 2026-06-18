@@ -41,6 +41,10 @@ export function SelectionHighlights() {
   const reachableHexes = useGameStore((s) => s.reachableHexes);
   const attackPreviewHexes = useGameStore((s) => s.attackPreviewHexes);
   const attackTargets = useGameStore((s) => s.attackTargets);
+  const combatResolutionDemo = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('combatResolutionDemo') === '1';
+  }, []);
 
   const fillGeometry = useMemo(() => createHexOverlay(0.9), []);
   const innerRingGeometry = useMemo(() => new THREE.RingGeometry(0.72, 0.86, 6), []);
@@ -51,7 +55,7 @@ export function SelectionHighlights() {
   if (!gameState) return null;
 
   // Build list of highlighted hexes
-  const highlights: Array<{ hex: HexCoord; type: 'selected' | 'hovered' | 'reachable' | 'attackable' }> = [];
+  const highlights: Array<{ hex: HexCoord; type: 'selected' | 'hovered' | 'reachable' | 'attackable' | 'resolved' }> = [];
 
   if (selectedHex) {
     highlights.push({ hex: selectedHex, type: 'selected' });
@@ -70,6 +74,9 @@ export function SelectionHighlights() {
   // Attackable entities and local preview target hexes (red overlay)
   for (const hex of attackPreviewHexes) {
     highlights.push({ hex, type: 'attackable' });
+    if (combatResolutionDemo) {
+      highlights.push({ hex, type: 'resolved' });
+    }
   }
 
   if (gameState && attackTargets.length > 0) {
@@ -122,6 +129,12 @@ export function SelectionHighlights() {
             ringOpacity = 0.92;
             yOffset = 0.15;
             break;
+          case 'resolved':
+            color = '#ff3f32';
+            fillOpacity = 0.26;
+            ringOpacity = 1;
+            yOffset = 0.24;
+            break;
           default:
             color = '#ffffff';
             fillOpacity = 0.08;
@@ -140,7 +153,7 @@ export function SelectionHighlights() {
             <mesh geometry={outerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} renderOrder={42 + i}>
               <meshBasicMaterial color={color} transparent opacity={ringOpacity} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
             </mesh>
-            {(type === 'selected' || type === 'attackable') && (
+            {(type === 'selected' || type === 'attackable' || type === 'resolved') && (
               <mesh geometry={innerRingGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]} renderOrder={43 + i}>
                 <meshBasicMaterial color={color} transparent opacity={ringOpacity * 0.7} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
               </mesh>
@@ -176,6 +189,25 @@ export function SelectionHighlights() {
                     <meshBasicMaterial color="#ffd5c8" transparent opacity={0.94} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
                   </mesh>
                 ))}
+              </group>
+            )}
+            {type === 'resolved' && (
+              <group>
+                {[Math.PI / 4, -Math.PI / 4].map((rotation) => (
+                  <mesh
+                    key={`resolution-x-${rotation}`}
+                    rotation={[-Math.PI / 2, 0, rotation]}
+                    position={[0, 0.05, 0]}
+                    renderOrder={48 + i}
+                  >
+                    <boxGeometry args={[0.86, 0.08, 0.04]} />
+                    <meshBasicMaterial color="#ffd0c7" transparent opacity={0.96} depthWrite={false} depthTest={false} />
+                  </mesh>
+                ))}
+                <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.064, 0]} renderOrder={49 + i}>
+                  <circleGeometry args={[0.16, 18]} />
+                  <meshBasicMaterial color="#fff0a8" transparent opacity={0.94} depthWrite={false} depthTest={false} />
+                </mesh>
               </group>
             )}
           </group>

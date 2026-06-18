@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
@@ -26,6 +26,8 @@ interface HitPulseData {
   hex: HexCoord;
   progress: number;
   isCritical: boolean;
+  amount?: number;
+  isDefeat?: boolean;
 }
 
 // ─── Projectile config per type ──────────────────────────────────────────────
@@ -224,11 +226,46 @@ function ProjectileMesh({ data }: { data: ProjectileData }) {
   );
 }
 
+function CombatTextSprite({ text, color, progress }: { text: string; color: string; progress: number }) {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = text.length > 4 ? '700 34px Arial' : '800 46px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = 'rgba(3, 5, 8, 0.95)';
+      ctx.fillStyle = color;
+      ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    }
+
+    const nextTexture = new THREE.CanvasTexture(canvas);
+    nextTexture.needsUpdate = true;
+    return nextTexture;
+  }, [color, text]);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+
+  const opacity = Math.max(0, 1 - progress * 0.85);
+
+  return (
+    <sprite position={[0, 0.44 + progress * 0.42, 0]} scale={[0.98, 0.36, 1]} renderOrder={82}>
+      <spriteMaterial map={texture} transparent opacity={opacity} depthWrite={false} depthTest={false} />
+    </sprite>
+  );
+}
+
 function HitPulseMesh({ data }: { data: HitPulseData }) {
   const [wx, , wz] = hexToWorld(data.hex);
-  const scale = 0.55 + data.progress * 0.7;
-  const opacity = Math.max(0, 0.76 * (1 - data.progress));
-  const color = data.isCritical ? '#fff0a8' : '#ff6a52';
+  const scale = (data.isDefeat ? 0.7 : 0.55) + data.progress * (data.isDefeat ? 0.98 : 0.7);
+  const opacity = Math.max(0, (data.isDefeat ? 0.9 : 0.76) * (1 - data.progress * 0.86));
+  const color = data.isDefeat ? '#ff3f32' : data.isCritical ? '#fff0a8' : '#ff6a52';
+  const label = data.isDefeat ? 'DEFEATED' : data.amount ? `-${data.amount}` : 'HIT';
 
   return (
     <group position={[wx, 0.74 + data.progress * 0.2, wz]}>
@@ -240,6 +277,17 @@ function HitPulseMesh({ data }: { data: HitPulseData }) {
         <ringGeometry args={[0.5, 0.6, 40]} />
         <meshBasicMaterial color={color} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
       </mesh>
+      {data.isDefeat && (
+        <group position={[0, 0.04, 0]} renderOrder={78}>
+          {[Math.PI / 4, -Math.PI / 4].map((rotation) => (
+            <mesh key={rotation} rotation={[-Math.PI / 2, 0, rotation]} position={[0, 0.03, 0]}>
+              <boxGeometry args={[0.82, 0.07, 0.03]} />
+              <meshBasicMaterial color="#ffd0c7" transparent opacity={opacity} depthWrite={false} depthTest={false} />
+            </mesh>
+          ))}
+        </group>
+      )}
+      <CombatTextSprite text={label} color={data.isDefeat ? '#ffd0c7' : color} progress={data.progress} />
     </group>
   );
 }
@@ -252,8 +300,16 @@ export function ProjectileLayer() {
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
   const [hitPulses, setHitPulses] = useState<HitPulseData[]>([]);
   const processedEventKeys = useRef<Set<string>>(new Set());
+  const demoQueuedRef = useRef(false);
   const gameState = useGameStore((s) => s.gameState);
   const optimisticEvents = useGameStore((s) => s.optimisticEvents);
+  const selectedEntityId = useGameStore((s) => s.selectedEntityId);
+  const attackPreviewHexes = useGameStore((s) => s.attackPreviewHexes);
+
+  const demoMode = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('combatResolutionDemo') === '1';
+  }, []);
 
   // Listen for attack events to spawn projectiles
   useEffect(() => {
@@ -270,6 +326,8 @@ export function ProjectileLayer() {
           defenderId: string | null;
           targetCityId: string | null;
           attackType: string;
+          attackerHex?: HexCoord;
+          targetHex?: HexCoord;
         };
 
         // Determine projectile type from attack type
@@ -284,17 +342,17 @@ export function ProjectileLayer() {
         if (payload.attackType === 'ranged' || payload.attackType === 'magic' || payload.attackType === 'siege' || payload.attackType === 'aoe') {
           // Find attacker position
           const attacker = gameState.entities[payload.attackerId];
-          if (!attacker) continue;
+          if (!attacker && !payload.attackerHex) continue;
 
-          const [sx, , sz] = hexToWorld(attacker.hex);
+          const [sx, , sz] = hexToWorld(payload.attackerHex ?? attacker!.hex);
           const startY = 0.4; // Unit height offset
 
           // Find target position
-          let targetHex = attacker.hex; // fallback
-          if (payload.defenderId) {
+          let targetHex = payload.targetHex ?? attacker?.hex ?? payload.attackerHex!; // fallback
+          if (!payload.targetHex && payload.defenderId) {
             const defender = gameState.entities[payload.defenderId];
             if (defender) targetHex = defender.hex;
-          } else if (payload.targetCityId) {
+          } else if (!payload.targetHex && payload.targetCityId) {
             const city = gameState.cities[payload.targetCityId];
             if (city) targetHex = city.hex;
           }
@@ -319,11 +377,13 @@ export function ProjectileLayer() {
       } else if (event.type === 'DamageApplied' && event.payload) {
         const payload = event.payload as {
           targetId: string;
+          amount: number;
           isCritical: boolean;
+          targetHex?: HexCoord;
         };
         const targetEntity = gameState.entities[payload.targetId];
         const targetCity = gameState.cities[payload.targetId];
-        const targetHex = targetEntity?.hex ?? targetCity?.hex;
+        const targetHex = payload.targetHex ?? targetEntity?.hex ?? targetCity?.hex;
 
         if (targetHex) {
           setHitPulses((prev) => [
@@ -333,12 +393,59 @@ export function ProjectileLayer() {
               hex: targetHex,
               progress: 0,
               isCritical: payload.isCritical,
+              amount: payload.amount,
             },
           ]);
         }
+      } else if (event.type === 'UnitKilled' && event.payload) {
+        const payload = event.payload as {
+          position: HexCoord;
+        };
+        setHitPulses((prev) => [
+          ...prev,
+          {
+            id: nextProjectileId++,
+            hex: payload.position,
+            progress: 0,
+            isCritical: true,
+            isDefeat: true,
+          },
+        ]);
       }
     }
   }, [optimisticEvents, gameState]);
+
+  useEffect(() => {
+    if (!demoMode || !gameState || !selectedEntityId || attackPreviewHexes.length === 0 || demoQueuedRef.current) return;
+
+    const selectedEntity = gameState.entities[selectedEntityId];
+    const targetHex = attackPreviewHexes[0];
+    if (!selectedEntity || !targetHex) return;
+
+    const timeout = window.setTimeout(() => {
+      if (demoQueuedRef.current) return;
+      demoQueuedRef.current = true;
+      setHitPulses((prev) => [
+        ...prev,
+        {
+          id: nextProjectileId++,
+          hex: targetHex,
+          progress: 0,
+          isCritical: true,
+          amount: Math.max(12, selectedEntity.attack * 2),
+        },
+        {
+          id: nextProjectileId++,
+          hex: targetHex,
+          progress: 0,
+          isCritical: true,
+          isDefeat: true,
+        },
+      ]);
+    }, 1600);
+
+    return () => window.clearTimeout(timeout);
+  }, [attackPreviewHexes, demoMode, gameState, selectedEntityId]);
 
   // Animate projectiles
   useFrame((_, delta) => {
@@ -363,7 +470,7 @@ export function ProjectileLayer() {
       const updated = prev
         .map((p) => ({
           ...p,
-          progress: Math.min(p.progress + delta * 1.8, 1),
+          progress: Math.min(p.progress + delta * (p.isDefeat ? 0.28 : 0.34), 1),
         }))
         .filter((p) => p.progress < 1);
       return updated.length !== prev.length || updated.some((p, i) => p.progress !== prev[i]?.progress) ? updated : prev;
