@@ -93,6 +93,24 @@ export interface GameEventMap {
     }>;
   };
 
+  StrategicObjectiveUpdated: {
+    playerId: PlayerId;
+    turn: number;
+    activeObjectiveId: string;
+    overallProgress: number;
+    pressureScore: number;
+    pressureLevel: 'low' | 'medium' | 'high';
+    objectives: Array<{
+      id: string;
+      label: string;
+      progress: number;
+      target: number;
+      completed: boolean;
+      priority: number;
+      reason: string;
+    }>;
+  };
+
   TechnologyCompleted: {
     playerId: PlayerId;
     techId: string;

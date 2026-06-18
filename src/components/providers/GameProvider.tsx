@@ -32,6 +32,7 @@ const EVENT_NOTIFICATION_MAP: Partial<
   BuildingCompleted: { type: 'success', title: 'Здание построено' },
   UnitRecruited: { type: 'success', title: 'Unit recruited' },
   AiPressureChanged: { type: 'warning', title: 'AI pressure rising' },
+  StrategicObjectiveUpdated: { type: 'info', title: 'Strategic objective' },
   UnitKilled: { type: 'warning', title: 'Юнит потерян' },
 };
 
@@ -223,6 +224,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const unsubStrategicObjective = eventBus.on('StrategicObjectiveUpdated', (event) => {
+      const mapping = EVENT_NOTIFICATION_MAP.StrategicObjectiveUpdated;
+      const objective = event.payload.objectives.find(
+        (item) => item.id === event.payload.activeObjectiveId,
+      );
+      if (mapping && objective) {
+        addNotification({
+          type: mapping.type,
+          title: mapping.title,
+          message: `${objective.label}: ${event.payload.overallProgress}% progress, ${event.payload.pressureLevel} pressure`,
+          duration: 4000,
+        });
+      }
+    });
+
     // ── Technology Completed ────────────────────────────────────────────────
     const unsubTech = eventBus.on('TechnologyCompleted', (event) => {
       const mapping = EVENT_NOTIFICATION_MAP.TechnologyCompleted;
@@ -284,6 +300,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       unsubBuilding,
       unsubUnitRecruited,
       unsubAiPressure,
+      unsubStrategicObjective,
       unsubTech,
       unsubTurn,
       unsubResources,
