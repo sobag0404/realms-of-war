@@ -68,7 +68,8 @@ function getDemoAttackPreviewHex(reachableHexes: HexCoord[], selectedHex: HexCoo
 function useBattlefieldPreviewDemo(): boolean {
   return useMemo(() => {
     if (typeof window === 'undefined') return false;
-    return new URLSearchParams(window.location.search).get('battlefieldPreviewDemo') === '1';
+    const params = new URLSearchParams(window.location.search);
+    return params.get('battlefieldPreviewDemo') === '1' || params.get('combatResolutionDemo') === '1';
   }, []);
 }
 
