@@ -11,19 +11,19 @@ artifact. Player-facing download and uninstall steps live in
 Current handoff:
 
 - Release:
-  <https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.12>
-- Commit: `aa2f6776ace49b58d854f0c1496274862582e891`
-- Main CI: <https://github.com/sobag0404/realms-of-war/actions/runs/27781536557>
+  <https://github.com/sobag0404/realms-of-war/releases/tag/v0.2.0-unsigned-playtest.13>
+- Commit: `715298c5c19b361d387d1d335516ad639329a474`
+- Main CI: <https://github.com/sobag0404/realms-of-war/actions/runs/27783481147>
 - Windows artifact workflow:
-  <https://github.com/sobag0404/realms-of-war/actions/runs/27781944714>
+  <https://github.com/sobag0404/realms-of-war/actions/runs/27783573065>
 - Local inspection path:
-  `C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\main-aa2f677-run-27781944714`
+  `C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\main-715298c-run-27783573065`
 
 Current release checksums:
 
 ```text
-7A30F6DCEA39C276BB073255E2751B7F0960A78C5A3E17EEF07A59C542F81257  realms-of-war.exe
-F1CF5E6344C989820848E340AE2E12B566F352C6F5774B1344406A85CCB2A1CA  RealmsOfWar-0.2.0-windows-x64-setup.exe
+F1406F1ECD62A59E8A62A5F8569EE8536E5A071C606249C45F38590DD9051AEE  realms-of-war.exe
+98ECA12596EAAFCF110593894A00AE8A960022B16031396BA2C59EC94D30E985  RealmsOfWar-0.2.0-windows-x64-setup.exe
 ```
 
 Use the manual GitHub Actions workflow:
@@ -63,7 +63,7 @@ bundle\nsis\Realms of War_0.2.0_x64-setup.exe
 `realms-of-war.exe` is the quickest portable smoke target. The NSIS setup file
 is the installer/uninstaller smoke target.
 
-The `v0.2.0-unsigned-playtest.12` handoff was smoke-checked locally by launching
+The `v0.2.0-unsigned-playtest.13` handoff was smoke-checked locally by launching
 the portable executable and by installing, launching, and uninstalling the NSIS
 installer from a temporary directory outside the repository.
 
