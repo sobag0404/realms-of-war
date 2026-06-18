@@ -9,7 +9,11 @@ const FLOW_TIMEOUT_MS = 60_000;
 const DEFAULT_ARTIFACT_DIR = 'C:/Users/pcia0/Documents/STR/realms-of-war-artifacts/graphics-evidence';
 const artifactDir = process.env.REALMS_GRAPHICS_EVIDENCE_DIR ?? DEFAULT_ARTIFACT_DIR;
 const externalBaseUrl = process.env.REALMS_GRAPHICS_EVIDENCE_URL;
-const scenario = process.env.REALMS_GRAPHICS_EVIDENCE_SCENARIO === 'showcase' ? 'showcase' : 'default';
+type EvidenceScenario = 'default' | 'showcase';
+const scenarioMode = process.env.REALMS_GRAPHICS_EVIDENCE_SCENARIO;
+const scenarios: EvidenceScenario[] = scenarioMode === 'both'
+  ? ['default', 'showcase']
+  : [scenarioMode === 'showcase' ? 'showcase' : 'default'];
 
 const viewports = [
   { width: 1366, height: 768 },
@@ -38,6 +42,7 @@ type Rect = {
 };
 
 type EvidenceEntry = {
+  scenario: EvidenceScenario;
   viewport: string;
   screenshot: string;
   stats: {
@@ -372,7 +377,7 @@ async function collectFrameSample(cdp: CdpClient): Promise<EvidenceEntry['frameS
   `, 20_000);
 }
 
-async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: number; height: number }): Promise<EvidenceEntry> {
+async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: number; height: number }, scenario: EvidenceScenario): Promise<EvidenceEntry> {
   await cdp.send('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
     height: viewport.height,
@@ -432,6 +437,7 @@ async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: n
   writeFileSync(screenshotPath, png);
 
   return {
+    scenario,
     viewport: `${viewport.width}x${viewport.height}`,
     screenshot: screenshotPath,
     stats,
@@ -440,7 +446,12 @@ async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: n
   };
 }
 
-async function runEvidence(baseUrl: string): Promise<EvidenceEntry[]> {
+type EvidenceRun = {
+  browserPid: number | null;
+  entries: EvidenceEntry[];
+};
+
+async function runEvidence(baseUrl: string): Promise<EvidenceRun> {
   const debugPort = await getFreePort();
   const userDataDir = join(artifactDir, `.edge-graphics-evidence-${Date.now()}`);
   mkdirSync(userDataDir, { recursive: true });
@@ -458,6 +469,7 @@ async function runEvidence(baseUrl: string): Promise<EvidenceEntry[]> {
     stdout: 'pipe',
     stderr: 'pipe',
   });
+  const browserPid = proc.pid ?? null;
 
   let cdp: CdpClient | null = null;
   try {
@@ -477,18 +489,20 @@ async function runEvidence(baseUrl: string): Promise<EvidenceEntry[]> {
     await cdp.send('Input.setIgnoreInputEvents', { ignore: false });
 
     const entries: EvidenceEntry[] = [];
-    for (const viewport of viewports) {
-      const entry = await runViewport(cdp, baseUrl, viewport);
-      entries.push(entry);
-      console.log(`${entry.viewport}: ${JSON.stringify({
-        screenshot: entry.screenshot,
-        stats: entry.stats,
-        frameSample: entry.frameSample,
-        offscreenCriticalControls: entry.layout.offscreenCriticalControls,
-        criticalOverlaps: entry.layout.criticalOverlaps,
-      })}`);
+    for (const activeScenario of scenarios) {
+      for (const viewport of viewports) {
+        const entry = await runViewport(cdp, baseUrl, viewport, activeScenario);
+        entries.push(entry);
+        console.log(`${entry.scenario} ${entry.viewport}: ${JSON.stringify({
+          screenshot: entry.screenshot,
+          stats: entry.stats,
+          frameSample: entry.frameSample,
+          offscreenCriticalControls: entry.layout.offscreenCriticalControls,
+          criticalOverlaps: entry.layout.criticalOverlaps,
+        })}`);
+      }
     }
-    return entries;
+    return { browserPid, entries };
   } finally {
     cdp?.close();
     proc.kill();
@@ -500,15 +514,18 @@ async function runEvidence(baseUrl: string): Promise<EvidenceEntry[]> {
 mkdirSync(artifactDir, { recursive: true });
 const server = externalBaseUrl ? null : await startStaticServer();
 const baseUrl = externalBaseUrl ?? `http://${HOST}:${server!.port}`;
+console.log(`Graphics evidence target: ${baseUrl} scenarios=${scenarios.join(',')} serverPort=${server?.port ?? 'external'}`);
 
 try {
-  const entries = await runEvidence(baseUrl);
+  const run = await runEvidence(baseUrl);
   const reportPath = join(artifactDir, 'graphics-evidence-report.json');
   writeFileSync(reportPath, `${JSON.stringify({
     generatedAt: new Date().toISOString(),
     baseUrl,
-    scenario,
-    entries,
+    serverPort: server?.port ?? null,
+    browserPid: run.browserPid,
+    scenarios,
+    entries: run.entries,
   }, null, 2)}\n`);
   console.log(`Graphics evidence report: ${reportPath}`);
 } finally {

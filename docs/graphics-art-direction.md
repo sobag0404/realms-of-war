@@ -349,6 +349,15 @@ Remaining reference gap after v15:
 - Generated opening maps can still be sparse in roads, forts, built improvements, and portals. The renderer now composes those fields where present, but future showcase maps should deliberately place them for art validation.
 - Ownership presentation would benefit from faction-specific architecture and banner kits once faction art direction is defined.
 
+## V19 Terrain Depth And Readability Refinement
+
+The v19 pass uses the authored showcase route as a stable camera target for terrain hierarchy checks. It keeps gameplay state untouched and tunes only renderer-side terrain depth/readability:
+
+- Terrain surface patterns carry stronger contrast so plains, forest, desert, swamp, hills, mountains, coast, and water remain distinguishable at desktop camera distance.
+- Highlands get more frequent local frost/snow-cap cues from existing mountain/hill data until durable snow biome fields exist.
+- Terrain depth faces, cast shadows, mountain/forest silhouettes, water depth, shoreline foam, coast dampness, and fog boundaries are more legible without adding per-frame tile work.
+- HUD, units, cities, resources, roads, selection, movement paths, and combat affordances remain the priority over decorative terrain.
+
 ## Originality And Reference Boundary
 
 Civilization VI may be used only as a general benchmark for production quality in the PC 4X genre: polished strategic readability, responsive feedback, cohesive terrain families, and map-scale clarity. It must not be used as a source of visual solutions.

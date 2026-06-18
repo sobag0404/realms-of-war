@@ -132,11 +132,11 @@ function buildDepthCueGroups(
 
 function buildDepthCueDefs(): Record<DepthCueKey, DepthCueDef> {
   return {
-    mountainCast: { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 18), color: '#071015', opacity: 0.24, renderOrder: 6 },
-    hillCast: { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 16), color: '#16140d', opacity: 0.18, renderOrder: 6 },
-    forestMass: { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 16), color: '#07160f', opacity: 0.2, renderOrder: 6 },
-    ruinBase: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#14100b', opacity: 0.18, renderOrder: 6 },
-    coastDrop: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#1b2b29', opacity: 0.2, renderOrder: 6 },
+    mountainCast: { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 18), color: '#061015', opacity: 0.3, renderOrder: 6 },
+    hillCast: { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 16), color: '#151209', opacity: 0.24, renderOrder: 6 },
+    forestMass: { geometry: new THREE.CylinderGeometry(0.5, 0.5, 1, 16), color: '#05140d', opacity: 0.28, renderOrder: 6 },
+    ruinBase: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#120d08', opacity: 0.24, renderOrder: 6 },
+    coastDrop: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#132a27', opacity: 0.3, renderOrder: 6 },
   };
 }
 

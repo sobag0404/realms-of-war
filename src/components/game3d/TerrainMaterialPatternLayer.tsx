@@ -205,11 +205,11 @@ function addHighlandFrostPatterns(groups: Map<PatternKey, PatternInstance[]>, ti
     const neighbor = tiles[hexKey(tile.coord.q + dir.q, tile.coord.r + dir.r)];
     return neighbor && (neighbor.terrain === 'mountain' || neighbor.terrain === 'hills') ? count + 1 : count;
   }, 0);
-  if (terrain === 'hills' && highlandNeighbors < 3) return;
+  if (terrain === 'hills' && highlandNeighbors < 2) return;
 
-  const patchCount = terrain === 'mountain' ? 2 : 1;
+  const patchCount = terrain === 'mountain' ? 3 : 2;
   for (let index = 0; index < patchCount; index++) {
-    if (terrainSurfaceHash(tile.coord.q, tile.coord.r, 300 + index) < (terrain === 'mountain' ? 0.18 : 0.42)) continue;
+    if (terrainSurfaceHash(tile.coord.q, tile.coord.r, 300 + index) < (terrain === 'mountain' ? 0.08 : 0.3)) continue;
     const a = anchor(tile, 310 + index, 0.22, 0.7);
     const s = terrain === 'mountain'
       ? 0.58 + terrainSurfaceHash(tile.coord.q, tile.coord.r, 320 + index) * 0.34
@@ -236,18 +236,18 @@ function buildPatterns(tiles: Record<string, HexTile>, knownHexes: Set<string> |
 
 function buildPatternDefs(): Record<PatternKey, PatternDef> {
   return {
-    plainsMottle: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d0c66d', opacity: 0.26 },
-    forestLeafMat: { geometry: new THREE.CylinderGeometry(0.44, 0.48, 1, 12), color: '#102b1d', opacity: 0.32 },
-    desertCrack: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#6f5730', opacity: 0.32 },
-    desertDust: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#f0cf86', opacity: 0.22 },
-    swampWetPatch: { geometry: new THREE.CylinderGeometry(0.42, 0.5, 1, 12), color: '#102f32', opacity: 0.38 },
-    hillStrata: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#c79c5b', opacity: 0.32 },
-    mountainScree: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d2d6d0', opacity: 0.28 },
-    alpineFrost: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#ecf4e8', opacity: 0.34 },
-    hillSnowTrace: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d9e8d7', opacity: 0.22 },
+    plainsMottle: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d3cb76', opacity: 0.24 },
+    forestLeafMat: { geometry: new THREE.CylinderGeometry(0.44, 0.48, 1, 12), color: '#0d2619', opacity: 0.36 },
+    desertCrack: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#644a27', opacity: 0.4 },
+    desertDust: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#f1ce82', opacity: 0.27 },
+    swampWetPatch: { geometry: new THREE.CylinderGeometry(0.42, 0.5, 1, 12), color: '#0b2b2f', opacity: 0.46 },
+    hillStrata: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#d3a762', opacity: 0.34 },
+    mountainScree: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#e0e1da', opacity: 0.36 },
+    alpineFrost: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#f2fbf1', opacity: 0.46 },
+    hillSnowTrace: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#e3f0dc', opacity: 0.32 },
     ruinCrack: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#393530', opacity: 0.3 },
-    coastDamp: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#2f5d5b', opacity: 0.3 },
-    waterSheen: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#baf7f1', opacity: 0.24 },
+    coastDamp: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#285f59', opacity: 0.38 },
+    waterSheen: { geometry: new THREE.BoxGeometry(1, 1, 1), color: '#c9fff3', opacity: 0.3 },
   };
 }
 

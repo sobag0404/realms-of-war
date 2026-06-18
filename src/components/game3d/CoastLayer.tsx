@@ -66,57 +66,57 @@ export function CoastLayer() {
   const edgeSandGeometry = useMemo(() => new THREE.BoxGeometry(0.6, 0.014, 0.12), []);
 
   const sandMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#dec88d',
+    color: '#e2c987',
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.5,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const foamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#effff7',
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.42,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const shallowsMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#64c1ad',
+    color: '#5dbda9',
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.3,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const landShoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#e0ca8d',
+    color: '#e5cb88',
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.36,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const rockyShoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#4f5f59',
     transparent: true,
-    opacity: 0.26,
+    opacity: 0.34,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const coldShoreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#d8eee8',
+    color: '#e2f7ef',
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.32,
     side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
   const edgeFoamMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#f7fff6',
     transparent: true,
-    opacity: 0.4,
+    opacity: 0.5,
     depthWrite: false,
   }), []);
   const edgeSandMaterial = useMemo(() => new THREE.MeshBasicMaterial({
     color: '#d8bd75',
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.36,
     depthWrite: false,
   }), []);
 

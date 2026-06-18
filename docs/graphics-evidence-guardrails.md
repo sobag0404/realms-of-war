@@ -84,6 +84,8 @@ bun run graphics:evidence
 
 Use generated-start evidence when validating real opening-game density, and showcase evidence when validating art direction, HUD overlap, and renderer stability against a repeatable dense strategic board.
 
+Set `REALMS_GRAPHICS_EVIDENCE_SCENARIO=both` when a graphics pass needs the generated-start and authored-showcase screenshot sets from one static server/browser evidence run.
+
 ## Reference Boundary
 
 Civilization VI and similar PC 4X screenshots are quality references only. Evidence should discuss production traits such as readability, lighting depth, terrain integration, and composition. Do not copy, trace, sample, extract, or recreate protected assets, UI, icons, palettes, silhouettes, city/district language, labels, or map dressing.

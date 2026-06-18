@@ -92,7 +92,7 @@ function buildDepthSegments(tiles: Record<string, HexTile>, knownHexes: Set<stri
       }
 
       if (delta >= 0.12 || neighbor.terrain === 'water') {
-        const faceHeight = THREE.MathUtils.clamp((neighbor.terrain === 'water' ? tileY + 0.18 : delta) * 0.42, 0.055, 0.22);
+        const faceHeight = THREE.MathUtils.clamp((neighbor.terrain === 'water' ? tileY + 0.22 : delta) * 0.52, 0.07, 0.3);
         face.push({
           position: new THREE.Vector3(edge.center.x, Math.max(tileY, 0) + 0.24 - faceHeight * 0.5, edge.center.z),
           rotationY: edge.rotationY,
@@ -197,27 +197,27 @@ export function TerrainDepthLayer() {
   }, [gameState, knownHexes]);
 
   const cliffMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#171b17',
+    color: '#10150f',
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.42,
     depthWrite: false,
   }), []);
   const faceMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#10150f',
+    color: '#0c110c',
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.3,
     depthWrite: false,
   }), []);
   const rimMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#e4d7a1',
+    color: '#f0e2ad',
     transparent: true,
-    opacity: 0.2,
+    opacity: 0.28,
     depthWrite: false,
   }), []);
   const shoreCliffMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#54402d',
+    color: '#4a3526',
     transparent: true,
-    opacity: 0.26,
+    opacity: 0.36,
     depthWrite: false,
   }), []);
 
