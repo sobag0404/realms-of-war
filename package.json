@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "bun scripts/smoke.ts",
+    "graphics:evidence": "bun scripts/graphics-evidence.ts",
     "desktop:doctor": "bun scripts/desktop-doctor.ts",
     "desktop:static:audit": "bun scripts/static-desktop-audit.ts",
     "desktop:static:build": "bun scripts/desktop-static-build.ts",
