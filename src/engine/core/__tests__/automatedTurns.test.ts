@@ -5,6 +5,7 @@ import type { CityState, GameState, EntityData, HexTile, PlayerState } from '@/e
 import type { HexCoord, PlayerId } from '@/engine/core/types';
 import { hexDistance, hexKey } from '@/engine/core/types';
 import { AiSystem } from '@/engine/ecs/systems/AiSystem';
+import { EventBus } from '@/engine/core/EventBus';
 
 function makePlayer(id: PlayerId, isAI: boolean): PlayerState {
   return {
@@ -219,6 +220,42 @@ describe('AiSystem movement generation', () => {
 });
 
 describe('AiSystem city production generation', () => {
+  it('emits an AI pressure report that explains production and economy pressure', () => {
+    const state = makeState(['human', 'ai-1'], 'ai-1', ['ai-1']);
+    state.players['ai-1'].resources = {
+      gold: 15,
+      food: 50,
+      wood: 15,
+      stone: 0,
+      iron: 0,
+      mana: 0,
+      progress: 0,
+      science: 0,
+    };
+    state.players['ai-1'].incomePerTurn = { gold: 3 };
+    state.cities = {
+      'ai-city-1': makeCity('ai-city-1', 'ai-1', { q: 0, r: 1 }),
+      'ai-city-2': makeCity('ai-city-2', 'ai-1', { q: 1, r: 1 }),
+    };
+    const eventBus = new EventBus();
+
+    AiSystem.generateTurn(state, 'ai-1', eventBus);
+    const pressureEvents = eventBus.getEventsByType('AiPressureChanged');
+
+    expect(pressureEvents).toHaveLength(1);
+    expect(pressureEvents[0].payload).toMatchObject({
+      playerId: 'ai-1',
+      cityCount: 2,
+      militaryUnitCount: 1,
+      gold: 15,
+      goldIncome: 3,
+      plannedProduction: [
+        { cityId: 'ai-city-1', kind: 'building', id: 'granary' },
+      ],
+    });
+    expect(pressureEvents[0].payload.pressureScore).toBeGreaterThan(0);
+  });
+
   it('queues affordable production for idle AI cities using a shared resource budget', () => {
     const state = makeState(['human', 'ai-1'], 'ai-1', ['ai-1']);
     state.players['ai-1'].resources = {
@@ -304,10 +341,14 @@ describe('AiSystem city production generation', () => {
     const productionCommands = engine.getCommandLog().filter(
       (command) => command.type === 'BuildBuilding' || command.type === 'RecruitUnit',
     );
+    const pressureEvents = engine.getEventBus().getEventsByType('AiPressureChanged');
 
     expect(afterAutomation.activePlayerId).toBe('human');
     expect(productionCommands).toHaveLength(1);
     expect(['BuildBuilding', 'RecruitUnit']).toContain(productionCommands[0].type);
     expect(afterAutomation.cities['ai-city-1'].productionQueue).toHaveLength(1);
+    expect(pressureEvents).toHaveLength(1);
+    expect(pressureEvents[0].payload.militaryUnitCount).toBe(2);
+    expect(pressureEvents[0].payload.plannedProduction).toHaveLength(1);
   });
 });

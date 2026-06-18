@@ -31,6 +31,7 @@ const EVENT_NOTIFICATION_MAP: Partial<
   TechnologyCompleted: { type: 'success', title: 'Исследование завершено' },
   BuildingCompleted: { type: 'success', title: 'Здание построено' },
   UnitRecruited: { type: 'success', title: 'Unit recruited' },
+  AiPressureChanged: { type: 'warning', title: 'AI pressure rising' },
   UnitKilled: { type: 'warning', title: 'Юнит потерян' },
 };
 
@@ -67,12 +68,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     // The worker manager's requestAiTurn internally falls back to
     // AiSystem.generateTurn if the worker fails or is unavailable.
     const workerManager = getWorkerManager();
-    workerManager.setEventBus(engine.getEventBus());
+    const eventBus = engine.getEventBus();
+    const pressureEventCount = eventBus.getEventsByType('AiPressureChanged').length;
+    workerManager.setEventBus(eventBus);
 
     workerManager
       .requestAiTurn(gameState, activePlayerId, 'normal')
       .then((result) => {
         const commands = result.commands as GameCommand[];
+        if (eventBus.getEventsByType('AiPressureChanged').length === pressureEventCount) {
+          eventBus.emit('AiPressureChanged', AiSystem.createPressureReport(
+            gameState,
+            activePlayerId,
+            commands,
+          ));
+        }
 
         // Dispatch each command sequentially
         // Skip EndTurn — we'll call endTurn() separately for cleaner state updates
@@ -201,6 +211,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const unsubAiPressure = eventBus.on('AiPressureChanged', (event) => {
+      const mapping = EVENT_NOTIFICATION_MAP.AiPressureChanged;
+      if (mapping) {
+        addNotification({
+          type: mapping.type,
+          title: mapping.title,
+          message: `${event.payload.primaryFocus}: ${event.payload.pressureScore} pressure, ${event.payload.plannedProduction.length} production orders`,
+          duration: 4000,
+        });
+      }
+    });
+
     // ── Technology Completed ────────────────────────────────────────────────
     const unsubTech = eventBus.on('TechnologyCompleted', (event) => {
       const mapping = EVENT_NOTIFICATION_MAP.TechnologyCompleted;
@@ -260,6 +282,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       unsubCity,
       unsubBuilding,
       unsubUnitRecruited,
+      unsubAiPressure,
       unsubTech,
       unsubTurn,
       unsubResources,

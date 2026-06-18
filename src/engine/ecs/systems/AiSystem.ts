@@ -15,7 +15,7 @@
 import type { PlayerId, HexCoord, ResourceId, ResourceYield } from '../../core/types';
 import type { GameState, EntityData } from '../../core/GameState';
 import type { GameCommand, MoveUnitCommand, AttackCommand, FoundCityCommand, BuildBuildingCommand, RecruitUnitCommand, ResearchTechnologyCommand, EndTurnCommand } from '../../core/CommandQueue';
-import type { EventBus } from '../../core/EventBus';
+import type { EventBus, GameEventMap } from '../../core/EventBus';
 import { hexKey, hexDistance, hexRing, HEX_DIRECTIONS } from '../../core/types';
 import { findPath } from '../../hex/pathfinding';
 import { canFoundCity } from '../../rules/cityRules';
@@ -53,7 +53,7 @@ export class AiSystem {
   static generateTurn(
     state: GameState,
     playerId: PlayerId,
-    _eventBus: EventBus,
+    eventBus: EventBus,
   ): GameCommand[] {
     const player = state.players[playerId];
     if (!player || !player.isAlive) return [];
@@ -241,6 +241,13 @@ export class AiSystem {
       commands.push(...AiSystem.planIdleCityProduction(state, playerId, 'balanced'));
     }
 
+    eventBus.emit('AiPressureChanged', AiSystem.createPressureReport(
+      state,
+      playerId,
+      commands,
+      sorted[0]?.type ?? 'none',
+    ));
+
     // Always end turn
     const endTurnCmd: EndTurnCommand = {
       type: 'EndTurn',
@@ -249,6 +256,61 @@ export class AiSystem {
     commands.push(endTurnCmd);
 
     return commands;
+  }
+
+  static createPressureReport(
+    state: GameState,
+    playerId: PlayerId,
+    plannedCommands: readonly GameCommand[] = [],
+    primaryFocus = AiSystem.evaluatePriorities(state, playerId)
+      .sort((a, b) => b.weight - a.weight)[0]?.type ?? 'none',
+  ): GameEventMap['AiPressureChanged'] {
+    const player = state.players[playerId];
+    const cities = Object.values(state.cities).filter((city) => city.ownerId === playerId);
+    const units = Object.values(state.entities).filter((entity) => entity.ownerId === playerId);
+    const militaryUnits = units.filter(
+      (unit) => unit.typeId !== 'settler' && unit.typeId !== 'worker',
+    );
+    const productionItems = cities.flatMap((city) => city.productionQueue);
+    const queuedUnitCount = productionItems.filter((item) => item.kind === 'unit').length;
+    const queuedBuildingCount = productionItems.filter((item) => item.kind === 'building').length;
+    const plannedProduction: GameEventMap['AiPressureChanged']['plannedProduction'] = [];
+    for (const command of plannedCommands) {
+      if (command.type === 'BuildBuilding') {
+        plannedProduction.push({ cityId: command.cityId, kind: 'building', id: command.buildingTypeId });
+      }
+      if (command.type === 'RecruitUnit') {
+        plannedProduction.push({ cityId: command.cityId, kind: 'unit', id: command.unitTypeId });
+      }
+    }
+    const nearestEnemyDistance = AiSystem.findNearestEnemyDistance(state, playerId);
+    const gold = player?.resources.gold ?? 0;
+    const goldIncome = player?.incomePerTurn.gold ?? 0;
+    const threatBonus = nearestEnemyDistance === null ? 0 : Math.max(0, 6 - nearestEnemyDistance) * 4;
+    const pressureScore = Math.min(100, Math.round(
+      cities.length * 12 +
+      militaryUnits.length * 8 +
+      queuedUnitCount * 6 +
+      queuedBuildingCount * 4 +
+      plannedProduction.length * 4 +
+      Math.max(0, goldIncome) * 3 +
+      threatBonus,
+    ));
+
+    return {
+      playerId,
+      pressureScore,
+      primaryFocus,
+      cityCount: cities.length,
+      militaryUnitCount: militaryUnits.length,
+      activeProductionCount: productionItems.length,
+      queuedUnitCount,
+      queuedBuildingCount,
+      gold,
+      goldIncome,
+      nearestEnemyDistance,
+      plannedProduction,
+    };
   }
 
   /**
@@ -623,6 +685,26 @@ export class AiSystem {
     for (const key of Object.keys(cost) as ResourceId[]) {
       resources[key] = (resources[key] ?? 0) - (cost[key] ?? 0);
     }
+  }
+
+  private static findNearestEnemyDistance(state: GameState, playerId: PlayerId): number | null {
+    const ownAnchors = [
+      ...Object.values(state.cities).filter((city) => city.ownerId === playerId).map((city) => city.hex),
+      ...Object.values(state.entities).filter((entity) => entity.ownerId === playerId).map((entity) => entity.hex),
+    ];
+    const enemyAnchors = [
+      ...Object.values(state.cities).filter((city) => city.ownerId !== playerId).map((city) => city.hex),
+      ...Object.values(state.entities).filter((entity) => entity.ownerId !== playerId).map((entity) => entity.hex),
+    ];
+    if (ownAnchors.length === 0 || enemyAnchors.length === 0) return null;
+
+    let nearest = Infinity;
+    for (const ownHex of ownAnchors) {
+      for (const enemyHex of enemyAnchors) {
+        nearest = Math.min(nearest, hexDistance(ownHex, enemyHex));
+      }
+    }
+    return nearest === Infinity ? null : nearest;
   }
 
   private static findMovementPathToward(
