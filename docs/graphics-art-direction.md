@@ -366,6 +366,7 @@ Reference work should be transformed into principles, not replicas. Build Realms
 
 Before the vertical slice graphics pass is considered ready, verify:
 
+- Future graphics PRs should also follow `docs/graphics-evidence-guardrails.md` for screenshot evidence, artifact paths, and static/instanced renderer performance guardrails.
 - At default zoom, terrain class, elevation, roads, resources, city ownership, unit presence, selected tile, reachable tiles, attackable tiles, invalid targets, and fog state are identifiable within one second.
 - The map remains readable on dense continents, mixed coastlines, mountain chains, forest-heavy regions, and city-adjacent clutter.
 - Interaction overlays are visible over plains, forest, hills, mountains, desert, swamp, snow, coast, and ocean.
