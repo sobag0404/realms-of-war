@@ -17,6 +17,8 @@ export interface SelectionSlice {
   selectedHex: HexCoord | null;
   selectedCityId: CityId | null;
   movementPath: HexCoord[];
+  reachableHexes: HexCoord[];
+  attackPreviewHexes: HexCoord[];
   attackTargets: EntityId[];
   buildOptions: BuildingTypeId[];
   recruitOptions: string[];
@@ -25,6 +27,8 @@ export interface SelectionSlice {
   selectHex: (hex: HexCoord | null) => void;
   selectCity: (id: CityId | null) => void;
   setMovementPath: (path: HexCoord[]) => void;
+  setReachableHexes: (hexes: HexCoord[]) => void;
+  setAttackPreviewHexes: (hexes: HexCoord[]) => void;
   setAttackTargets: (targets: EntityId[]) => void;
   setBuildOptions: (options: BuildingTypeId[]) => void;
   setRecruitOptions: (options: string[]) => void;
@@ -45,6 +49,8 @@ export const createSelectionSlice: StateCreator<
   selectedHex: null,
   selectedCityId: null,
   movementPath: [],
+  reachableHexes: [],
+  attackPreviewHexes: [],
   attackTargets: [],
   buildOptions: [],
   recruitOptions: [],
@@ -55,9 +61,15 @@ export const createSelectionSlice: StateCreator<
     set(
       {
         selectedEntityId: id,
+        selectedHex: null,
+        selectedCityId: null,
         // Clear derived data when entity changes
         movementPath: [],
+        reachableHexes: [],
+        attackPreviewHexes: [],
         attackTargets: [],
+        buildOptions: [],
+        recruitOptions: [],
       },
       false,
       'selection/selectEntity',
@@ -69,9 +81,11 @@ export const createSelectionSlice: StateCreator<
       {
         selectedHex: hex,
         // Clear entity-specific data when selecting a raw hex
-        selectedEntityId: hex ? undefined : null,
+        selectedEntityId: null,
         selectedCityId: null,
         movementPath: [],
+        reachableHexes: [],
+        attackPreviewHexes: [],
         attackTargets: [],
         buildOptions: [],
         recruitOptions: [],
@@ -88,6 +102,8 @@ export const createSelectionSlice: StateCreator<
         // Clear entity-specific data when selecting a city
         selectedEntityId: null,
         movementPath: [],
+        reachableHexes: [],
+        attackPreviewHexes: [],
         attackTargets: [],
       },
       false,
@@ -97,6 +113,14 @@ export const createSelectionSlice: StateCreator<
 
   setMovementPath: (path) => {
     set({ movementPath: path }, false, 'selection/setMovementPath');
+  },
+
+  setReachableHexes: (hexes) => {
+    set({ reachableHexes: hexes }, false, 'selection/setReachableHexes');
+  },
+
+  setAttackPreviewHexes: (hexes) => {
+    set({ attackPreviewHexes: hexes }, false, 'selection/setAttackPreviewHexes');
   },
 
   setAttackTargets: (targets) => {
@@ -118,6 +142,8 @@ export const createSelectionSlice: StateCreator<
         selectedHex: null,
         selectedCityId: null,
         movementPath: [],
+        reachableHexes: [],
+        attackPreviewHexes: [],
         attackTargets: [],
         buildOptions: [],
         recruitOptions: [],

@@ -356,10 +356,13 @@ function buildCompoundGroup(modelDef: ReturnType<typeof getModelDefinition>): TH
 }
 
 /** Single unit mesh */
-function UnitMesh({ entity, playerColor, isSelected }: {
+function UnitMesh({ entity, playerColor, isSelected, isAttackTarget, onSelect, onHover }: {
   entity: EntityData;
   playerColor: string;
   isSelected: boolean;
+  isAttackTarget: boolean;
+  onSelect: (entity: EntityData) => void;
+  onHover: (entityId: string | null) => void;
 }) {
   const gameState = useGameStore((s) => s.gameState);
   const [wx, , wz] = hexToWorld(entity.hex);
@@ -378,7 +381,21 @@ function UnitMesh({ entity, playerColor, isSelected }: {
   const compoundGroup = useMemo(() => buildCompoundGroup(modelDef), [modelDef]);
 
   return (
-    <group position={[wx, yOffset, wz]}>
+    <group
+      position={[wx, yOffset, wz]}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(entity);
+      }}
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        onHover(entity.id);
+      }}
+      onPointerOut={(event) => {
+        event.stopPropagation();
+        onHover(null);
+      }}
+    >
       <UnitTacticalHalo playerColor={playerColor} isSelected={isSelected} tacticalState={tacticalState} />
       <UnitBaseMarker playerColor={playerColor} isSelected={isSelected} tacticalState={tacticalState} />
       <UnitFormationMarks attackType={entity.attackType} playerColor={playerColor} tacticalState={tacticalState} />
@@ -420,6 +437,12 @@ function UnitMesh({ entity, playerColor, isSelected }: {
           <meshBasicMaterial color={playerColor} transparent opacity={0.5} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       )}
+      {isAttackTarget && (
+        <mesh rotation={[-Math.PI / 2, 0, Math.PI / 6]} position={[0, -0.218, 0]}>
+          <ringGeometry args={[0.78, 0.9, 6]} />
+          <meshBasicMaterial color="#ff5d45" transparent opacity={0.72} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+      )}
 
       {(isSelected || tacticalState.isDamaged) && (
         <HealthBar
@@ -436,6 +459,9 @@ export function UnitLayer() {
   const gameState = useGameStore((s) => s.gameState);
   const selectedEntityId = useGameStore((s) => s.selectedEntityId);
   const selectedHex = useGameStore((s) => s.selectedHex);
+  const attackTargets = useGameStore((s) => s.attackTargets);
+  const selectEntity = useGameStore((s) => s.selectEntity);
+  const setHoveredEntity = useGameStore((s) => s.setHoveredEntity);
 
   if (!gameState) return null;
 
@@ -460,6 +486,9 @@ export function UnitLayer() {
           entity={entity}
           playerColor={getPlayerColor(gameState, entity.ownerId)}
           isSelected={selectedEntityId === entity.id || isSameHex(selectedHex, entity.hex)}
+          isAttackTarget={attackTargets.includes(entity.id)}
+          onSelect={(unit) => selectEntity(unit.id)}
+          onHover={setHoveredEntity}
         />
       ))}
     </group>
