@@ -15,6 +15,7 @@ import { SelectionPanel } from './SelectionPanel';
 import { Minimap } from './Minimap';
 import { NotificationStack } from './NotificationStack';
 import { ControlsHelp } from './ControlsHelp';
+import { AdvisorPanel } from './AdvisorPanel';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,9 @@ export function GameHud() {
 
       {/* Top-right: Turn info + End Turn */}
       <TurnPanel />
+
+      {/* Right side: compact next-step advisor */}
+      <AdvisorPanel />
 
       {/* Bottom-left: Selection panel (unit/city/hex info) */}
       <SelectionPanel />

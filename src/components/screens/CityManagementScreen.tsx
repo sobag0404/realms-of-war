@@ -11,7 +11,6 @@ import { useGameStore } from '@/store/useGameStore';
 import { BUILDINGS, getBuildingById } from '@/data/buildings';
 import { UNIT_TYPES } from '@/data/units';
 import { calculateCityYield, getAvailableBuildings } from '@/engine/rules/cityRules';
-import { RESOURCES } from '@/data/resources';
 import type { ResourceId } from '@/engine/core/types';
 import type { CityState, ProductionItem } from '@/engine/core/GameState';
 import type { BuildingId } from '@/data/buildings';
@@ -169,6 +168,14 @@ export function CityManagementScreen() {
       ? '∞'
       : '';
 
+  const currentProduction = city.productionQueue[0] ?? null;
+  const currentProductionTurns =
+    currentProduction && city.productionPerTurn > 0
+      ? Math.max(1, Math.ceil((currentProduction.cost - currentProduction.progress) / city.productionPerTurn))
+      : currentProduction
+      ? '?'
+      : null;
+
   return (
     <div className="absolute top-0 right-0 bottom-0 z-50 w-full sm:w-[450px] bg-black/85 backdrop-blur-md border-l border-amber-900/30 flex flex-col">
       {/* Header */}
@@ -191,6 +198,69 @@ export function CityManagementScreen() {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-5">
+          <section>
+            <Card className="border-amber-900/40 bg-amber-950/20">
+              <CardContent className="p-3 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200/70">
+                      City brief
+                    </div>
+                    <div className="mt-1 truncate text-sm font-semibold text-white">
+                      {currentProduction ? getProductionItemName(currentProduction) : 'Choose production'}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-zinc-500">
+                      {currentProduction
+                        ? `${city.productionQueue.length} queued, ${currentProductionTurns} turn${currentProductionTurns === 1 ? '' : 's'} to finish`
+                        : 'No queue item is using this city output.'}
+                    </div>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={
+                      currentProduction
+                        ? 'border-amber-700/50 bg-amber-900/25 text-amber-200'
+                        : 'border-red-700/50 bg-red-900/25 text-red-200'
+                    }
+                  >
+                    {currentProduction ? 'Producing' : 'Idle'}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div className="rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+                    <div className="text-zinc-500">Output</div>
+                    <div className="mt-0.5 font-semibold text-amber-200 tabular-nums">
+                      {city.productionPerTurn}/turn
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+                    <div className="text-zinc-500">Food net</div>
+                    <div className={`mt-0.5 font-semibold tabular-nums ${foodSurplus < 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                      {foodSurplus >= 0 ? '+' : ''}{foodSurplus}/turn
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+                    <div className="text-zinc-500">Worked</div>
+                    <div className="mt-0.5 font-semibold text-white/80 tabular-nums">
+                      {city.workedHexes.length}/{city.territory.length}
+                    </div>
+                  </div>
+                </div>
+
+                {!currentProduction && (
+                  <Button
+                    size="sm"
+                    className="h-8 w-full bg-amber-700 text-xs font-bold text-white hover:bg-amber-600"
+                    onClick={() => setOpenPanel('recruitment')}
+                  >
+                    Queue unit
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
           {/* ── Население ─────────────────────────────────────────────── */}
           <section>
             <h3 className="text-zinc-300 text-sm font-semibold mb-2">

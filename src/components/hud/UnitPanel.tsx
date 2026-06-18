@@ -28,12 +28,30 @@ const STATUS_COLORS: Record<string, string> = {
   cursed: 'bg-purple-700/80 text-purple-100',
 };
 
+const RESOURCE_ICONS: Record<string, string> = {
+  gold: 'G',
+  food: 'F',
+  wood: 'W',
+  stone: 'S',
+  iron: 'I',
+  mana: 'M',
+  progress: 'P',
+  science: 'Sci',
+};
+
 // ─── HP Bar Color ─────────────────────────────────────────────────────────────
 
 function getHpColor(ratio: number): string {
   if (ratio > 0.6) return 'bg-emerald-500';
   if (ratio > 0.3) return 'bg-amber-500';
   return 'bg-red-500';
+}
+
+function renderUpkeepBrief(upkeep: EntityData['upkeep']): string {
+  return Object.entries(upkeep)
+    .filter(([, value]) => value !== undefined && value > 0)
+    .map(([key, value]) => `${RESOURCE_ICONS[key] ?? key} ${value}`)
+    .join('  ');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -61,6 +79,14 @@ export function UnitPanel({ entity }: UnitPanelProps) {
 
   const hpRatio = entity.maxHp > 0 ? entity.hp / entity.maxHp : 0;
   const mpRatio = entity.maxMovement > 0 ? entity.movementPoints / entity.maxMovement : 0;
+  const upkeepLine = renderUpkeepBrief(entity.upkeep);
+  const actionStatus = !isOwnedByActive
+    ? 'Foreign unit'
+    : entity.hasActed
+    ? 'Acted this turn'
+    : entity.movementPoints <= 0
+    ? 'No movement left'
+    : 'Ready for orders';
 
   // Parse status effects (format: "effectId:duration" or just "effectId")
   const statusEffects = useMemo(() => {
@@ -171,6 +197,20 @@ export function UnitPanel({ entity }: UnitPanelProps) {
           className="h-1.5 bg-white/10"
         />
       </div>
+
+      <div className="hud-chip flex items-center justify-between gap-2 px-2 py-1.5 text-[10px]">
+        <span className="font-bold uppercase tracking-[0.14em] text-white/45">Status</span>
+        <span className={!isOwnedByActive || entity.hasActed || entity.movementPoints <= 0 ? 'text-white/55' : 'text-emerald-300'}>
+          {actionStatus}
+        </span>
+      </div>
+
+      {upkeepLine && (
+        <div className="hud-chip flex items-center justify-between gap-2 px-2 py-1.5 text-[10px]">
+          <span className="font-bold uppercase tracking-[0.14em] text-white/45">Upkeep</span>
+          <span className="text-white/70">{upkeepLine}/turn</span>
+        </div>
+      )}
 
       {/* Action buttons */}
       {isOwnedByActive && (
