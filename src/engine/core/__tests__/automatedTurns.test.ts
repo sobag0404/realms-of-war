@@ -408,3 +408,63 @@ describe('Strategic objective pressure feedback', () => {
     expect((engine.getState() as Record<string, unknown>).objectiveReports).toBeUndefined();
   });
 });
+
+describe('War pressure stance feedback', () => {
+  it('escalates threatened AI stance across turns and avoids invalid diplomacy spam', () => {
+    const state = makeState(['human', 'ai-1'], 'human', ['ai-1']);
+    state.cities = {
+      'human-city': makeCity('human-city', 'human', { q: -2, r: 0 }),
+      'ai-city-1': makeCity('ai-city-1', 'ai-1', { q: 0, r: 1 }),
+    };
+    state.entities = {
+      'human-unit-1': makeUnit('human-unit-1', 'human', { q: 0, r: 0 }),
+      'human-unit-2': makeUnit('human-unit-2', 'human', { q: 1, r: 1 }),
+      'ai-unit': makeUnit('ai-unit', 'ai-1', { q: 2, r: 1 }),
+    };
+    const engine = makeEngine(state);
+
+    engine.endTurn('human');
+    const firstWarPressure = engine.getEventBus()
+      .getEventsByType('WarPressureChanged')
+      .find((event) => event.payload.playerId === 'ai-1');
+
+    expect(firstWarPressure?.payload).toMatchObject({
+      playerId: 'ai-1',
+      turn: 1,
+      stance: 'crisis',
+      recommendedFocus: 'defend',
+      threatenedCityCount: 1,
+      ownMilitaryCount: 1,
+      enemyMilitaryCount: 2,
+      primaryThreatPlayerId: 'human',
+    });
+
+    const generatedCommands = AiSystem.generateTurn(engine.getState(), 'ai-1', engine.getEventBus());
+    expect(generatedCommands.some((command) => command.type === 'ChangeDiplomacy')).toBe(false);
+    expect(generatedCommands.at(-1)).toEqual({ type: 'EndTurn', playerId: 'ai-1' });
+
+    engine.resolveAutomatedTurns(['human']);
+    engine.endTurn('human');
+
+    const aiWarPressureEvents = engine.getEventBus()
+      .getEventsByType('WarPressureChanged')
+      .filter((event) => event.payload.playerId === 'ai-1');
+    const aiPressureEvents = engine.getEventBus().getEventsByType('AiPressureChanged');
+    const productionCommands = engine.getCommandLog().filter(
+      (command) => command.type === 'BuildBuilding' || command.type === 'RecruitUnit',
+    );
+
+    expect(aiWarPressureEvents).toHaveLength(2);
+    expect(aiWarPressureEvents[1].payload.turn).toBe(2);
+    expect(aiWarPressureEvents[1].payload.stance).toBe('crisis');
+    expect(aiPressureEvents.at(-1)?.payload).toMatchObject({
+      playerId: 'ai-1',
+      primaryFocus: 'defend',
+      warStance: 'crisis',
+    });
+    expect(aiPressureEvents.at(-1)?.payload.warPressureScore).toBeGreaterThanOrEqual(70);
+    expect(productionCommands.some((command) => command.type === 'RecruitUnit')).toBe(true);
+    expect(engine.getCommandLog().some((command) => command.type === 'ChangeDiplomacy')).toBe(false);
+    expect((engine.getState() as Record<string, unknown>).warPressure).toBeUndefined();
+  });
+});

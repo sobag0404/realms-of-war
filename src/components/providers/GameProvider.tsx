@@ -218,7 +218,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         addNotification({
           type: mapping.type,
           title: mapping.title,
-          message: `${event.payload.primaryFocus}: ${event.payload.pressureScore} pressure, ${event.payload.plannedProduction.length} production orders`,
+          message: `${event.payload.primaryFocus}/${event.payload.warStance}: ${event.payload.pressureScore} pressure, ${event.payload.plannedProduction.length} production orders`,
           duration: 4000,
         });
       }

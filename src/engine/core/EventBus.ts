@@ -78,6 +78,8 @@ export interface GameEventMap {
     playerId: PlayerId;
     pressureScore: number;
     primaryFocus: string;
+    warStance: 'guarded' | 'mobilizing' | 'pressing' | 'crisis';
+    warPressureScore: number;
     cityCount: number;
     militaryUnitCount: number;
     activeProductionCount: number;
@@ -91,6 +93,19 @@ export interface GameEventMap {
       kind: 'unit' | 'building';
       id: string;
     }>;
+  };
+
+  WarPressureChanged: {
+    playerId: PlayerId;
+    turn: number;
+    stance: 'guarded' | 'mobilizing' | 'pressing' | 'crisis';
+    recommendedFocus: 'balanced' | 'military' | 'defend';
+    pressureScore: number;
+    nearestEnemyDistance: number | null;
+    threatenedCityCount: number;
+    ownMilitaryCount: number;
+    enemyMilitaryCount: number;
+    primaryThreatPlayerId: PlayerId | null;
   };
 
   StrategicObjectiveUpdated: {
