@@ -19,6 +19,7 @@ import { CitySystem } from './CitySystem';
 import { VisionSystem } from './VisionSystem';
 import { StatusEffectSystem } from './StatusEffectSystem';
 import { ObjectiveSystem } from './ObjectiveSystem';
+import { WarPressureSystem } from './WarPressureSystem';
 import { hasWon, isPlayerAlive, eliminatePlayer } from '../../rules/victoryRules';
 
 // ─── TurnSystem ────────────────────────────────────────────────────────────────
@@ -187,6 +188,10 @@ export class TurnSystem {
     const objectiveReport = ObjectiveSystem.createObjectiveReport(newState, playerId);
     if (objectiveReport) {
       eventBus.emit('StrategicObjectiveUpdated', objectiveReport);
+    }
+    const warPressureReport = WarPressureSystem.createReport(newState, playerId);
+    if (warPressureReport) {
+      eventBus.emit('WarPressureChanged', warPressureReport);
     }
 
     return newState;

@@ -23,6 +23,7 @@ import { getAvailableBuildings } from '../../rules/cityRules';
 import { getRecruitableUnits } from '../../rules/recruitmentRules';
 import { getAvailableTechs } from '../../rules/researchRules';
 import { calculateMovementCost } from '../../rules/movementRules';
+import { WarPressureSystem } from './WarPressureSystem';
 import { TERRAIN_TYPES } from '../../../data/terrain';
 import { BUILDINGS } from '../../../data/buildings';
 import { UNIT_TYPES } from '../../../data/units';
@@ -60,6 +61,7 @@ export class AiSystem {
 
     const commands: GameCommand[] = [];
     const priorities = AiSystem.evaluatePriorities(state, playerId);
+    const warPressure = WarPressureSystem.createReport(state, playerId);
 
     // Sort priorities by weight (highest first)
     const sorted = [...priorities].sort((a, b) => b.weight - a.weight);
@@ -238,7 +240,10 @@ export class AiSystem {
     }
 
     if (!hasPlannedProduction) {
-      commands.push(...AiSystem.planIdleCityProduction(state, playerId, 'balanced'));
+      const fallbackFocus = warPressure?.recommendedFocus === 'balanced'
+        ? 'balanced'
+        : 'military';
+      commands.push(...AiSystem.planIdleCityProduction(state, playerId, fallbackFocus));
     }
 
     eventBus.emit('AiPressureChanged', AiSystem.createPressureReport(
@@ -284,6 +289,7 @@ export class AiSystem {
       }
     }
     const nearestEnemyDistance = AiSystem.findNearestEnemyDistance(state, playerId);
+    const warPressure = WarPressureSystem.createReport(state, playerId);
     const gold = player?.resources.gold ?? 0;
     const goldIncome = player?.incomePerTurn.gold ?? 0;
     const threatBonus = nearestEnemyDistance === null ? 0 : Math.max(0, 6 - nearestEnemyDistance) * 4;
@@ -294,6 +300,7 @@ export class AiSystem {
       queuedBuildingCount * 4 +
       plannedProduction.length * 4 +
       Math.max(0, goldIncome) * 3 +
+      (warPressure?.pressureScore ?? 0) * 0.25 +
       threatBonus,
     ));
 
@@ -301,6 +308,8 @@ export class AiSystem {
       playerId,
       pressureScore,
       primaryFocus,
+      warStance: warPressure?.stance ?? 'guarded',
+      warPressureScore: warPressure?.pressureScore ?? 0,
       cityCount: cities.length,
       militaryUnitCount: militaryUnits.length,
       activeProductionCount: productionItems.length,
@@ -381,6 +390,25 @@ export class AiSystem {
     }
     const defendWeight = threatenedCities > 0 ? 60 + threatenedCities * 10 : 5;
     priorities.push({ type: 'defend', weight: Math.min(defendWeight, 90) });
+
+    const warPressure = WarPressureSystem.createReport(state, playerId);
+    if (warPressure) {
+      for (const priority of priorities) {
+        if (warPressure.stance === 'crisis') {
+          if (priority.type === 'defend') priority.weight += 35;
+          if (priority.type === 'military') priority.weight += 20;
+          if (priority.type === 'expand') priority.weight -= 20;
+        } else if (warPressure.stance === 'mobilizing') {
+          if (priority.type === 'military') priority.weight += 25;
+          if (priority.type === 'defend') priority.weight += 20;
+          if (priority.type === 'expand') priority.weight -= 10;
+        } else if (warPressure.stance === 'pressing') {
+          if (priority.type === 'military') priority.weight += 25;
+          if (priority.type === 'defend') priority.weight += 10;
+        }
+        priority.weight = Math.max(0, Math.min(100, priority.weight));
+      }
+    }
 
     return priorities;
   }
