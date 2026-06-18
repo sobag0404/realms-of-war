@@ -43,6 +43,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const engine = useGameStore((s) => s.engine);
   const gameState = useGameStore((s) => s.gameState);
   const activePlayerId = useGameStore((s) => s.activePlayerId);
+  const mode = useGameStore((s) => s.mode);
   const addNotification = useGameStore((s) => s.addNotification);
   const dispatchCommand = useGameStore((s) => s.dispatchCommand);
   const endTurn = useGameStore((s) => s.endTurn);
@@ -117,6 +118,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!gameState || !engine) return;
+    if (mode === 'single') return;
 
     const player = gameState.players[activePlayerId];
     if (!player || !player.isAI || !player.isAlive) return;
@@ -134,7 +136,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         aiTimeoutRef.current = null;
       }
     };
-  }, [gameState, engine, activePlayerId, executeAiTurn]);
+  }, [gameState, engine, activePlayerId, mode, executeAiTurn]);
 
   // ── EventBus Subscriptions ────────────────────────────────────────────────
 

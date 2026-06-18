@@ -465,16 +465,23 @@ export const createSessionSlice: StateCreator<
   },
 
   endTurn: () => {
-    const { engine, activePlayerId } = get();
+    const { engine, activePlayerId, localPlayerIds, mode } = get();
     if (!engine) return;
 
+    set({ isProcessingCommand: true }, false, 'session/endTurnStart');
+
     try {
-      const newState = engine.endTurn(activePlayerId);
+      let newState = engine.endTurn(activePlayerId);
+      if (mode === 'single') {
+        newState = engine.resolveAutomatedTurns(localPlayerIds);
+      }
       set(
         {
           gameState: newState,
           snapshotVersion: get().snapshotVersion + 1,
           activePlayerId: newState.activePlayerId,
+          isProcessingCommand: false,
+          lastError: null,
         },
         false,
         'session/endTurn',
@@ -483,7 +490,10 @@ export const createSessionSlice: StateCreator<
       const message =
         error instanceof Error ? error.message : 'End turn failed';
       set(
-        { lastError: { message, code: ERROR_CODES.ENGINE_ERROR } },
+        {
+          isProcessingCommand: false,
+          lastError: { message, code: ERROR_CODES.ENGINE_ERROR },
+        },
         false,
         'session/endTurnError',
       );

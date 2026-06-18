@@ -17,10 +17,13 @@ import type { GameState, EntityData } from '../../core/GameState';
 import type { GameCommand, MoveUnitCommand, AttackCommand, FoundCityCommand, BuildBuildingCommand, RecruitUnitCommand, ResearchTechnologyCommand, EndTurnCommand } from '../../core/CommandQueue';
 import type { EventBus } from '../../core/EventBus';
 import { hexKey, hexDistance, hexRing, HEX_DIRECTIONS } from '../../core/types';
+import { findPath } from '../../hex/pathfinding';
 import { canFoundCity } from '../../rules/cityRules';
 import { getAvailableBuildings } from '../../rules/cityRules';
 import { getRecruitableUnits } from '../../rules/recruitmentRules';
 import { getAvailableTechs } from '../../rules/researchRules';
+import { calculateMovementCost } from '../../rules/movementRules';
+import { TERRAIN_TYPES } from '../../../data/terrain';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -76,29 +79,31 @@ export class AiSystem {
           );
 
           for (const settler of settlerUnits) {
+            const canFoundHere = canFoundCity(state, playerId, settler.hex);
+            if (canFoundHere.canFound) {
+              const foundCmd: FoundCityCommand = {
+                type: 'FoundCity',
+                playerId,
+                hex: settler.hex,
+                name: `City ${Object.values(state.cities).filter(c => c.ownerId === playerId).length + 1}`,
+              };
+              commands.push(foundCmd);
+              continue;
+            }
+
             // Find a good location near the settler
             const bestHex = AiSystem.findBestCityLocation(state, playerId, settler.hex);
             if (bestHex) {
               // Move settler toward the location
-              if (hexDistance(settler.hex, bestHex) > 0) {
+              const path = AiSystem.findMovementPathToward(state, settler, bestHex);
+              if (path) {
                 const moveCmd: MoveUnitCommand = {
                   type: 'MoveUnit',
                   playerId,
                   entityId: settler.id,
-                  path: [settler.hex, bestHex],
+                  path,
                 };
                 commands.push(moveCmd);
-              }
-
-              // Found city if settler is at the location
-              if (hexDistance(settler.hex, bestHex) <= 1) {
-                const foundCmd: FoundCityCommand = {
-                  type: 'FoundCity',
-                  playerId,
-                  hex: bestHex,
-                  name: `City ${Object.values(state.cities).filter(c => c.ownerId === playerId).length + 1}`,
-                };
-                commands.push(foundCmd);
               }
             }
           }
@@ -139,13 +144,16 @@ export class AiSystem {
               commands.push(attackCmd);
             } else if (closestEnemy && !unit.hasMoved) {
               // Move toward enemy
-              const moveCmd: MoveUnitCommand = {
-                type: 'MoveUnit',
-                playerId,
-                entityId: unit.id,
-                path: [unit.hex, closestEnemy.hex],
-              };
-              commands.push(moveCmd);
+              const path = AiSystem.findMovementPathToward(state, unit, closestEnemy.hex, true);
+              if (path) {
+                const moveCmd: MoveUnitCommand = {
+                  type: 'MoveUnit',
+                  playerId,
+                  entityId: unit.id,
+                  path,
+                };
+                commands.push(moveCmd);
+              }
             }
           }
 
@@ -250,13 +258,16 @@ export class AiSystem {
               );
 
               for (const unit of idleUnits.slice(0, 2)) {
-                const moveCmd: MoveUnitCommand = {
-                  type: 'MoveUnit',
-                  playerId,
-                  entityId: unit.id,
-                  path: [unit.hex, city.hex],
-                };
-                commands.push(moveCmd);
+                const path = AiSystem.findMovementPathToward(state, unit, city.hex, true);
+                if (path) {
+                  const moveCmd: MoveUnitCommand = {
+                    type: 'MoveUnit',
+                    playerId,
+                    entityId: unit.id,
+                    path,
+                  };
+                  commands.push(moveCmd);
+                }
               }
             }
           }
@@ -458,9 +469,7 @@ export class AiSystem {
         // Must be walkable land
         if (tile.terrain === 'mountain' || tile.terrain === 'water') continue;
 
-        // Check if can found city here
-        const result = canFoundCity(state, playerId, hex);
-        if (!result.canFound) continue;
+        if (!AiSystem.isViableCitySite(state, playerId, hex)) continue;
 
         // Score this location
         let score = 0;
@@ -505,5 +514,78 @@ export class AiSystem {
     }
 
     return bestHex;
+  }
+
+  private static isViableCitySite(
+    state: GameState,
+    playerId: PlayerId,
+    hex: HexCoord,
+  ): boolean {
+    const tile = state.map.tiles[hexKey(hex)];
+    if (!tile) return false;
+
+    const terrain = TERRAIN_TYPES[tile.terrain];
+    if (!terrain?.walkable) return false;
+
+    const cityAtHex = Object.values(state.cities).find((city) => hexKey(city.hex) === hexKey(hex));
+    if (cityAtHex) return false;
+
+    if (tile.owningCityId) {
+      const owningCity = state.cities[tile.owningCityId];
+      if (owningCity && owningCity.ownerId !== playerId) return false;
+    }
+
+    return true;
+  }
+
+  private static findMovementPathToward(
+    state: GameState,
+    unit: EntityData,
+    targetHex: HexCoord,
+    stopAdjacent = false,
+  ): HexCoord[] | null {
+    const path = findPath(
+      unit.hex,
+      targetHex,
+      (hex) => AiSystem.canPathThroughHex(state, unit, hex, targetHex),
+      (hex) => calculateMovementCost(state, unit.hex, hex, unit.id),
+    );
+
+    if (path.length < 2) return null;
+
+    let movementCost = 0;
+    let lastReachableIndex = 0;
+    for (let i = 1; i < path.length; i++) {
+      const nextStep = path[i];
+      if (stopAdjacent && hexDistance(nextStep, targetHex) === 0) break;
+
+      const stepCost = calculateMovementCost(state, path[i - 1], nextStep, unit.id);
+      if (stepCost <= 0 || movementCost + stepCost > unit.movementPoints) break;
+
+      movementCost += stepCost;
+      lastReachableIndex = i;
+    }
+
+    if (lastReachableIndex === 0) return null;
+    return path.slice(0, lastReachableIndex + 1);
+  }
+
+  private static canPathThroughHex(
+    state: GameState,
+    unit: EntityData,
+    hex: HexCoord,
+    targetHex: HexCoord,
+  ): boolean {
+    const tile = state.map.tiles[hexKey(hex)];
+    if (!tile) return false;
+
+    const terrain = TERRAIN_TYPES[tile.terrain];
+    if (!terrain?.walkable) return false;
+
+    const occupant = Object.values(state.entities).find((e) => hexKey(e.hex) === hexKey(hex));
+    if (!occupant || occupant.id === unit.id) return true;
+    if (occupant.ownerId === unit.ownerId) return false;
+
+    return hexDistance(hex, targetHex) === 0;
   }
 }

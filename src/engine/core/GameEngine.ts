@@ -45,6 +45,7 @@ import { CombatSystem } from '../ecs/systems/CombatSystem';
 import { CitySystem } from '../ecs/systems/CitySystem';
 import { ResearchSystem } from '../ecs/systems/ResearchSystem';
 import { TurnSystem } from '../ecs/systems/TurnSystem';
+import { AiSystem } from '../ecs/systems/AiSystem';
 
 // ─── Rules imports (validation only) ───────────────────────────────────────────
 
@@ -199,6 +200,60 @@ export class GameEngine {
    */
   endTurn(playerId: PlayerId): GameState {
     return this.dispatch({ type: 'EndTurn', playerId });
+  }
+
+  /**
+   * Resolve consecutive AI turns until control returns to a local human player.
+   *
+   * AI commands are generated from a snapshot at the start of each AI turn.
+   * Commands that become invalid after earlier AI actions are skipped, while
+   * the AI still gets a forced EndTurn fallback so single-player cannot stall.
+   */
+  resolveAutomatedTurns(
+    localPlayerIds: readonly PlayerId[],
+    maxAutomatedTurns = Math.max(1, this.state.turnOrder.length * 2),
+  ): GameState {
+    const localPlayers = new Set(localPlayerIds);
+    let resolvedTurns = 0;
+
+    while (!this.state.gameOver && resolvedTurns < maxAutomatedTurns) {
+      const activePlayerId = this.state.activePlayerId;
+      const activePlayer = this.state.players[activePlayerId];
+      if (!activePlayer || !activePlayer.isAlive) break;
+      if (!activePlayer.isAI || localPlayers.has(activePlayerId)) break;
+
+      const turnOwner = activePlayerId;
+      const commands = AiSystem.generateTurn(this.state, turnOwner, this.eventBus);
+      let endedTurn = false;
+
+      for (const command of commands) {
+        if (this.state.gameOver || this.state.activePlayerId !== turnOwner) break;
+
+        const validation = this.validateCommand(command);
+        if (!validation.valid) continue;
+
+        this.state = this.applyCommand(command);
+        this.executedCommands.push(structuredClone(command));
+
+        if (command.type === 'EndTurn') {
+          endedTurn = true;
+          break;
+        }
+      }
+
+      if (!endedTurn && !this.state.gameOver && this.state.activePlayerId === turnOwner) {
+        const fallbackEndTurn: EndTurnCommand = { type: 'EndTurn', playerId: turnOwner };
+        const validation = this.validateCommand(fallbackEndTurn);
+        if (!validation.valid) break;
+
+        this.state = this.applyCommand(fallbackEndTurn);
+        this.executedCommands.push(structuredClone(fallbackEndTurn));
+      }
+
+      resolvedTurns += 1;
+    }
+
+    return this.state;
   }
 
   // ─── Private: Validation ─────────────────────────────────────────────────
