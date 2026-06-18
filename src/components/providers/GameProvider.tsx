@@ -46,6 +46,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const activePlayerId = useGameStore((s) => s.activePlayerId);
   const mode = useGameStore((s) => s.mode);
   const addNotification = useGameStore((s) => s.addNotification);
+  const addOptimisticEvent = useGameStore((s) => s.addOptimisticEvent);
   const dispatchCommand = useGameStore((s) => s.dispatchCommand);
   const endTurn = useGameStore((s) => s.endTurn);
   const unsubscribeRefs = useRef<Array<() => void>>([]);
@@ -158,8 +159,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     // ── Attack Started ──────────────────────────────────────────────────────
-    const unsubAttack = eventBus.on('AttackStarted', (_event) => {
-      // Could trigger combat animation here
+    const unsubAttack = eventBus.on('AttackStarted', (event) => {
+      addOptimisticEvent(event);
     });
 
     // ── City Founded ────────────────────────────────────────────────────────
@@ -235,8 +236,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     // ── Damage Applied ──────────────────────────────────────────────────────
-    const unsubDamage = eventBus.on('DamageApplied', (_event) => {
-      // Could trigger damage number animation here
+    const unsubDamage = eventBus.on('DamageApplied', (event) => {
+      addOptimisticEvent(event);
     });
 
     // ── Attack Started (separate subscription for unit killed) ──────────────
@@ -274,7 +275,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
       unsubscribeRefs.current = [];
     };
-  }, [engine, addNotification, gameState]);
+  }, [engine, addNotification, addOptimisticEvent, gameState]);
 
   // Cleanup AI timeout on unmount
   useEffect(() => {

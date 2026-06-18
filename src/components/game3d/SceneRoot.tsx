@@ -20,6 +20,7 @@ import { UnitLayer } from './UnitLayer';
 import { StrategicLabelLayer } from './StrategicLabelLayer';
 import { ResourceLayer } from './ResourceLayer';
 import { FogLayer } from './FogLayer';
+import { BattlefieldPreviewController } from './BattlefieldPreviewController';
 import { SelectionHighlights } from './SelectionHighlights';
 import { PathPreview } from './PathPreview';
 import { ProjectileLayer } from './ProjectileLayer';
@@ -51,6 +52,7 @@ export function SceneRoot() {
       <UnitLayer />
       <StrategicLabelLayer />
       <FogLayer />
+      <BattlefieldPreviewController />
       <SelectionHighlights />
       <PathPreview />
       <ProjectileLayer />

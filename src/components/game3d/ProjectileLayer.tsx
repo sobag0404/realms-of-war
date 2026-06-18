@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/store/useGameStore';
 import { hexToWorld } from '@/engine/hex/coordinates';
+import type { HexCoord } from '@/engine/core/types';
 
 // ─── Projectile types ────────────────────────────────────────────────────────
 
@@ -18,6 +19,13 @@ export interface ProjectileData {
   progress: number;
   speed: number;
   arcHeight: number;
+}
+
+interface HitPulseData {
+  id: number;
+  hex: HexCoord;
+  progress: number;
+  isCritical: boolean;
 }
 
 // ─── Projectile config per type ──────────────────────────────────────────────
@@ -216,12 +224,34 @@ function ProjectileMesh({ data }: { data: ProjectileData }) {
   );
 }
 
+function HitPulseMesh({ data }: { data: HitPulseData }) {
+  const [wx, , wz] = hexToWorld(data.hex);
+  const scale = 0.55 + data.progress * 0.7;
+  const opacity = Math.max(0, 0.76 * (1 - data.progress));
+  const color = data.isCritical ? '#fff0a8' : '#ff6a52';
+
+  return (
+    <group position={[wx, 0.74 + data.progress * 0.2, wz]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[scale, scale, scale]} renderOrder={72}>
+        <ringGeometry args={[0.44, 0.54, 40]} />
+        <meshBasicMaterial color="#050608" transparent opacity={opacity * 0.78} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[scale, scale, scale]} position={[0, 0.012, 0]} renderOrder={73}>
+        <ringGeometry args={[0.5, 0.6, 40]} />
+        <meshBasicMaterial color={color} transparent opacity={opacity} side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
+      </mesh>
+    </group>
+  );
+}
+
 // ─── Main ProjectileLayer component ──────────────────────────────────────────
 
 let nextProjectileId = 0;
 
 export function ProjectileLayer() {
   const [projectiles, setProjectiles] = useState<ProjectileData[]>([]);
+  const [hitPulses, setHitPulses] = useState<HitPulseData[]>([]);
+  const processedEventKeys = useRef<Set<string>>(new Set());
   const gameState = useGameStore((s) => s.gameState);
   const optimisticEvents = useGameStore((s) => s.optimisticEvents);
 
@@ -230,6 +260,10 @@ export function ProjectileLayer() {
     if (!gameState) return;
 
     for (const event of optimisticEvents) {
+      const eventKey = `${event.type}:${event.turn}:${JSON.stringify(event.payload)}`;
+      if (processedEventKeys.current.has(eventKey)) continue;
+      processedEventKeys.current.add(eventKey);
+
       if (event.type === 'AttackStarted' && event.payload) {
         const payload = event.payload as {
           attackerId: string;
@@ -282,13 +316,33 @@ export function ProjectileLayer() {
 
           setProjectiles((prev) => [...prev, projectile]);
         }
+      } else if (event.type === 'DamageApplied' && event.payload) {
+        const payload = event.payload as {
+          targetId: string;
+          isCritical: boolean;
+        };
+        const targetEntity = gameState.entities[payload.targetId];
+        const targetCity = gameState.cities[payload.targetId];
+        const targetHex = targetEntity?.hex ?? targetCity?.hex;
+
+        if (targetHex) {
+          setHitPulses((prev) => [
+            ...prev,
+            {
+              id: nextProjectileId++,
+              hex: targetHex,
+              progress: 0,
+              isCritical: payload.isCritical,
+            },
+          ]);
+        }
       }
     }
   }, [optimisticEvents, gameState]);
 
   // Animate projectiles
   useFrame((_, delta) => {
-    if (projectiles.length === 0) return;
+    if (projectiles.length === 0 && hitPulses.length === 0) return;
 
     setProjectiles((prev) => {
       const updated = prev
@@ -304,36 +358,27 @@ export function ProjectileLayer() {
       }
       return prev;
     });
+
+    setHitPulses((prev) => {
+      const updated = prev
+        .map((p) => ({
+          ...p,
+          progress: Math.min(p.progress + delta * 1.8, 1),
+        }))
+        .filter((p) => p.progress < 1);
+      return updated.length !== prev.length || updated.some((p, i) => p.progress !== prev[i]?.progress) ? updated : prev;
+    });
   });
 
-  // Spawn a projectile manually (for external use)
-  const spawnProjectile = useCallback(
-    (type: ProjectileType, startHex: { q: number; r: number }, endHex: { q: number; r: number }) => {
-      const [sx, , sz] = hexToWorld(startHex);
-      const [ex, , ez] = hexToWorld(endHex);
-      const config = PROJECTILE_CONFIGS[type];
-
-      const projectile: ProjectileData = {
-        id: nextProjectileId++,
-        type,
-        startPos: new THREE.Vector3(sx, 0.4, sz),
-        endPos: new THREE.Vector3(ex, 0.3, ez),
-        progress: 0,
-        speed: config.speed,
-        arcHeight: config.arcHeight,
-      };
-
-      setProjectiles((prev) => [...prev, projectile]);
-    },
-    [],
-  );
-
-  if (projectiles.length === 0) return null;
+  if (projectiles.length === 0 && hitPulses.length === 0) return null;
 
   return (
     <group>
       {projectiles.map((proj) => (
         <ProjectileMesh key={proj.id} data={proj} />
+      ))}
+      {hitPulses.map((pulse) => (
+        <HitPulseMesh key={pulse.id} data={pulse} />
       ))}
     </group>
   );

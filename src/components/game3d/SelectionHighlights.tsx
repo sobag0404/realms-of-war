@@ -38,7 +38,8 @@ export function SelectionHighlights() {
   const gameState = useGameStore((s) => s.gameState);
   const selectedHex = useGameStore((s) => s.selectedHex);
   const hoveredHex = useGameStore((s) => s.hoveredHex);
-  const movementPath = useGameStore((s) => s.movementPath);
+  const reachableHexes = useGameStore((s) => s.reachableHexes);
+  const attackPreviewHexes = useGameStore((s) => s.attackPreviewHexes);
   const attackTargets = useGameStore((s) => s.attackTargets);
 
   const fillGeometry = useMemo(() => createHexOverlay(0.9), []);
@@ -59,14 +60,18 @@ export function SelectionHighlights() {
     highlights.push({ hex: hoveredHex, type: 'hovered' });
   }
 
-  // Reachable hexes (movement path, blue overlay)
-  for (const hex of movementPath) {
+  // Reachable movement area (blue overlay)
+  for (const hex of reachableHexes) {
     if (!(selectedHex && hex.q === selectedHex.q && hex.r === selectedHex.r)) {
       highlights.push({ hex, type: 'reachable' });
     }
   }
 
-  // Attackable entities — resolve to hex positions (red overlay)
+  // Attackable entities and local preview target hexes (red overlay)
+  for (const hex of attackPreviewHexes) {
+    highlights.push({ hex, type: 'attackable' });
+  }
+
   if (gameState && attackTargets.length > 0) {
     for (const entityId of attackTargets) {
       const entity = gameState.entities[entityId];
