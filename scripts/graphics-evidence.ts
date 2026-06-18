@@ -9,6 +9,7 @@ const FLOW_TIMEOUT_MS = 60_000;
 const DEFAULT_ARTIFACT_DIR = 'C:/Users/pcia0/Documents/STR/realms-of-war-artifacts/graphics-evidence';
 const artifactDir = process.env.REALMS_GRAPHICS_EVIDENCE_DIR ?? DEFAULT_ARTIFACT_DIR;
 const externalBaseUrl = process.env.REALMS_GRAPHICS_EVIDENCE_URL;
+const scenario = process.env.REALMS_GRAPHICS_EVIDENCE_SCENARIO === 'showcase' ? 'showcase' : 'default';
 
 const viewports = [
   { width: 1366, height: 768 },
@@ -103,10 +104,15 @@ async function startStaticServer(): Promise<StaticServer> {
       const url = new URL(request.url);
       const decodedPath = decodeURIComponent(url.pathname);
       const pathname = decodedPath === '/' ? '/index.html' : decodedPath;
-      const filePath = join(OUT_DIR, pathname.replace(/^\/+/, ''));
-      const file = Bun.file(filePath);
+      const candidates = [
+        join(OUT_DIR, pathname.replace(/^\/+/, '')),
+        join(OUT_DIR, `${pathname.replace(/^\/+/, '')}.html`),
+        join(OUT_DIR, pathname.replace(/^\/+/, ''), 'index.html'),
+      ];
 
-      if (await file.exists()) {
+      for (const filePath of candidates) {
+        const file = Bun.file(filePath);
+        if (!await file.exists()) continue;
         return new Response(file, {
           headers: { 'content-type': contentType(filePath) },
         });
@@ -377,11 +383,16 @@ async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: n
     origin: new URL(baseUrl).origin,
     storageTypes: 'all',
   });
-  await cdp.send('Page.navigate', { url: `${baseUrl}/` });
+  const path = scenario === 'showcase' ? '/graphics-showcase' : '/';
+  await cdp.send('Page.navigate', { url: `${baseUrl}${path}` });
 
   await waitFor(cdp, `document.readyState === 'complete'`);
-  await click(cdp, 'main-menu-new-game');
-  await click(cdp, 'new-game-start');
+  if (scenario === 'default') {
+    await click(cdp, 'main-menu-new-game');
+    await click(cdp, 'new-game-start');
+  } else {
+    await waitFor(cdp, `Boolean(document.querySelector('[data-testid="graphics-showcase-route"]'))`);
+  }
   await waitFor(cdp, `Boolean(document.querySelector('canvas'))`);
   await waitFor(cdp, `Boolean(document.querySelector('[data-testid="turn-save-game"]'))`);
   await Bun.sleep(2_400);
@@ -389,8 +400,10 @@ async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: n
   const x = Math.floor(viewport.width * 0.5);
   const y = Math.floor(viewport.height * 0.52);
   await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none' });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
-  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+  if (scenario === 'default') {
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+  }
   await Bun.sleep(600);
 
   const layout = await collectLayout(cdp, viewport);
@@ -415,7 +428,7 @@ async function runViewport(cdp: CdpClient, baseUrl: string, viewport: { width: n
     throw new Error(`${viewport.width}x${viewport.height}: screenshot failed pixel check: ${JSON.stringify(stats)}`);
   }
 
-  const screenshotPath = join(artifactDir, `graphics-evidence-${viewport.width}x${viewport.height}.png`);
+  const screenshotPath = join(artifactDir, `graphics-${scenario}-evidence-${viewport.width}x${viewport.height}.png`);
   writeFileSync(screenshotPath, png);
 
   return {
@@ -494,6 +507,7 @@ try {
   writeFileSync(reportPath, `${JSON.stringify({
     generatedAt: new Date().toISOString(),
     baseUrl,
+    scenario,
     entries,
   }, null, 2)}\n`);
   console.log(`Graphics evidence report: ${reportPath}`);

@@ -63,6 +63,27 @@ The script records:
 
 The frame sample is an early warning signal, not a benchmark. Use it to spot regressions or unstable captures, then document exact hardware/browser/context before making performance claims.
 
+## Authored Showcase Scenario
+
+For stable high-density evidence, set `REALMS_GRAPHICS_EVIDENCE_SCENARIO=showcase` before running `bun run graphics:evidence`. This opens the opt-in `/graphics-showcase` route instead of clicking through a random new game.
+
+The showcase route seeds a deterministic local state from `src/engine/graphics/graphicsShowcaseState.ts`. It is not linked from gameplay and does not change rules. The scene is authored from existing serializable map fields so future graphics reviews can compare the same composition across PRs:
+
+- city ownership, settlement detail, roads, farms, mines, lumber mills, quarry work, forts, and a rift portal;
+- units, selected unit, path preview, reachable hexes, and attack affordances;
+- water/coast, river edges, forest, hills, mountain snow/frost-cap cues where the renderer exposes them, plains, desert, ruins, resources, visible fog, explored fog, and hidden map edge;
+- standard desktop HUD controls for overlap checks at `1366x768`, `1920x1080`, and `2560x1440`.
+
+Example:
+
+```powershell
+$env:REALMS_GRAPHICS_EVIDENCE_SCENARIO = 'showcase'
+$env:REALMS_GRAPHICS_EVIDENCE_DIR = 'C:\Users\pcia0\Documents\STR\realms-of-war-artifacts\graphics-v18-showcase\after'
+bun run graphics:evidence
+```
+
+Use generated-start evidence when validating real opening-game density, and showcase evidence when validating art direction, HUD overlap, and renderer stability against a repeatable dense strategic board.
+
 ## Reference Boundary
 
 Civilization VI and similar PC 4X screenshots are quality references only. Evidence should discuss production traits such as readability, lighting depth, terrain integration, and composition. Do not copy, trace, sample, extract, or recreate protected assets, UI, icons, palettes, silhouettes, city/district language, labels, or map dressing.
