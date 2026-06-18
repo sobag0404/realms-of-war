@@ -12,6 +12,7 @@ import { hexKey, hexRing } from '../core/types';
 import { TERRAIN_TYPES } from '../../data/terrain';
 import { BUILDINGS } from '../../data/buildings';
 import { nextCityId } from '../core/idGenerator';
+import { getHexYield } from './economyRules';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -290,7 +291,6 @@ export function getCityTerritory(
  * Combines:
  * - Yields from all worked hexes
  * - Building yield bonuses
- * - City center base yield
  *
  * @param state - Current game state
  * @param cityId - City to calculate yield for
@@ -305,62 +305,11 @@ export function calculateCityYield(
 
   let totalYield: ResourceYield = {};
 
-  // City center base yield
-  totalYield = addYields(totalYield, { gold: 2, food: 1 });
-
   // Yields from worked hexes
   for (const hexKey_ of city.workedHexes) {
     const [q, r] = hexKey_.split(',').map(Number);
     const hex: HexCoord = { q, r };
-    const tile = getHexTile(state, hex);
-    if (!tile) continue;
-
-    const terrainData = TERRAIN_TYPES[tile.terrain];
-    if (terrainData) {
-      totalYield = addYields(totalYield, terrainData.yields as ResourceYield);
-    }
-
-    // Resource on hex
-    if (tile.resource) {
-      const resourceBonuses: Record<string, ResourceYield> = {
-        iron_deposit: { iron: 2 },
-        gold_vein: { gold: 3 },
-        mana_crystal: { mana: 2 },
-        fertile_soil: { food: 2 },
-        ancient_ruins: { science: 2, progress: 1 },
-        oasis: { food: 1, gold: 1 },
-        fish: { food: 2 },
-        horses: { food: 1, gold: 1 },
-        timber: { wood: 2 },
-        quarry: { stone: 2 },
-        river: { gold: 1, food: 1 },
-      };
-      const bonus = resourceBonuses[tile.resource];
-      if (bonus) {
-        totalYield = addYields(totalYield, bonus);
-      }
-    }
-
-    // Improvement on hex
-    const improvementBonuses: Record<string, ResourceYield> = {
-      farm: { food: 2 },
-      mine: { stone: 1, iron: 1 },
-      lumber_mill: { wood: 2 },
-      quarry_improvement: { stone: 2 },
-      fishing: { food: 2 },
-      trading_post: { gold: 2 },
-    };
-    if (tile.improvement) {
-      const improvementYield = improvementBonuses[tile.improvement];
-      if (improvementYield) {
-        totalYield = addYields(totalYield, improvementYield);
-      }
-    }
-
-    // Tile yield override
-    if (tile.yield) {
-      totalYield = addYields(totalYield, tile.yield);
-    }
+    totalYield = addYields(totalYield, getHexYield(state, hex, city.id));
   }
 
   // Building yield bonuses

@@ -66,6 +66,11 @@ export function getHexYield(
   if (!tile) return {};
 
   let totalYield: ResourceYield = {};
+  const hasCanonicalTileYield = Object.keys(tile.yield ?? {}).length > 0;
+
+  if (hasCanonicalTileYield) {
+    return { ...tile.yield };
+  }
 
   // Base terrain yield
   const terrainData = TERRAIN_TYPES[tile.terrain];
@@ -109,11 +114,6 @@ export function getHexYield(
     if (improvementYield) {
       totalYield = addYields(totalYield, improvementYield);
     }
-  }
-
-  // Tile yield override (from improvements or special features)
-  if (tile.yield) {
-    totalYield = addYields(totalYield, tile.yield);
   }
 
   return totalYield;
@@ -162,9 +162,6 @@ export function calculateIncome(
         }
       }
     }
-
-    // City center base yield
-    totalIncome = addYields(totalIncome, { gold: 2, food: 1 });
   }
 
   // Trade route income

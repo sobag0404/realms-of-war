@@ -30,6 +30,7 @@ const EVENT_NOTIFICATION_MAP: Partial<
   CityFounded: { type: 'success', title: 'Город основан' },
   TechnologyCompleted: { type: 'success', title: 'Исследование завершено' },
   BuildingCompleted: { type: 'success', title: 'Здание построено' },
+  UnitRecruited: { type: 'success', title: 'Unit recruited' },
   UnitKilled: { type: 'warning', title: 'Юнит потерян' },
 };
 
@@ -187,6 +188,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    const unsubUnitRecruited = eventBus.on('UnitRecruited', (event) => {
+      const mapping = EVENT_NOTIFICATION_MAP.UnitRecruited;
+      if (mapping) {
+        addNotification({
+          type: mapping.type,
+          title: mapping.title,
+          message: `${event.payload.unitType} ready for orders`,
+          duration: 4000,
+        });
+      }
+    });
+
     // ── Technology Completed ────────────────────────────────────────────────
     const unsubTech = eventBus.on('TechnologyCompleted', (event) => {
       const mapping = EVENT_NOTIFICATION_MAP.TechnologyCompleted;
@@ -227,7 +240,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
 
     // ── Attack Started (separate subscription for unit killed) ──────────────
-    const unsubUnitKilled = eventBus.on('UnitKilled', (event) => {
+    const unsubUnitKilled = eventBus.on('UnitKilled', (_event) => {
       const mapping = EVENT_NOTIFICATION_MAP.UnitKilled;
       if (mapping) {
         addNotification({
@@ -245,6 +258,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       unsubAttack,
       unsubCity,
       unsubBuilding,
+      unsubUnitRecruited,
       unsubTech,
       unsubTurn,
       unsubResources,

@@ -56,6 +56,14 @@ function buyPrice(resource: ResourceId): number {
   return BUY_PRICES[resource] ?? 0;
 }
 
+function addYields(a: ResourceYield, b: ResourceYield): ResourceYield {
+  const result: ResourceYield = { ...a };
+  for (const key of Object.keys(b) as ResourceId[]) {
+    result[key] = (result[key] ?? 0) + (b[key] ?? 0);
+  }
+  return result;
+}
+
 // ─── Improvement Validation ────────────────────────────────────────────────────
 
 /** Valid improvement types. */
@@ -215,7 +223,7 @@ export function applyBuildImprovement(
   const updatedTile: HexTile = {
     ...tile,
     improvement: command.improvementType,
-    yield: { ...tile.yield, ...improvementYield },
+    yield: addYields(tile.yield, improvementYield),
     // Road also sets hasRoad flag
     hasRoad: command.improvementType === 'road' ? true : tile.hasRoad,
   };

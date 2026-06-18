@@ -65,16 +65,26 @@ export class CitySystem {
       // Apply city growth
       currentState = applyCityGrowth(currentState, city.id);
 
-      // Process production queue
-      const productionResult = processRecruitment(currentState, city.id);
-      currentState = productionResult.state;
-
-      // If a unit was completed, the recruitmentRules already added it
-      // Check for completed building production too
       const updatedCity = currentState.cities[city.id];
       if (updatedCity && updatedCity.productionQueue.length > 0) {
         const currentItem = updatedCity.productionQueue[0];
-        if (currentItem.kind === 'building') {
+        if (currentItem.kind === 'unit') {
+          const productionResult = processRecruitment(currentState, city.id);
+          currentState = productionResult.state;
+
+          if (productionResult.completed && productionResult.unitId) {
+            const recruitedUnit = currentState.entities[productionResult.unitId];
+            if (recruitedUnit) {
+              eventBus.emit('UnitRecruited', {
+                cityId: city.id,
+                entityId: recruitedUnit.id,
+                unitType: recruitedUnit.typeId,
+                ownerId: recruitedUnit.ownerId,
+                hex: recruitedUnit.hex,
+              });
+            }
+          }
+        } else if (currentItem.kind === 'building') {
           // Process building production
           const productionPerTurn = updatedCity.productionPerTurn || 1;
           const newProgress = currentItem.progress + productionPerTurn;

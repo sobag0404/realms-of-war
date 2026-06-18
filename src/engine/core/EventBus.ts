@@ -66,6 +66,14 @@ export interface GameEventMap {
     buildingType: string;
   };
 
+  UnitRecruited: {
+    cityId: CityId;
+    entityId: EntityId;
+    unitType: string;
+    ownerId: PlayerId;
+    hex: HexCoord;
+  };
+
   TechnologyCompleted: {
     playerId: PlayerId;
     techId: string;
